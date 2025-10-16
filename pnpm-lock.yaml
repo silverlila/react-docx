@@ -11,9 +11,6 @@ importers:
       docx:
         specifier: ^9.5.1
         version: 9.5.1
-      react:
-        specifier: ^18.2.0
-        version: 18.3.1
       react-reconciler:
         specifier: 0.29.0
         version: 0.29.0(react@18.3.1)
@@ -27,6 +24,9 @@ importers:
       '@types/react-reconciler':
         specifier: ^0.32.1
         version: 0.32.1(@types/react@18.3.24)
+      react:
+        specifier: ^18.2.0
+        version: 18.3.1
       tsup:
         specifier: ^8.5.0
         version: 8.5.0(tsx@4.20.5)(typescript@5.9.2)
