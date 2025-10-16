@@ -37,12 +37,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/react-docx"
+    "url": "https://github.com/silverlila/react-docx"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/react-docx/issues"
+    "url": "https://github.com/silverlila/react-docx/issues"
   },
-  "homepage": "https://github.com/yourusername/react-docx#readme",
+  "homepage": "https://github.com/silverlila/react-docx#readme",
   "author": "Silvi Lila",
   "license": "MIT",
   "peerDependencies": {
