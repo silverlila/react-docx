@@ -71,13 +71,10 @@ Every document follows this hierarchy:
 
 ```tsx
 <Document>
-  {" "}
   {/* Document-level properties and metadata */}
   <Section>
-    {" "}
     {/* Section-level properties (margins, headers, footers) */}
     <Paragraph>
-      {" "}
       {/* Paragraph-level properties (spacing, alignment) */}
       <TextRun /> {/* Text-level properties (font, size, color) */}
     </Paragraph>

@@ -11,7 +11,7 @@ import {
   ExternalHyperlink,
   PageBreak,
   renderToBuffer,
-} from "../src";
+} from "@react-docx/core";
 import fs from "node:fs";
 
 /**
