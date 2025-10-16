@@ -1,6 +1,6 @@
 {
   "name": "@react-docx/core",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A React custom renderer for generating Microsoft Word documents (.docx) using JSX",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
