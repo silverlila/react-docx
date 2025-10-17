@@ -6,6 +6,7 @@ export default defineConfig({
   dts: true,
   sourcemap: true,
   clean: true,
-  external: ["react", "react-dom", "react-reconciler", "docx"],
+  external: ["react", "docx"],
   target: "node16",
+  noExternal: [],
 });
