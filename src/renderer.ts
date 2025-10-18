@@ -2,11 +2,9 @@ import { ReactElement } from "react";
 import * as docx from "docx";
 import { DocxReconciler } from "./reconciler-v19";
 import { transformNodeToDocx } from "./transformer";
-import { DocxContainer, RenderFunction, DocumentNode } from "./types";
+import { DocxContainer, DocumentNode } from "./types";
 
-export const renderToBuffer: RenderFunction = async (
-  element: ReactElement
-): Promise<Buffer> => {
+export const renderToDocx = async (element: ReactElement) => {
   // Create a container for the reconciler
   const container: DocxContainer = { rootInstance: null };
 
@@ -45,15 +43,19 @@ export const renderToBuffer: RenderFunction = async (
     throw new Error("Failed to transform mutable tree to DOCX document");
   }
 
-  const buffer = await docx.Packer.toBuffer(docxDocument);
+  return docxDocument;
+};
+
+export const renderToBuffer = async (tree: ReactElement) => {
+  const document = await renderToDocx(tree);
+  const buffer = await docx.Packer.toBuffer(document);
   return buffer;
 };
 
-export const renderToBlob = async (element: ReactElement): Promise<Blob> => {
-  const buffer = await renderToBuffer(element);
-  return new Blob([buffer], {
-    type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  });
+export const renderToBlob = async (tree: ReactElement): Promise<Blob> => {
+  const document = await renderToDocx(tree);
+  const blob = await docx.Packer.toBlob(document);
+  return blob;
 };
 
 export const renderToBase64 = async (
