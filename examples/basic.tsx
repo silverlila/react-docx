@@ -22,8 +22,8 @@ const BasicExample = () => (
   <Document>
     <Section>
       {/* Title */}
-      <Paragraph spacing={{ after: 200 }}>
-        <TextRun text="Welcome to React-DOCX" bold={true} size={32} />
+      <Paragraph spacing={{ after: 500 }}>
+        <TextRun text="Welcome to React-DOCX" bold={true} size={50} />
       </Paragraph>
 
       {/* Introduction */}
@@ -89,6 +89,8 @@ const BasicExample = () => (
     </Section>
   </Document>
 );
+
+export default BasicExample;
 
 async function generateBasicExample() {
   try {

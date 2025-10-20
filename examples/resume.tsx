@@ -62,57 +62,9 @@ const ResumeExample = () => (
         />
       </Paragraph>
 
-      {/* Professional Summary */}
-      <Paragraph
-        spacing={{ after: 100, before: 500 }}
-        border={{ bottom: { style: "single", size: 20, color: "2B6CB0" } }}
-      >
-        <TextRun text="PROFESSIONAL SUMMARY" bold={true} size={28} />
-      </Paragraph>
+      <ProfessionalSummary />
 
-      <Paragraph spacing={{ after: 300 }}>
-        <TextRun
-          text="Results-driven Software Engineer with 8+ years of experience building scalable web applications and leading development teams. Expertise in React, TypeScript, and Node.js with a proven track record of delivering high-quality software solutions. Passionate about creating intuitive user experiences and mentoring junior developers."
-          size={22}
-        />
-      </Paragraph>
-
-      {/* Technical Skills */}
-      <Paragraph
-        spacing={{ after: 100, before: 500 }}
-        border={{ bottom: { style: "single", size: 20, color: "2B6CB0" } }}
-      >
-        <TextRun text="TECHNICAL SKILLS" bold={true} size={28} />
-      </Paragraph>
-
-      <Paragraph spacing={{ after: 100 }}>
-        <TextRun text="Languages: " bold={true} size={22} />
-        <TextRun text="JavaScript, TypeScript, Python, Go" size={22} />
-      </Paragraph>
-
-      <Paragraph spacing={{ after: 100 }}>
-        <TextRun text="Frontend: " bold={true} size={22} />
-        <TextRun
-          text="React, Next.js, Vue.js, HTML5, CSS3, Tailwind CSS"
-          size={22}
-        />
-      </Paragraph>
-
-      <Paragraph spacing={{ after: 100 }}>
-        <TextRun text="Backend: " bold={true} size={22} />
-        <TextRun
-          text="Node.js, Express, FastAPI, PostgreSQL, MongoDB, Redis"
-          size={22}
-        />
-      </Paragraph>
-
-      <Paragraph spacing={{ after: 300 }}>
-        <TextRun text="Tools: " bold={true} size={22} />
-        <TextRun
-          text="Git, Docker, Kubernetes, AWS, CI/CD, Jest, Playwright"
-          size={22}
-        />
-      </Paragraph>
+      <TechnicalSkills />
 
       {/* Professional Experience */}
       <Paragraph
@@ -228,6 +180,67 @@ const ResumeExample = () => (
   </Document>
 );
 
+function ProfessionalSummary() {
+  return (
+    <>
+      <Paragraph
+        spacing={{ after: 100, before: 500 }}
+        border={{ bottom: { style: "single", size: 20, color: "2B6CB0" } }}
+      >
+        <TextRun text="PROFESSIONAL SUMMARY" bold={true} size={28} />
+      </Paragraph>
+      <Paragraph spacing={{ after: 300 }}>
+        <TextRun
+          text="Results-driven Software Engineer with 8+ years of experience building scalable web applications and leading development teams. Expertise in React, TypeScript, and Node.js with a proven track record of delivering high-quality software solutions. Passionate about creating intuitive user experiences and mentoring junior developers."
+          size={22}
+        />
+      </Paragraph>
+    </>
+  );
+}
+
+function TechnicalSkills() {
+  return (
+    <>
+      <Paragraph
+        spacing={{ after: 100, before: 500 }}
+        border={{ bottom: { style: "single", size: 20, color: "2B6CB0" } }}
+      >
+        <TextRun text="TECHNICAL SKILLS" bold={true} size={28} />
+      </Paragraph>
+
+      <Paragraph spacing={{ after: 100 }}>
+        <TextRun text="Languages: " bold={true} size={22} />
+        <TextRun text="JavaScript, TypeScript, Python, Go" size={22} />
+      </Paragraph>
+
+      <Paragraph spacing={{ after: 100 }}>
+        <TextRun text="Frontend: " bold={true} size={22} />
+        <TextRun
+          text="React, Next.js, Vue.js, HTML5, CSS3, Tailwind CSS"
+          size={22}
+        />
+      </Paragraph>
+
+      <Paragraph spacing={{ after: 100 }}>
+        <TextRun text="Backend: " bold={true} size={22} />
+        <TextRun
+          text="Node.js, Express, FastAPI, PostgreSQL, MongoDB, Redis"
+          size={22}
+        />
+      </Paragraph>
+
+      <Paragraph spacing={{ after: 300 }}>
+        <TextRun text="Tools: " bold={true} size={22} />
+        <TextRun
+          text="Git, Docker, Kubernetes, AWS, CI/CD, Jest, Playwright"
+          size={22}
+        />
+      </Paragraph>
+    </>
+  );
+}
+export default ResumeExample;
 async function generateResumeExample() {
   try {
     console.log("Generating resume example...\n");

@@ -1,79 +1,23 @@
 import { ReactElement, ReactNode } from "react";
 import * as docx from "docx";
-
-export abstract class MutableNode {
-  abstract nodeType: string;
-  children: MutableNode[] = [];
-  props: any = {};
-
-  constructor(props: any = {}) {
-    this.props = props;
-  }
-}
-
-export class DocumentNode extends MutableNode {
-  nodeType = "Document" as const;
-}
-
-export class SectionNode extends MutableNode {
-  nodeType = "Section" as const;
-}
-
-export class ParagraphNode extends MutableNode {
-  nodeType = "Paragraph" as const;
-}
-
-export class TextRunNode extends MutableNode {
-  nodeType = "TextRun" as const;
-}
-
-export class TableNode extends MutableNode {
-  nodeType = "Table" as const;
-}
-
-export class TableRowNode extends MutableNode {
-  nodeType = "TableRow" as const;
-}
-
-export class TableCellNode extends MutableNode {
-  nodeType = "TableCell" as const;
-}
-
-export class TabNode extends MutableNode {
-  nodeType = "Tab" as const;
-}
-
-export class ImageRunNode extends MutableNode {
-  nodeType = "ImageRun" as const;
-}
-
-export class ExternalHyperlinkNode extends MutableNode {
-  nodeType = "ExternalHyperlink" as const;
-}
-
-export class InternalHyperlinkNode extends MutableNode {
-  nodeType = "InternalHyperlink" as const;
-}
-
-export class PageBreakNode extends MutableNode {
-  nodeType = "PageBreak" as const;
-}
-
-export class BookmarkNode extends MutableNode {
-  nodeType = "Bookmark" as const;
-}
-
-export class SymbolRunNode extends MutableNode {
-  nodeType = "SymbolRun" as const;
-}
-
-export class MathNode extends MutableNode {
-  nodeType = "Math" as const;
-}
-
-export class BreakNode extends MutableNode {
-  nodeType = "Break" as const;
-}
+import {
+  DocumentNode,
+  SectionNode,
+  ParagraphNode,
+  TextRunNode,
+  TableNode,
+  TableRowNode,
+  TableCellNode,
+  TabNode,
+  ImageRunNode,
+  ExternalHyperlinkNode,
+  InternalHyperlinkNode,
+  PageBreakNode,
+  BookmarkNode,
+  SymbolRunNode,
+  MathNode,
+  BreakNode,
+} from "./nodes";
 
 export type MutableTreeNode =
   | DocumentNode
@@ -113,12 +57,12 @@ export type ElementType =
 
 export type DocxInstance = MutableTreeNode;
 
-// ============================================
-// COMPONENT PROP TYPES
-// ============================================
-
 type NotReadonly<T> = {
-  -readonly [K in keyof T]: T[K] extends object ? NotReadonly<T[K]> : T[K];
+  -readonly [K in keyof T]: T[K] extends object
+    ? T[K] extends any[]
+      ? T[K]
+      : NotReadonly<T[K]>
+    : T[K];
 };
 
 export interface DocumentProps
@@ -136,8 +80,9 @@ export interface ParagraphProps
   children?: ReactNode;
 }
 
-export interface TextRunProps extends NotReadonly<docx.IRunOptions> {
-  children?: never;
+export interface TextRunProps
+  extends NotReadonly<Omit<docx.IRunOptions, "children">> {
+  children?: ReactNode;
 }
 
 export interface TableProps

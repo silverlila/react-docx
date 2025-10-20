@@ -1,0 +1,74 @@
+{
+  "name": "vscode-react-docx-preview",
+  "displayName": "React-DOCX Preview",
+  "description": "Live preview for React-DOCX documents",
+  "version": "0.1.0",
+  "publisher": "silvilila",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Formatters",
+    "Other"
+  ],
+  "keywords": [
+    "react",
+    "docx",
+    "word",
+    "preview",
+    "document"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./src/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "react-docx.preview",
+        "title": "React-DOCX: Open Preview",
+        "icon": "$(open-preview)"
+      },
+      {
+        "command": "react-docx.exportDocx",
+        "title": "React-DOCX: Export to DOCX",
+        "icon": "$(save)"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "when": "resourceLangId == typescriptreact || resourceLangId == javascriptreact",
+          "command": "react-docx.preview",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "react-docx.preview"
+        },
+        {
+          "command": "react-docx.exportDocx"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "test": "echo \"Tests coming soon\""
+  },
+  "dependencies": {
+    "@babel/core": "^7.28.4",
+    "@babel/plugin-transform-modules-commonjs": "^7.27.1",
+    "@babel/preset-react": "^7.27.1",
+    "@babel/preset-typescript": "^7.27.1",
+    "@babel/register": "^7.28.3",
+    "@react-docx/core": "workspace:*",
+    "docx": "^9.5.1",
+    "mammoth": "^1.8.0",
+    "pdf-lib": "^1.17.1",
+    "react": "^18.2.0",
+    "docx-preview": "^0.3.5"
+  },
+  "author": "Silvi Lila",
+  "license": "MIT"
+}

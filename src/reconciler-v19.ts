@@ -1,8 +1,6 @@
 import Reconciler from "react-reconciler";
+import { ElementType, DocxInstance, DocxContainer } from "./types";
 import {
-  ElementType,
-  DocxInstance,
-  DocxContainer,
   DocumentNode,
   SectionNode,
   ParagraphNode,
@@ -20,7 +18,7 @@ import {
   MathNode,
   BreakNode,
   MutableNode,
-} from "./types";
+} from "./nodes";
 
 // Create mutable tree nodes based on element type
 function createMutableNode(type: ElementType, props: any): DocxInstance {

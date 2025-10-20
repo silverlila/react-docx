@@ -17,7 +17,7 @@ import {
   SymbolRunNode,
   MathNode,
   BreakNode,
-} from "./types";
+} from "../nodes";
 
 /**
  * Transforms a mutable tree node into its corresponding DOCX object
@@ -92,13 +92,20 @@ function transformParagraph(node: ParagraphNode): docx.Paragraph {
   const children = node.children.map((child) => transformNodeToDocx(child));
 
   return new docx.Paragraph({
-    children: children,
     ...node.props,
+    children: children,
   });
 }
 
 function transformTextRun(node: TextRunNode): docx.TextRun {
-  // TextRun doesn't have children, just props
+  // TextRun can have children (e.g., Tab, Break, etc.)
+  if (node.children.length > 0) {
+    const children = node.children.map((child) => transformNodeToDocx(child));
+    return new docx.TextRun({
+      ...node.props,
+      children: children,
+    });
+  }
   return new docx.TextRun(node.props);
 }
 
@@ -107,8 +114,8 @@ function transformTable(node: TableNode): docx.Table {
   const rows = node.children.map((child) => transformNodeToDocx(child));
 
   return new docx.Table({
-    rows: rows,
     ...node.props,
+    rows: rows,
   });
 }
 
@@ -117,8 +124,8 @@ function transformTableRow(node: TableRowNode): docx.TableRow {
   const children = node.children.map((child) => transformNodeToDocx(child));
 
   return new docx.TableRow({
-    children: children,
     ...node.props,
+    children: children,
   });
 }
 
@@ -127,13 +134,13 @@ function transformTableCell(node: TableCellNode): docx.TableCell {
   const children = node.children.map((child) => transformNodeToDocx(child));
 
   return new docx.TableCell({
-    children: children,
     ...node.props,
+    children: children,
   });
 }
 
 function transformTab(node: TabNode): docx.Tab {
-  return new docx.Tab();
+  return new docx.TextRun({ text: "", children: [new docx.Tab()] });
 }
 
 function transformImageRun(node: ImageRunNode): docx.ImageRun {

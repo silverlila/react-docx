@@ -1,8 +1,9 @@
 import { ReactElement } from "react";
 import * as docx from "docx";
 import { DocxReconciler } from "./reconciler-v19";
-import { transformNodeToDocx } from "./transformer";
-import { DocxContainer, DocumentNode } from "./types";
+import { transformNodeToDocx } from "./transformers/docx-transformer";
+import { DocxContainer } from "./types";
+import { DocumentNode } from "./nodes";
 
 export const renderToDocx = async (element: ReactElement) => {
   // Create a container for the reconciler
