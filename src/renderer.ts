@@ -3,32 +3,54 @@ import * as docx from "docx";
 import { DocxReconciler } from "./reconciler-v19";
 import { transformNodeToDocx } from "./transformers/docx-transformer";
 import { DocxContainer } from "./types";
-import { DocumentNode } from "./nodes";
+import { DocumentNode, ListNode, MutableNode } from "./nodes";
+import { DEFAULT_NUMBERING } from "./constants";
+
+function containsList(node: MutableNode): boolean {
+  if (node instanceof ListNode) return true;
+  for (const child of node.children) {
+    if (containsList(child)) return true;
+  }
+  return false;
+}
+
+function ensureNumberingConfig(documentNode: DocumentNode): void {
+  if (!containsList(documentNode)) return;
+
+  const existing = documentNode.props.numbering;
+  const existingConfigs: Array<{ reference: string }> = existing?.config ?? [];
+  const existingRefs = new Set(existingConfigs.map((c) => c.reference));
+
+  const defaults = DEFAULT_NUMBERING.config.filter(
+    (c) => !existingRefs.has(c.reference)
+  );
+  if (defaults.length === 0) return;
+
+  documentNode.props = {
+    ...documentNode.props,
+    numbering: {
+      ...(existing ?? {}),
+      config: [...existingConfigs, ...defaults],
+    },
+  };
+}
 
 export const renderToDocx = async (element: ReactElement) => {
-  // Create a container for the reconciler
   const container: DocxContainer = { rootInstance: null };
 
-  // Create a fiber root
   const fiberRoot = DocxReconciler.createContainer(
     container,
-    0, // tag
-    null, // hydrationCallbacks
-    false, // isStrictMode
-    null, // concurrentUpdatesByDefaultOverride
-    "", // identifierPrefix
-    () => {}, // onRecoverableError
-    null // transitionCallbacks
+    0,
+    null,
+    false,
+    null,
+    "",
+    () => {},
+    null
   );
 
-  DocxReconciler.updateContainer(
-    element,
-    fiberRoot,
-    null, // parentComponent
-    () => {} // onComplete callback
-  );
+  DocxReconciler.updateContainer(element, fiberRoot, null, () => {});
 
-  // Extract the mutable document tree from our container
   const documentNode = container.rootInstance;
 
   if (!documentNode || !(documentNode instanceof DocumentNode)) {
@@ -37,7 +59,8 @@ export const renderToDocx = async (element: ReactElement) => {
     );
   }
 
-  // Transform the mutable tree to DOCX objects
+  ensureNumberingConfig(documentNode);
+
   const docxDocument = transformNodeToDocx(documentNode);
 
   if (!docxDocument || !(docxDocument instanceof docx.Document)) {

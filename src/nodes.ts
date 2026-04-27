@@ -71,3 +71,11 @@ export class MathNode extends MutableNode {
 export class BreakNode extends MutableNode {
   nodeType = "Break" as const;
 }
+
+export class ListNode extends MutableNode {
+  nodeType = "List" as const;
+}
+
+export class ListItemNode extends MutableNode {
+  nodeType = "ListItem" as const;
+}

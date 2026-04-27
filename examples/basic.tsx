@@ -6,7 +6,10 @@ import {
   TextRun,
   Break,
   renderToBuffer,
-} from "@react-docx/core";
+  List,
+  ListItem,
+  DEFAULT_NUMBERING,
+} from "../src/index";
 import fs from "node:fs";
 
 /**
@@ -19,7 +22,7 @@ import fs from "node:fs";
  * - Applying text formatting (bold, italic, color, size)
  */
 const BasicExample = () => (
-  <Document>
+  <Document numbering={DEFAULT_NUMBERING as any}>
     <Section>
       {/* Title */}
       <Paragraph spacing={{ after: 500 }}>
@@ -86,6 +89,13 @@ const BasicExample = () => (
           italics={true}
         />
       </Paragraph>
+      <Paragraph text="another test"></Paragraph>
+
+      <List type="bullet">
+        <ListItem text="hellow" />
+        <ListItem text="hellow" />
+        <ListItem text="hellow" />
+      </List>
     </Section>
   </Document>
 );

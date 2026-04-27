@@ -17,6 +17,8 @@ import {
   SymbolRunNode,
   MathNode,
   BreakNode,
+  ListNode,
+  ListItemNode,
 } from "../nodes";
 
 /**
@@ -55,13 +57,20 @@ export function transformNodeToDocx(node: MutableNode): any {
     return transformMath(node);
   } else if (node instanceof BreakNode) {
     return transformBreak(node);
+  } else if (node instanceof ListNode) {
+    return transformList(node);
+  } else if (node instanceof ListItemNode) {
+    return transformListItem(node);
   }
 
   throw new Error(`Unknown node type: ${node.nodeType}`);
 }
 
+function flattenChildren(nodes: any[]): any[] {
+  return nodes.flatMap((n) => (Array.isArray(n) ? n : [n]));
+}
+
 function transformDocument(node: DocumentNode): docx.Document {
-  // Transform all children (should be Section nodes)
   const sections = node.children.map((child) => {
     if (child instanceof SectionNode) {
       return transformSection(child);
@@ -70,7 +79,6 @@ function transformDocument(node: DocumentNode): docx.Document {
       `Document children must be Section nodes, got: ${child.nodeType}`
     );
   });
-
   return new docx.Document({
     ...node.props,
     sections: sections,
@@ -78,17 +86,16 @@ function transformDocument(node: DocumentNode): docx.Document {
 }
 
 function transformSection(node: SectionNode): docx.ISectionOptions {
-  // Transform all children (should be paragraphs, tables, etc.)
-  const children = node.children.map((child) => transformNodeToDocx(child));
+  const children = flattenChildren(
+    node.children.map((child) => transformNodeToDocx(child))
+  );
 
   return {
     ...node.props,
-    children: children,
+    children,
   };
 }
-
 function transformParagraph(node: ParagraphNode): docx.Paragraph {
-  // Transform all children (should be TextRuns)
   const children = node.children.map((child) => transformNodeToDocx(child));
 
   return new docx.Paragraph({
@@ -98,7 +105,6 @@ function transformParagraph(node: ParagraphNode): docx.Paragraph {
 }
 
 function transformTextRun(node: TextRunNode): docx.TextRun {
-  // TextRun can have children (e.g., Tab, Break, etc.)
   if (node.children.length > 0) {
     const children = node.children.map((child) => transformNodeToDocx(child));
     return new docx.TextRun({
@@ -110,7 +116,6 @@ function transformTextRun(node: TextRunNode): docx.TextRun {
 }
 
 function transformTable(node: TableNode): docx.Table {
-  // Transform all children (should be TableRows)
   const rows = node.children.map((child) => transformNodeToDocx(child));
 
   return new docx.Table({
@@ -120,7 +125,6 @@ function transformTable(node: TableNode): docx.Table {
 }
 
 function transformTableRow(node: TableRowNode): docx.TableRow {
-  // Transform all children (should be TableCells)
   const children = node.children.map((child) => transformNodeToDocx(child));
 
   return new docx.TableRow({
@@ -130,8 +134,9 @@ function transformTableRow(node: TableRowNode): docx.TableRow {
 }
 
 function transformTableCell(node: TableCellNode): docx.TableCell {
-  // Transform all children (should be Paragraphs)
-  const children = node.children.map((child) => transformNodeToDocx(child));
+  const children = flattenChildren(
+    node.children.map((child) => transformNodeToDocx(child))
+  );
 
   return new docx.TableCell({
     ...node.props,
@@ -150,7 +155,6 @@ function transformImageRun(node: ImageRunNode): docx.ImageRun {
 function transformExternalHyperlink(
   node: ExternalHyperlinkNode
 ): docx.ExternalHyperlink {
-  // Transform children (should be TextRuns or other inline elements)
   const children = node.children.map((child) => transformNodeToDocx(child));
 
   return new docx.ExternalHyperlink({
@@ -162,7 +166,6 @@ function transformExternalHyperlink(
 function transformInternalHyperlink(
   node: InternalHyperlinkNode
 ): docx.InternalHyperlink {
-  // Transform children (should be TextRuns or other inline elements)
   const children = node.children.map((child) => transformNodeToDocx(child));
 
   return new docx.InternalHyperlink({
@@ -176,7 +179,6 @@ function transformPageBreak(node: PageBreakNode): docx.PageBreak {
 }
 
 function transformBookmark(node: BookmarkNode): docx.Bookmark {
-  // Transform children
   const children = node.children.map((child) => transformNodeToDocx(child));
 
   return new docx.Bookmark({
@@ -186,12 +188,10 @@ function transformBookmark(node: BookmarkNode): docx.Bookmark {
 }
 
 function transformSymbolRun(node: SymbolRunNode): docx.SymbolRun {
-  // Create symbol run
   return new docx.SymbolRun(node.props.char);
 }
 
 function transformMath(node: MathNode): docx.Math {
-  // Transform children (should be math elements)
   const children = node.children.map((child) => transformNodeToDocx(child));
 
   return new docx.Math({
@@ -200,9 +200,37 @@ function transformMath(node: MathNode): docx.Math {
 }
 
 function transformBreak(_node: BreakNode): docx.TextRun {
-  // Line break within a paragraph
-  // In DOCX, this is done using a TextRun with the break property
   return new docx.TextRun({
     break: 1,
+  });
+}
+
+function transformList(node: ListNode): docx.Paragraph[] {
+  const reference =
+    node.props.type === "numbered" ? "NumberedList" : "BulletList";
+  const level = node.props.level ?? 0;
+
+  return node.children.map((child) => {
+    if (!(child instanceof ListItemNode)) {
+      throw new Error(
+        `List children must be ListItem nodes, got: ${child.nodeType}`
+      );
+    }
+    const itemChildren = child.children.map((c) => transformNodeToDocx(c));
+    return new docx.Paragraph({
+      ...child.props,
+      numbering: { reference, level },
+      children: itemChildren,
+    });
+  });
+}
+
+function transformListItem(node: ListItemNode): docx.Paragraph {
+  // When a ListItem is rendered outside a List, it falls back to a plain
+  // paragraph without numbering (the List transformer handles the inside case).
+  const children = node.children.map((child) => transformNodeToDocx(child));
+  return new docx.Paragraph({
+    ...node.props,
+    children: children,
   });
 }

@@ -17,6 +17,8 @@ import {
   SymbolRunNode,
   MathNode,
   BreakNode,
+  ListItemNode,
+  ListNode,
 } from "./nodes";
 
 export type MutableTreeNode =
@@ -35,7 +37,9 @@ export type MutableTreeNode =
   | BookmarkNode
   | SymbolRunNode
   | MathNode
-  | BreakNode;
+  | BreakNode
+  | ListNode
+  | ListItemNode;
 
 export type ElementType =
   | "RDDocument"
@@ -53,7 +57,9 @@ export type ElementType =
   | "RDBookmark"
   | "RDSymbolRun"
   | "RDMath"
-  | "RDBreak";
+  | "RDBreak"
+  | "RDList"
+  | "RDListItem";
 
 export type DocxInstance = MutableTreeNode;
 
@@ -138,6 +144,17 @@ export interface MathProps {
 
 export interface BreakProps {
   children?: never;
+}
+
+export interface ListProps {
+  type?: "bullet" | "numbered";
+  level?: number;
+  children?: ReactNode;
+}
+
+export interface ListItemProps
+  extends NotReadonly<Omit<docx.IParagraphOptions, "children">> {
+  children?: ReactNode;
 }
 
 export interface DocxContainer {

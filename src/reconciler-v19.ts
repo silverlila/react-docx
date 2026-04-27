@@ -18,6 +18,8 @@ import {
   MathNode,
   BreakNode,
   MutableNode,
+  ListItemNode,
+  ListNode,
 } from "./nodes";
 
 // Create mutable tree nodes based on element type
@@ -72,6 +74,12 @@ function createMutableNode(type: ElementType, props: any): DocxInstance {
 
     case "RDBreak":
       return new BreakNode(nodeProps);
+
+    case "RDList":
+      return new ListNode(nodeProps);
+
+    case "RDListItem":
+      return new ListItemNode(nodeProps);
 
     default:
       throw new Error(`Unknown element type: ${type}`);
