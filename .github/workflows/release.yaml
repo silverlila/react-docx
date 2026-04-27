@@ -39,7 +39,7 @@ jobs:
 
       - name: Setup npm token
         run: |
-          echo "@orgname:registry=https://registry.npmjs.org/" >> .npmrc
+          echo "@react-docx:registry=https://registry.npmjs.org/" >> .npmrc
           echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" >> .npmrc
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
