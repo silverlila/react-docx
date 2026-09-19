@@ -3,8 +3,11 @@ import { ElementType, DocxInstance, DocxContainer } from "./types";
 import {
   DocumentNode,
   SectionNode,
+  HeaderNode,
+  FooterNode,
   ParagraphNode,
   TextRunNode,
+  TextNode,
   TableNode,
   TableRowNode,
   TableCellNode,
@@ -32,6 +35,12 @@ function createMutableNode(type: ElementType, props: any): DocxInstance {
 
     case "RDSection":
       return new SectionNode(nodeProps);
+
+    case "RDHeader":
+      return new HeaderNode(nodeProps);
+
+    case "RDFooter":
+      return new FooterNode(nodeProps);
 
     case "RDParagraph":
       return new ParagraphNode(nodeProps);
@@ -92,7 +101,7 @@ export const DocxReconciler = Reconciler({
   },
 
   createTextInstance(text: string): DocxInstance {
-    return new TextRunNode({ text });
+    return new TextNode({ text });
   },
 
   appendChild(parent: MutableNode, child: MutableNode): void {
@@ -134,7 +143,7 @@ export const DocxReconciler = Reconciler({
   },
 
   commitTextUpdate(
-    textInstance: TextRunNode,
+    textInstance: TextNode,
     oldText: string,
     newText: string
   ): void {

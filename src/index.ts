@@ -5,6 +5,8 @@ export { renderToBuffer, renderToBlob, renderToBase64 } from "./renderer";
 export {
   Document,
   Section,
+  Header,
+  Footer,
   Paragraph,
   TextRun,
   Table,
@@ -27,6 +29,8 @@ export {
 export type {
   DocumentProps,
   SectionProps,
+  HeaderProps,
+  FooterProps,
   ParagraphProps,
   TextRunProps,
   TableProps,

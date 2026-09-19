@@ -1,5 +1,7 @@
 export { Document } from "./Document";
 export { Section } from "./Section";
+export { Header } from "./Header";
+export { Footer } from "./Footer";
 export { Paragraph } from "./Paragraph";
 export { TextRun } from "./TextRun";
 export { Table, TableRow, TableCell } from "./Table";

@@ -16,12 +16,25 @@ export class SectionNode extends MutableNode {
   nodeType = "Section" as const;
 }
 
+export class HeaderNode extends MutableNode {
+  nodeType = "Header" as const;
+}
+
+export class FooterNode extends MutableNode {
+  nodeType = "Footer" as const;
+}
+
 export class ParagraphNode extends MutableNode {
   nodeType = "Paragraph" as const;
 }
 
 export class TextRunNode extends MutableNode {
   nodeType = "TextRun" as const;
+}
+
+// A plain string child, as React hands it over.
+export class TextNode extends MutableNode {
+  nodeType = "Text" as const;
 }
 
 export class TableNode extends MutableNode {

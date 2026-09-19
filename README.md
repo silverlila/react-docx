@@ -201,12 +201,48 @@ Use `<Break />` to add line breaks within a paragraph:
 <PageBreak />
 ```
 
+### Headers and Footers
+
+Put `<Header>` and `<Footer>` directly inside a `<Section>`. They take the same children as a section: paragraphs, tables, lists, images.
+
+```tsx
+<Section properties={{ titlePage: true }}>
+  <Header>
+    <Table width={{ size: 100, type: "pct" }}>
+      <TableRow>
+        <TableCell><Paragraph><TextRun text="Acme Ltd" /></Paragraph></TableCell>
+        <TableCell><Paragraph><TextRun text="Report" /></Paragraph></TableCell>
+      </TableRow>
+    </Table>
+  </Header>
+  <Header type="first">
+    <Paragraph><TextRun text="Only on page one" /></Paragraph>
+  </Header>
+  <Footer>
+    <Paragraph>
+      <TextRun children={["Page ", PageNumber.CURRENT, " of ", PageNumber.TOTAL_PAGES]} />
+    </Paragraph>
+  </Footer>
+  <Paragraph><TextRun text="Body" /></Paragraph>
+</Section>
+```
+
+`PageNumber` comes from `docx`. The text children of a `TextRun` go to docx.js as its `children`, so a `PageNumber` value becomes a Word field and any other string becomes text.
+
+- `type` is `"default"`, `"first"` or `"even"`. It defaults to `"default"`.
+- A `"first"` header shows only when the section sets `properties.titlePage`. An `"even"` header shows only when the document sets `evenAndOddHeaderAndFooters`.
+- Two headers of the same type in one section: the later one wins.
+- A `Header` or `Footer` anywhere except directly inside a `Section` throws.
+- The `headers` and `footers` props of `Section` still work. The components are merged over them.
+
 ## API Reference
 
 ### Components
 
 - `Document` - Root document component
 - `Section` - Document section with page layout
+- `Header` - Page header of a section
+- `Footer` - Page footer of a section
 - `Paragraph` - Text paragraph
 - `TextRun` - Formatted text
 - `Break` - Line break within paragraph

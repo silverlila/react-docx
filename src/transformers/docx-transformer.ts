@@ -3,8 +3,11 @@ import {
   MutableNode,
   DocumentNode,
   SectionNode,
+  HeaderNode,
+  FooterNode,
   ParagraphNode,
   TextRunNode,
+  TextNode,
   TableNode,
   TableRowNode,
   TableCellNode,
@@ -29,10 +32,14 @@ export function transformNodeToDocx(node: MutableNode): any {
     return transformDocument(node);
   } else if (node instanceof SectionNode) {
     return transformSection(node);
+  } else if (node instanceof HeaderNode || node instanceof FooterNode) {
+    throw new Error("Header and Footer must be direct children of Section");
   } else if (node instanceof ParagraphNode) {
     return transformParagraph(node);
   } else if (node instanceof TextRunNode) {
     return transformTextRun(node);
+  } else if (node instanceof TextNode) {
+    return new docx.TextRun({ text: node.props.text });
   } else if (node instanceof TableNode) {
     return transformTable(node);
   } else if (node instanceof TableRowNode) {
@@ -86,15 +93,38 @@ function transformDocument(node: DocumentNode): docx.Document {
 }
 
 function transformSection(node: SectionNode): docx.ISectionOptions {
-  const children = flattenChildren(
-    node.children.map((child) => transformNodeToDocx(child))
-  );
+  const headers: Record<string, docx.Header> = {};
+  const footers: Record<string, docx.Footer> = {};
+  const body: MutableNode[] = [];
+
+  for (const child of node.children) {
+    if (child instanceof HeaderNode) {
+      headers[child.props.type ?? "default"] = new docx.Header({
+        children: transformBlocks(child),
+      });
+    } else if (child instanceof FooterNode) {
+      footers[child.props.type ?? "default"] = new docx.Footer({
+        children: transformBlocks(child),
+      });
+    } else {
+      body.push(child);
+    }
+  }
 
   return {
     ...node.props,
-    children,
+    headers: { ...node.props.headers, ...headers },
+    footers: { ...node.props.footers, ...footers },
+    children: flattenChildren(body.map((child) => transformNodeToDocx(child))),
   };
 }
+
+function transformBlocks(node: HeaderNode | FooterNode): any[] {
+  return flattenChildren(
+    node.children.map((child) => transformNodeToDocx(child))
+  );
+}
+
 function transformParagraph(node: ParagraphNode): docx.Paragraph {
   const children = node.children.map((child) => transformNodeToDocx(child));
 
@@ -104,9 +134,13 @@ function transformParagraph(node: ParagraphNode): docx.Paragraph {
   });
 }
 
+// docx.js reads a string child as text, or as a field when it is a
+// PageNumber value, so strings go through as strings.
 function transformTextRun(node: TextRunNode): docx.TextRun {
   if (node.children.length > 0) {
-    const children = node.children.map((child) => transformNodeToDocx(child));
+    const children = node.children.map((child) =>
+      child instanceof TextNode ? child.props.text : transformNodeToDocx(child)
+    );
     return new docx.TextRun({
       ...node.props,
       children: children,

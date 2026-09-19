@@ -3,8 +3,11 @@ import * as docx from "docx";
 import {
   DocumentNode,
   SectionNode,
+  HeaderNode,
+  FooterNode,
   ParagraphNode,
   TextRunNode,
+  TextNode,
   TableNode,
   TableRowNode,
   TableCellNode,
@@ -24,8 +27,11 @@ import {
 export type MutableTreeNode =
   | DocumentNode
   | SectionNode
+  | HeaderNode
+  | FooterNode
   | ParagraphNode
   | TextRunNode
+  | TextNode
   | TableNode
   | TableRowNode
   | TableCellNode
@@ -44,6 +50,8 @@ export type MutableTreeNode =
 export type ElementType =
   | "RDDocument"
   | "RDSection"
+  | "RDHeader"
+  | "RDFooter"
   | "RDParagraph"
   | "RDTextRun"
   | "RDTable"
@@ -78,6 +86,16 @@ export interface DocumentProps
 
 export interface SectionProps
   extends NotReadonly<Omit<docx.ISectionOptions, "children">> {
+  children?: ReactNode;
+}
+
+export interface HeaderProps {
+  type?: "default" | "first" | "even";
+  children?: ReactNode;
+}
+
+export interface FooterProps {
+  type?: "default" | "first" | "even";
   children?: ReactNode;
 }
 

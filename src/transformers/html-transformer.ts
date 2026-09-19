@@ -119,6 +119,7 @@ export function transformNodeToHtml(node: MutableNode): string {
       return transformSection(node as SectionNode);
     case "Paragraph":
       return transformParagraph(node as ParagraphNode);
+    case "Text":
     case "TextRun":
       return transformTextRun(node as TextRunNode);
     case "Table":
