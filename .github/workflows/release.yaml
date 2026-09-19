@@ -46,3 +46,8 @@ jobs:
 
       - name: Publish
         run: npm publish
+
+      # npm logs why the trusted-publishing login failed only to its debug log.
+      - name: Show npm's trusted-publishing log
+        if: failure()
+        run: grep -h oidc ~/.npm/_logs/*-debug-0.log
