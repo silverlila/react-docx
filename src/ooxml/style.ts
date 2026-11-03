@@ -15,6 +15,7 @@ import { xmlRoots } from "../tree/xml-roots";
 import {
   applyFates,
   dropped,
+  isOneOf,
   isOnValue,
   mapTo,
   onOff,
@@ -30,6 +31,7 @@ import {
 } from "./codec";
 import { readParagraphProperties, type ParagraphOptions, type ParagraphRead } from "./paragraph";
 import { readRunProperties, type RunOptions } from "./run";
+import { readTableProperties, type TableOptions } from "./table";
 
 export type StyleRead =
   | {
@@ -151,6 +153,55 @@ export function readStyle(style: XmlElement, env: CodecEnv): StyleRead | StyleDr
   const { paragraph, numPr } = readStyleParagraph(pPr, env, notes);
   const withParagraph = Object.keys(paragraph).length === 0 ? options : { ...options, paragraph };
   return { kind: "paragraph", options: { id, ...withParagraph }, numPr, notes };
+}
+
+/** A style as the HTML preview applies it: the paragraph, run and table options it sets, whatever docx.js
+ *  could write of it. */
+export type PreviewStyle = {
+  readonly id: string;
+  readonly isDefault: boolean;
+  readonly sheet: {
+    readonly type: "paragraph" | "character" | "table";
+    readonly basedOn?: string;
+    readonly paragraph?: Omit<ParagraphOptions, "style">;
+    readonly run?: RunOptions;
+    readonly table?: TableOptions;
+  };
+};
+
+const PREVIEW_TYPES: readonly PreviewStyle["sheet"]["type"][] = ["paragraph", "character", "table"];
+
+/** Any w:style, read with the property codecs for the HTML preview (raw `importedStyles` included); null
+ *  for a numbering style or a style with no w:styleId, which no paragraph, run or table can name.
+ *
+ *  - Notes are not kept: the reader already reported this style when it read the file.
+ *  - w:tblStylePr (conditional formatting of first rows, banding, …) is not read. That is a preview
+ *    simplification, not a reader or writer gap.
+ *  - A w:numPr in the style's w:pPr is left out: it names a numId, which only the reader can resolve. */
+export function readStyleForPreview(style: XmlElement, env: CodecEnv): PreviewStyle | null {
+  const type = attrOf(style, "w:type") ?? "paragraph";
+  const id = attrOf(style, "w:styleId");
+  if (id === null || !isOneOf(PREVIEW_TYPES, type)) return null;
+  const notes: Note[] = [];
+  const basedOn = attrOf(childNamed(style, "w:basedOn"), "w:val");
+  const pPr = childNamed(style, "w:pPr");
+  const paragraph = pPr === null ? null : readStyleParagraph(pPr, env, notes).paragraph;
+  const rPr = childNamed(style, "w:rPr");
+  const run = rPr === null ? null : readRun(rPr, env, notes);
+  const tblPr = childNamed(style, "w:tblPr");
+  const table = tblPr === null ? null : readTableProperties({ name: "w:tbl", attributes: {}, children: [tblPr] }, env).options;
+  const isDefault = attrOf(style, "w:default");
+  return {
+    id,
+    isDefault: isDefault !== null && isOnValue(isDefault),
+    sheet: {
+      type,
+      ...(basedOn === null ? {} : { basedOn }),
+      ...(paragraph === null ? {} : { paragraph }),
+      ...(run === null ? {} : { run }),
+      ...(table === null ? {} : { table }),
+    },
+  };
 }
 
 /** A w:numPr outside a style, where docx.js has no numbering option. */

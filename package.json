@@ -35,6 +35,7 @@
     "test:react": "pnpm run build && node test/react-lines/run.mjs",
     "examples": "for f in basic header-footer resume advanced; do tsx examples/$f.tsx || exit 1; done",
     "roundtrip": "tsx scripts/roundtrip.ts",
+    "generate:styles": "tsx scripts/generate-default-styles.ts",
     "prepublishOnly": "pnpm run build"
   },
   "keywords": [
