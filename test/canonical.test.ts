@@ -516,8 +516,41 @@ describe("xmlRoots", () => {
     ["<![CDATA[x]]>", "<![CDATA[ stands outside an element"],
     ["<!DOCTYPE x>", "declarations (<!…>) are not allowed"],
     ["< >", "the tag at offset 0 has no name"],
+    ["<w:t>a & b</w:t>", 'a bare "&" in "a & b": write &amp;'],
+    ['<w:sz w:val="a&b"/>', 'a bare "&" in "a&b": write &amp;'],
+    ["<w:sz w:val=24/>", 'the attributes of <w:sz> are not name="value" pairs: w:val=24'],
+    ["<w:b w:val/>", 'the attributes of <w:b> are not name="value" pairs: w:val'],
+    ['<w:sz w:val="1" w:val="2"/>', "<w:sz> has the attribute w:val twice"],
+    ["<w:t>&nbsp;</w:t>", "&nbsp; is not an XML entity: write a character reference such as &#160;"],
+    ["<w:t>&#0;</w:t>", "&#0; is not a character XML allows"],
+    ["<w:t>&#x110000;</w:t>", "&#x110000; is not a character XML allows"],
+    ["<w:r><!-- a -- b --><w:t/></w:r>", "a comment holds --"],
   ])("%j is malformed: %s", (xml, reason) => {
     expect(xmlRoots(xml)).toEqual({ kind: "malformed", reason });
+  });
+
+  test("character and entity references are not bare ampersands", () => {
+    expect(xmlRoots('<w:t a="&quot;">a &amp; b &lt;&gt;&apos; &#169; &#xA9;</w:t>')).toEqual({ kind: "roots", roots: ["w:t"] });
+  });
+
+  test("attributes may be single- or double-quoted and spaced around =", () => {
+    expect(xmlRoots("<w:sz w:val = '24'\n w:x=\"1\" />")).toEqual({ kind: "roots", roots: ["w:sz"] });
+  });
+
+  test.each([
+    ['<w:r><w:rPr/>x<w:t>a</w:t></w:r>', '<w:r> mixes text "x" with elements, and docx.js drops the element before the text'],
+    ["<w:r><w:t>a</w:t>tail</w:r>", '<w:r> mixes text "tail" with elements, and docx.js drops the element before the text'],
+    ["<w:r><![CDATA[x]]><w:t/></w:r>", '<w:r> mixes text "x" with elements, and docx.js drops the element before the text'],
+    ["<w:r><w:t>a</w:t>\u00a0<w:tab/></w:r>", '<w:r> mixes text "\u00a0" with elements, and docx.js drops the element before the text'],
+    ["<w:r><w:t>a</w:t>&#160;<w:tab/></w:r>", '<w:r> mixes text "&#160;" with elements, and docx.js drops the element before the text'],
+    ["<w:r><w:t>a</w:t>\ufeff<w:tab/></w:r>", '<w:r> mixes text "\ufeff" with elements, and docx.js drops the element before the text'],
+  ])("%j cannot be written: %s", (xml, reason) => {
+    expect(xmlRoots(xml)).toEqual({ kind: "unwritable", reason });
+  });
+
+  test("XML whitespace between elements is indentation, not mixed content, written as text or a reference", () => {
+    expect(xmlRoots("<w:r>\n  <w:rPr/>\n\t<w:t> a </w:t>\r\n</w:r>")).toEqual({ kind: "roots", roots: ["w:r"] });
+    expect(xmlRoots("<w:r><w:rPr/>&#32;&#x9;<![CDATA[ ]]><w:t/></w:r>")).toEqual({ kind: "roots", roots: ["w:r"] });
   });
 });
 
@@ -592,10 +625,22 @@ describe("13. RawXml fragment roots", () => {
     expect(error.message).toContain("RawXml must contain at least one element");
   });
 
-  test("a fragment that is only text throws", () => {
-    expect(() => canon(doc(n("Paragraph", {}, raw("just text"))))).toThrow(
-      'RawXml is not well-formed: text "just text" stands outside an element'
+  test("a fragment that is only text throws: it holds no element", () => {
+    expect(() => canon(doc(n("Paragraph", {}, raw("just text"))))).toThrow("RawXml must contain at least one element");
+  });
+
+  test("a fragment that mixes text and elements throws a TreeError with the RawXml's path", () => {
+    const error = treeError(() => canon(doc(n("Paragraph", {}, raw("<w:r><w:t>x</w:t>junk<w:tab/></w:r>")))));
+    expect(error.path).toEqual(rawPath);
+    expect(error.message).toContain(
+      'RawXml cannot be written: <w:r> mixes text "junk" with elements, and docx.js drops the element before the text'
     );
+  });
+
+  test("a bare & throws at the RawXml's path, before anything is written", () => {
+    const error = treeError(() => canon(doc(n("Paragraph", {}, raw("<w:r><w:t>a & b</w:t></w:r>")))));
+    expect(error.path).toEqual(rawPath);
+    expect(error.message).toContain('RawXml is not well-formed: a bare "&" in "a & b": write &amp;');
   });
 
   test("an unbalanced fragment throws a TreeError with the RawXml's path", () => {
@@ -728,6 +773,10 @@ describe("17. loose content in Footnote, Comment and Textbox", () => {
     expect(error.message).toContain("<Section> is not allowed in <TextRun>");
   });
 
+  test("an empty Textbox holds one empty Paragraph, since w:txbxContent needs at least one block", () => {
+    expect(hosts.Textbox.children(canon(hosts.Textbox.tree()))).toEqual([paragraph({})]);
+  });
+
   test("a block kind the host does not hold still throws", () => {
     expect(() => canon(hosts.Textbox.tree(n("Table")))).toThrow("<Table> is not allowed in <Textbox>");
   });
@@ -858,6 +907,57 @@ describe("lists", () => {
     ]);
   });
 
+  test("a nested List of another type is a list of its own: a definition for its depth, at level 0 of a fresh instance", () => {
+    const tree = canon(
+      doc(
+        n(
+          "List",
+          { type: "numbered" },
+          n("ListItem", {}, "a", n("List", { type: "bullet" }, n("ListItem", {}, "a.1"))),
+          n("List", {}, n("ListItem", {}, "a.2")),
+          n("ListItem", {}, "b")
+        ),
+        n("List", { type: "numbered" }, n("ListItem", {}, "c"))
+      )
+    );
+    expect(blocks(tree)).toEqual([
+      paragraph(numbering("NumberedList", 0, 0), run({}, "a")),
+      paragraph(numbering("BulletList@1", 0, 1), run({}, "a.1")),
+      paragraph(numbering("BulletList@1", 0, 2), run({}, "a.2")),
+      paragraph(numbering("NumberedList", 0, 0), run({}, "b")),
+      paragraph(numbering("NumberedList", 0, 3), run({}, "c")),
+    ]);
+    const [, , nested] = (tree.props.numbering as typeof LIST_NUMBERING).config;
+    expect(nested.reference).toBe("BulletList@1");
+    expect(nested.levels.slice(0, 2)).toEqual([
+      { level: 0, format: "bullet", text: "◦", alignment: "left", style: { paragraph: { indent: { left: 1440, hanging: 360 } } } },
+      { level: 1, format: "bullet", text: "▪", alignment: "left", style: { paragraph: { indent: { left: 2160, hanging: 360 } } } },
+    ]);
+    expect(nested.levels).toHaveLength(8);
+  });
+
+  test("a List of its parent's type below a switch continues that list one level deeper", () => {
+    const tree = canon(
+      doc(
+        n(
+          "List",
+          { type: "bullet" },
+          n("ListItem", {}, "a", n("List", { type: "numbered" }, n("ListItem", {}, "1", n("List", { type: "numbered" }, n("ListItem", {}, "1.a")))))
+        )
+      )
+    );
+    expect(blocks(tree)).toEqual([
+      paragraph(numbering("BulletList", 0, 0), run({}, "a")),
+      paragraph(numbering("NumberedList@1", 0, 1), run({}, "1")),
+      paragraph(numbering("NumberedList@1", 1, 1), run({}, "1.a")),
+    ]);
+    const [, , nested] = (tree.props.numbering as typeof LIST_NUMBERING).config;
+    expect(nested.levels.slice(0, 2).map((l) => [l.format, l.text])).toEqual([
+      ["lowerLetter", "%1."],
+      ["lowerRoman", "%2."],
+    ]);
+  });
+
   test("a List inside a ListItem splits the item: its paragraph first, then the nested items", () => {
     const tree = canon(
       doc(n("List", { type: "numbered" }, n("ListItem", {}, "a", n("List", { type: "numbered" }, n("ListItem", {}, "a.1")), " tail")))
@@ -892,6 +992,18 @@ describe("lists", () => {
     expect(table).toMatchObject({
       children: [{ children: [{ children: [paragraph(numbering("BulletList", 0, 1), run({}, "c"))] }] }],
     });
+  });
+
+  test("Lists nest at most 9 deep, Word's level count, whatever their types", () => {
+    const nest = (types: readonly string[]): AuthorNode =>
+      n("List", { type: types[0] }, n("ListItem", {}, "x", ...(types.length > 1 ? [nest(types.slice(1))] : [])));
+    const nine = Array.from({ length: 9 }, (_, i) => (i % 2 === 0 ? "bullet" : "numbered"));
+    expect(() => canon(doc(nest(nine)))).not.toThrow();
+    for (const tenth of ["bullet", "numbered"]) {
+      expect(() => canon(doc(nest(["bullet", ...Array<string>(8).fill("bullet"), tenth])))).toThrow(
+        "Lists nest at most 9 deep: Word numbers 9 levels"
+      );
+    }
   });
 
   test("List.level throws", () => {
@@ -942,10 +1054,15 @@ describe("lists", () => {
 });
 
 describe("LIST_NUMBERING", () => {
-  test("level 0 of each reference equals today's DEFAULT_NUMBERING", () => {
-    expect(LIST_NUMBERING.config.map((c) => ({ reference: c.reference, level0: c.levels[0] }))).toEqual(
-      DEFAULT_NUMBERING.config.map((c) => ({ reference: c.reference, level0: c.levels[0] }))
-    );
+  test("level 0 of each reference is 0.1.8's DEFAULT_NUMBERING, which DEFAULT_NUMBERING still exports", () => {
+    const indent = { paragraph: { indent: { left: 720, hanging: 360 } } };
+    const released = [
+      { reference: "NumberedList", level0: { level: 0, format: "decimal", text: "%1.", alignment: "left", style: indent } },
+      { reference: "BulletList", level0: { level: 0, format: "bullet", text: "•", alignment: "left", style: indent } },
+    ];
+    for (const numbering of [LIST_NUMBERING, DEFAULT_NUMBERING]) {
+      expect(numbering.config.map((c) => ({ reference: c.reference, level0: c.levels[0] }))).toEqual(released);
+    }
   });
 
   test("defines levels 0–8, indenting 720 twips per level", () => {

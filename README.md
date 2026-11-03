@@ -197,8 +197,12 @@ Use `<Break />` to add line breaks within a paragraph:
 
 ### Page Breaks
 
+A page break is part of a paragraph, as it is in Word:
+
 ```tsx
-<PageBreak />
+<Paragraph>
+  <PageBreak />
+</Paragraph>
 ```
 
 ### Headers and Footers
@@ -231,9 +235,22 @@ Put `<Header>` and `<Footer>` directly inside a `<Section>`. They take the same 
 
 - `type` is `"default"`, `"first"` or `"even"`. It defaults to `"default"`.
 - A `"first"` header shows only when the section sets `properties.titlePage`. An `"even"` header shows only when the document sets `evenAndOddHeaderAndFooters`.
-- Two headers of the same type in one section: the later one wins.
+- Two headers, or two footers, of the same type in one section throw.
 - A `Header` or `Footer` anywhere except directly inside a `Section` throws.
-- The `headers` and `footers` props of `Section` still work. The components are merged over them.
+
+## Upgrading from 0.1
+
+- **Versions.** React 18.2 or later (including 19) and docx 9.5 or later are required. React 16 and 17 and docx 8 are no longer supported.
+- **Placement.** Every element must sit where Word allows it, or the render throws a `TreeError` that names its place in the document. Most often this means inline elements (`TextRun`, `PageBreak`, `Tab`, `Break`, `Bookmark`, `ImageRun`, hyperlinks, `Math`) must be inside a `<Paragraph>`, not directly in a `Section`, `Header`, `Footer` or `TableCell`:
+
+  ```
+  Document > Section[0] > PageBreak[0]: <PageBreak> is not allowed in <Section>
+  ```
+
+- **Headers and footers.** `Section`'s `headers` and `footers` props are removed. Use `<Header>` and `<Footer>` children.
+- **Footnotes and comments.** `Document`'s `footnotes` and `comments` props are removed. Put a `<Footnote>` in a paragraph where its number goes, and `<Comment>` elements directly in the `Document`.
+- **Styles.** `Document`'s `externalStyles` and `styles.initialStyles` are removed. `styles.importedStyles` takes XML strings of `<w:style>` elements instead of docx.js objects.
+- **Lists.** `List`'s `level` prop is removed: nest a `<List>` in a `<List>` or a `<ListItem>` instead. Each `<List>` now numbers from 1, where before every numbered list continued the previous one, and a nested list keeps its own `type`.
 
 ## API Reference
 

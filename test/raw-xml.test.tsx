@@ -52,6 +52,24 @@ describe("RawXml is written verbatim", () => {
     expect(xml).toContain('<w:body><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>hi</w:t></w:r></w:p>');
   });
 
+  test("CDATA is written as escaped text", async () => {
+    const run = "<w:r><w:t>x<![CDATA[ <a> & b ]]></w:t></w:r>";
+    const xml = await documentXml(body(<Paragraph key="p"><RawXml xml={run} /></Paragraph>));
+    expect(xml).toContain("<w:p><w:r><w:t>x &lt;a&gt; &amp; b </w:t></w:r></w:p>");
+  });
+
+  test("a comment or processing instruction inside text is dropped, and the text around it kept", async () => {
+    const run = "<w:r><w:t>a<!--c-->b<?p?>c<![CDATA[d]]></w:t></w:r>";
+    const xml = await documentXml(body(<Paragraph key="p"><RawXml xml={run} /></Paragraph>));
+    expect(xml).toContain("<w:p><w:r><w:t>abcd</w:t></w:r></w:p>");
+  });
+
+  test("whitespace written as CDATA or a character reference between elements is dropped, not the elements", async () => {
+    const run = "<w:r><w:t>a</w:t><![CDATA[ ]]>&#32;<w:tab/></w:r>";
+    const xml = await documentXml(body(<Paragraph key="p"><RawXml xml={run} /></Paragraph>));
+    expect(xml).toContain("<w:p><w:r><w:t>a</w:t><w:tab/></w:r></w:p>");
+  });
+
   test("a space after an element is dropped, not the element", async () => {
     const xml = await documentXml(body(<Paragraph key="p"><RawXml xml="<w:r><w:t>x</w:t> </w:r>" /></Paragraph>));
     expect(xml).toContain("<w:p><w:r><w:t>x</w:t></w:r></w:p>");

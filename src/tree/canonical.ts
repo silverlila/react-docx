@@ -1,6 +1,6 @@
 import { DEFAULT_STYLE_SLOTS, PAGE_NUMBER_VALUES, PRESENCE_ONLY, RAW_XML_ROOTS } from "../schema/docx-facts";
 import { ELEMENTS, isKind, type DocumentNode, type Kind } from "../schema/elements";
-import { LIST_NUMBERING, listEntries, listReference } from "./lists";
+import { LIST_NUMBERING, listEntries, type ListEntry } from "./lists";
 import { xmlRoots } from "./xml-roots";
 
 /** The unnormalized `{ type, props, children }` the reconciler builds from JSX. */
@@ -26,7 +26,8 @@ type Built = { readonly type: Kind; readonly props: PropBag; readonly children: 
 /** One canonicalize call's document-wide state, shared by every node. */
 type DocumentState = {
   nextListInstance: number;
-  listsExpanded: boolean;
+  /** Each list definition an expanded List numbers with, by reference, in first-use order. */
+  readonly listDefinitions: Map<string, ListEntry["definition"]>;
   /** Rule 19: every Comment id, and each id a comment range or reference names, with that node's path. */
   readonly commentIds: Set<unknown>;
   readonly commentMarks: { readonly id: unknown; readonly path: readonly string[] }[];
@@ -100,15 +101,19 @@ export function canonicalize(root: AuthorNode): DocumentNode {
   if (root.type !== "Document") {
     throw new TreeError([root.type], `The root must be <Document>, got <${root.type}>`);
   }
-  const state: DocumentState = { nextListInstance: 0, listsExpanded: false, commentIds: new Set(), commentMarks: [] };
+  const state: DocumentState = { nextListInstance: 0, listDefinitions: new Map(), commentIds: new Set(), commentMarks: [] };
   const document = canonicalNode("Document", root, indexed(root.children), ["Document"], {
     document: state,
     outsideBody: false,
   });
   assertCommentIdsResolve(state);
-  const props = state.listsExpanded ? withListNumbering(document.props) : document.props;
+  const props = state.listDefinitions.size > 0 ? withListNumbering(document.props, state.listDefinitions) : document.props;
   // The placement checks enforce the child structure DocumentNode describes; props are trusted as authored.
   return { ...document, props } as DocumentNode;
+}
+
+function emptyParagraph(): Built {
+  return { type: "Paragraph", props: {}, children: [] };
 }
 
 function indexed(children: readonly (AuthorNode | string)[]): IndexedChild[] {
@@ -133,7 +138,9 @@ function canonicalNode(
   recordCommentId(kind, node.props, path, context.document);
   const parent: Parent = { kind, name: node.type, path };
   const inner = OUTSIDE_BODY.includes(kind) ? { ...context, outsideBody: true } : context;
-  const children = [...textPropChild(kind, node.props, path), ...canonicalChildren(parent, content, inner)];
+  const authored = [...textPropChild(kind, node.props, path), ...canonicalChildren(parent, content, inner)];
+  // w:txbxContent must hold at least one block; Word writes an empty text box with one empty paragraph.
+  const children = kind === "Textbox" && authored.length === 0 ? [emptyParagraph()] : authored;
   if (kind === "TableCell") assertCellEndsWithParagraph(children, path);
   if (kind === "Footnote") assertFootnoteStartsWithParagraph(children, path);
   return { type: kind, props: canonicalProps(kind, node.props, path), children };
@@ -420,8 +427,10 @@ type Fragment = {
 /** Rules 13 and 14: a well-formed fragment of at least one element, each root allowed where it stands,
  *  and no relationship references, whose targets docx.js cannot write. */
 function assertFragment({ xml, label, allowedRoots, where }: Fragment, path: readonly string[]): void {
+  if (!xml.includes("<")) throw new TreeError(path, `${label} must contain at least one element`);
   const scanned = xmlRoots(xml);
   if (scanned.kind === "malformed") throw new TreeError(path, `${label} is not well-formed: ${scanned.reason}`);
+  if (scanned.kind === "unwritable") throw new TreeError(path, `${label} cannot be written: ${scanned.reason}`);
   if (scanned.roots.length === 0) throw new TreeError(path, `${label} must contain at least one element`);
   const stray = scanned.roots.find((root) => !allowedRoots.includes(root));
   if (stray !== undefined) throw new TreeError(path, `${label} <${stray}> is not allowed in ${where}`);
@@ -645,21 +654,23 @@ function partitionStyles(
 }
 
 function listParagraphs(list: AuthorNode, path: readonly string[], context: Context): Built[] {
-  const reference = listReference(list);
-  const instance = context.document.nextListInstance++;
-  context.document.listsExpanded = true;
-  return listEntries(list, path).map((entry) => {
+  const nextInstance = () => context.document.nextListInstance++;
+  return listEntries(list, path, nextInstance).map((entry) => {
+    context.document.listDefinitions.set(entry.definition.reference, entry.definition);
     const paragraph = canonicalNode("Paragraph", entry.item, entry.content, entry.path, context);
-    return { ...paragraph, props: { ...paragraph.props, numbering: { reference, level: entry.level, instance } } };
+    return { ...paragraph, props: { ...paragraph.props, numbering: entry.numbering } };
   });
 }
 
-/** Adds each LIST_NUMBERING config whose reference the document does not already configure. */
-function withListNumbering(props: PropBag): PropBag {
+/** Adds both LIST_NUMBERING configs, then each other definition the Lists used, unless the document
+ *  already configures that reference. */
+function withListNumbering(props: PropBag, used: ReadonlyMap<string, ListEntry["definition"]>): PropBag {
   const numbering = isRecord(props.numbering) ? props.numbering : {};
   const config: unknown[] = Array.isArray(numbering.config) ? numbering.config : [];
   const configured = new Set(config.map((entry) => (isRecord(entry) ? entry.reference : undefined)));
-  const missing = LIST_NUMBERING.config.filter((entry) => !configured.has(entry.reference));
+  const base = new Set(LIST_NUMBERING.config.map((entry) => entry.reference));
+  const wanted = [...LIST_NUMBERING.config, ...[...used.values()].filter((entry) => !base.has(entry.reference))];
+  const missing = wanted.filter((entry) => !configured.has(entry.reference));
   if (missing.length === 0) return props;
   return { ...props, numbering: { ...numbering, config: [...config, ...missing] } };
 }

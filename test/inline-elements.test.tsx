@@ -27,6 +27,7 @@ import {
   renderToBuffer,
   renderToTree,
 } from "../src/index";
+import { PageNumber } from "docx";
 import { docxXml } from "./support/docx-xml";
 
 /** word/document.xml's body, with docxXml's pretty-printing undone so one element sits on one line. */
@@ -56,6 +57,16 @@ describe("tracked changes", () => {
   test("<DeletedTextRun> with string children writes a w:del around a run of w:delText", async () => {
     expect(await bodyXml(<DeletedTextRun {...change}>del</DeletedTextRun>)).toBe(
       `<w:p><w:del ${changeAttributes}><w:r><w:delText xml:space="preserve">del</w:delText></w:r></w:del></w:p>`
+    );
+  });
+
+  test("<DeletedTextRun> with PageNumber.CURRENT_SECTION writes a deleted SECTION field, not the word", async () => {
+    expect(await bodyXml(<DeletedTextRun {...change}>{["Section ", PageNumber.CURRENT_SECTION]}</DeletedTextRun>)).toBe(
+      `<w:p><w:del ${changeAttributes}><w:r>` +
+        '<w:delText xml:space="preserve">Section </w:delText>' +
+        '<w:fldChar w:fldCharType="begin"/><w:delInstrText xml:space="preserve">SECTION</w:delInstrText>' +
+        '<w:fldChar w:fldCharType="separate"/><w:fldChar w:fldCharType="end"/>' +
+        "</w:r></w:del></w:p>"
     );
   });
 

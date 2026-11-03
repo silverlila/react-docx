@@ -11,7 +11,32 @@ export function rawXmlComponents(xml: string): XmlComponent[] {
   const parsed = xml2js(`<x>${xml}</x>`, { compact: false, captureSpacesBetweenElements: true });
   if (!isNonCompact(parsed)) throw new Error("xml2js returned its compact shape despite compact: false");
   const roots = parsed.elements?.[0]?.elements ?? [];
-  return roots.filter((element) => element.type === "element").map(withoutIndentation).map(component);
+  const elements = roots.filter((element) => element.type === "element");
+  return elements.map(elementsAndText).map(withoutIndentation).map(component);
+}
+
+/** Only elements and text, as docx.js writes them. A CDATA section, which docx.js drops, becomes text; a
+ *  comment or processing instruction, which splits text into pieces docx.js writes only the last of, is
+ *  dropped. Adjacent text is then joined, and docx.js escapes it. */
+function elementsAndText(element: XmlJsElement): XmlJsElement {
+  const children = element.elements;
+  if (children === undefined) return element;
+  const kept: XmlJsElement[] = [];
+  for (const child of children) {
+    const node = child.type === "cdata" ? { type: "text", text: child.cdata } : child;
+    if (node.type === "element") {
+      kept.push(elementsAndText(node));
+      continue;
+    }
+    if (node.type !== "text") continue;
+    const last = kept[kept.length - 1];
+    if (last?.type === "text") {
+      kept[kept.length - 1] = { type: "text", text: `${String(last.text)}${String(node.text)}` };
+    } else {
+      kept.push(node);
+    }
+  }
+  return { ...element, elements: kept };
 }
 
 /** xml2js declares one return type for both its modes; the non-compact shape holds the document's `elements`. */

@@ -20,7 +20,6 @@ import {
   renderToBuffer,
   renderToTree,
 } from "../src/index";
-import { CASES } from "./support/cases";
 import { docxXml } from "./support/docx-xml";
 
 /** The rendered parts with docxXml's pretty-printing undone, so one element sits on one line. */
@@ -34,12 +33,6 @@ const body = (...blocks: ReactElement[]) => (
     <Section>{blocks}</Section>
   </Document>
 );
-
-function caseNamed(name: string) {
-  const found = CASES.find((c) => c.name === name);
-  if (found === undefined) throw new Error(`no characterization case "${name}"`);
-  return found.element;
-}
 
 describe("footnotes", () => {
   test("are numbered 1, 2, 3 in body order: a Section paragraph, a TableCell paragraph, the next Section", async () => {
@@ -133,6 +126,18 @@ describe("comments", () => {
     );
   });
 
+  test("a Comment without a date writes no w:date, so every render is the same", async () => {
+    const xml = await parts(
+      <Document>
+        <Comment id={0} author="Ada">
+          c0
+        </Comment>
+        <Section>{marked(0)}</Section>
+      </Document>
+    );
+    expect(xml["word/comments.xml"]).toContain('<w:comment w:id="0" w:author="Ada"><w:p>');
+  });
+
   test("a range id with no Comment throws", () => {
     const element = (
       <Document>
@@ -162,6 +167,11 @@ test("a TableOfContents writes a w:sdt holding the TOC field", async () => {
   expect(document).toContain('<w:instrText xml:space="preserve">TOC \\h \\o &quot;1-3&quot;</w:instrText>');
 });
 
+test("an empty Textbox writes one empty paragraph into w:txbxContent", async () => {
+  const xml = await parts(body(<Textbox key="box" style={{ width: "200pt", height: "50pt" }} />));
+  expect(xml["word/document.xml"]).toContain("<w:txbxContent><w:p/></w:txbxContent>");
+});
+
 test("a Textbox writes its paragraphs into w:txbxContent", async () => {
   const xml = await parts(
     body(
@@ -173,11 +183,4 @@ test("a Textbox writes its paragraphs into w:txbxContent", async () => {
   expect(xml["word/document.xml"]).toContain(
     '<w:txbxContent><w:p><w:r><w:t xml:space="preserve">in box</w:t></w:r></w:p></w:txbxContent>'
   );
-});
-
-describe("documents without notes are unchanged", () => {
-  // Recorded before this file's writer change landed; equal to the characterization snapshots of the same cases.
-  test.each(["paragraph-and-run-formatting", "header-footer-types", "table"])("%s", async (name) => {
-    expect(docxXml(await renderToBuffer(caseNamed(name)))).toMatchSnapshot();
-  });
 });

@@ -13,32 +13,44 @@ let reconciler29: ReturnType<typeof Reconciler29> | undefined;
 let reconciler31: ReturnType<typeof Reconciler31> | undefined;
 let reconciler33: ReturnType<typeof Reconciler33> | undefined;
 
+/** The first error React reports to a root, kept in a box so that a thrown `undefined` still fails the render. */
+function firstError(): { record: (error: unknown) => void; rethrow: () => void } {
+  let first: { readonly error: unknown } | undefined;
+  return {
+    record: (error) => {
+      first ??= { error };
+    },
+    rethrow: () => {
+      if (first !== undefined) throw first.error;
+    },
+  };
+}
+
+/** An error an error boundary caught has been handled: its fallback renders. Logged, as React does by default. */
+function logCaught(error: unknown): void {
+  console.error(error);
+}
+
 /** React 18: a legacy root (tag 0) renders synchronously and throws render errors directly. */
 function render29(element: React.ReactElement, container: HostContainer): void {
   reconciler29 ??= Reconciler29(hostConfig18);
-  let error: unknown = undefined;
-  const record = (e: unknown) => {
-    if (error === undefined) error = e;
-  };
-  const root = reconciler29.createContainer(container, 0, null, false, null, "", record, null);
+  const errors = firstError();
+  const root = reconciler29.createContainer(container, 0, null, false, null, "", errors.record, null);
   reconciler29.updateContainer(element, root, null, null);
-  if (error !== undefined) throw error;
+  errors.rethrow();
 }
 
-/** React 19 has no legacy root: render synchronously, then rethrow the first error React reported. */
+/** React 19 has no legacy root: render synchronously, then rethrow the first error no boundary caught. */
 function renderSync(
   reconciler: ReturnType<typeof Reconciler31> | ReturnType<typeof Reconciler33>,
   element: React.ReactElement,
   container: HostContainer
 ): void {
-  let error: unknown = undefined;
-  const record = (e: unknown) => {
-    if (error === undefined) error = e;
-  };
-  const root = reconciler.createContainer(container, 0, null, false, null, "", record, record, record, null);
+  const errors = firstError();
+  const root = reconciler.createContainer(container, 0, null, false, null, "", errors.record, logCaught, errors.record, null);
   reconciler.updateContainerSync(element, root, null, null);
   reconciler.flushSyncWork();
-  if (error !== undefined) throw error;
+  errors.rethrow();
 }
 
 const RENDER: Record<ReactLine, Render> = {

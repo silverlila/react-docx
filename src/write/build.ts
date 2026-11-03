@@ -173,6 +173,31 @@ function buildRun<P, R>(
   return new Run({ ...props, children: built.length === 0 ? undefined : inPlace(built) });
 }
 
+/** docx.js's DeletedTextRun writes PAGE, NUMPAGES and SECTIONPAGES as deleted fields but has no case for
+ *  PageNumber.CURRENT_SECTION, which it writes as the deleted word "SECTION": that field is written here. */
+const DELETED_SECTION_FIELD: Node<"RawXml"> = {
+  type: "RawXml",
+  props: {
+    xml:
+      '<w:fldChar w:fldCharType="begin"/><w:delInstrText xml:space="preserve">SECTION</w:delInstrText>' +
+      '<w:fldChar w:fldCharType="separate"/><w:fldChar w:fldCharType="end"/>',
+  },
+  children: [],
+};
+
+function buildDeletedRun(node: Node<"DeletedTextRun">, ctx: BuildCtx): docx.DeletedTextRun {
+  const children = node.children.map((child) =>
+    typeof child === "object" && child.type === "PageNumber" && child.props.field === docx.PageNumber.CURRENT_SECTION
+      ? DELETED_SECTION_FIELD
+      : child
+  );
+  return buildRun(docx.DeletedTextRun, { props: node.props, children }, ctx);
+}
+
+/** docx.js stamps a Comment without a date with the time of writing, as `date.toISOString()`, and leaves out
+ *  an attribute whose value is undefined: this date writes no `w:date`, so the same tree writes the same bytes. */
+const UNDATED = { toISOString: () => undefined } as unknown as Date;
+
 const BUILD: { readonly [K in Kind]: (node: Node<K>, ctx: BuildCtx) => Built[K] } = {
   Document: buildDocumentNode,
   Section: buildSection,
@@ -201,7 +226,7 @@ const BUILD: { readonly [K in Kind]: (node: Node<K>, ctx: BuildCtx) => Built[K] 
   RawXml: ({ props }) => rawXmlComponents(props.xml),
   // The footnote's content is built once, by the Document, into its `footnotes` option.
   Footnote: (node, ctx) => new docx.FootnoteReferenceRun(footnoteId(node, ctx)),
-  Comment: ({ props, children }, ctx) => ({ ...props, children: buildAll(children, ctx) }),
+  Comment: ({ props, children }, ctx) => ({ ...props, date: props.date ?? UNDATED, children: buildAll(children, ctx) }),
   CommentRangeStart: ({ props }) => new docx.CommentRangeStart(props.id),
   CommentRangeEnd: ({ props }) => new docx.CommentRangeEnd(props.id),
   CommentReference: ({ props }) => [new docx.CommentReference(props.id)],
@@ -211,7 +236,7 @@ const BUILD: { readonly [K in Kind]: (node: Node<K>, ctx: BuildCtx) => Built[K] 
   Textbox: ({ props, children }, ctx) =>
     new docx.Textbox({ ...props, children: asChildren<docx.ParagraphChild>(buildAll(children, ctx)) }),
   InsertedTextRun: (node, ctx) => buildRun(docx.InsertedTextRun, node, ctx),
-  DeletedTextRun: (node, ctx) => buildRun(docx.DeletedTextRun, node, ctx),
+  DeletedTextRun: buildDeletedRun,
   ColumnBreak: () => new docx.ColumnBreak(),
   SimpleField: ({ props }) => new docx.SimpleField(props.instruction, props.cachedValue),
   SimpleMailMergeField: ({ props }) => new docx.SimpleMailMergeField(props.fieldName),
