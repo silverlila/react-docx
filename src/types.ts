@@ -2,12 +2,10 @@ import type { ReactNode } from "react";
 import type * as docx from "docx";
 import type { Props, StylesProps } from "./schema/elements";
 
-/** Authoring props: docx.js option types verbatim, with element children in place of option-bag children. */
 type Kids = { children?: ReactNode };
 type NoKids = { children?: never };
 type HeaderFooterType = { type?: "default" | "first" | "even" };
 
-/** `styles.importedStyles` takes raw `<w:style>` XML strings. */
 export type DocumentProps = Omit<
   docx.IPropertiesOptions,
   "sections" | "footnotes" | "comments" | "externalStyles" | "styles"

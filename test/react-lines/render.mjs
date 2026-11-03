@@ -1,7 +1,3 @@
-// Renders a hook- and context-using document through the built ESM output and checks the text
-// reached word/document.xml, that an error boundary's fallback renders, that a thrown
-// `undefined` still fails the render, and that reordered keyed children come out in order.
-// Usage: node [--import <hook>] render.mjs <expected React version>
 import React from "react";
 import { strFromU8, unzipSync } from "fflate";
 import { Document, Paragraph, Section, TextRun, renderToBuffer } from "../../dist/index.mjs";
@@ -16,7 +12,6 @@ function Body() {
   return h(Paragraph, null, h(TextRun, { text }));
 }
 
-/** A user error boundary: React reports the caught error and renders the fallback. */
 class Boundary extends React.Component {
   constructor(props) {
     super(props);
@@ -34,14 +29,12 @@ function Throws({ value }) {
   throw value;
 }
 
-/** Reorders its keyed paragraphs in a layout effect, so React moves host children it already placed. */
 function Reordered() {
   const [order, setOrder] = React.useState(["a", "b", "c", "d"]);
   React.useLayoutEffect(() => setOrder(["d", "c", "x", "a"]), []);
   return h(React.Fragment, null, ...order.map((key) => h(Paragraph, { key }, h(TextRun, { text: `item-${key}` }))));
 }
 
-/** React logs every render error it reports; the checks below expect those errors. */
 async function quietly(run) {
   const log = console.error;
   console.error = () => {};

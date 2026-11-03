@@ -1,12 +1,13 @@
-// Renders through the built dist/ under every supported React version, ESM and CommonJS.
-// Not a vitest test: vitest's resolve.alias does not reach the reconciler's CommonJS require("react"),
-// while node's module.registerHooks (loaded with --import) does.
+/** Renders through the built dist/ under every supported React version, as ESM and as CommonJS.
+ *
+ *  Not a vitest test: vitest's resolve.alias does not reach the reconciler's CommonJS `require("react")`,
+ *  while node's module.registerHooks, loaded with --import, does. */
+
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const here = (path) => fileURLToPath(new URL(path, import.meta.url));
 
-// hook: null runs on the repo's own react, which is 18.3.1.
 const MATRIX = [
   { version: "18.3.1", hook: null, line: "29" },
   { version: "19.0.0", hook: "react-19-0", line: "31" },

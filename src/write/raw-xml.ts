@@ -1,12 +1,17 @@
+/** Turns a RawXml fragment that passed canonicalize into docx.js components, one per top-level element.
+ *
+ *  - docx 9.5.1's `ImportedXmlComponent.fromXmlString` writes an `<undefined>` wrapper element, so the
+ *    fragment is wrapped in `<x>` and parsed with xml-js instead.
+ *  - xml-js drops a whitespace-only text such as `<w:t xml:space="preserve"> </w:t>` unless
+ *    captureSpacesBetweenElements is set. That option also keeps the indentation between elements,
+ *    which must go: docx.js loses the element before a whitespace text when it writes a mix of text and
+ *    elements.
+ *  - docx.js drops CDATA sections, so they become text. A comment or processing instruction splits text
+ *    into pieces of which docx.js writes only the last, so those are dropped. */
+
 import { xml2js, type Element as XmlJsElement, type ElementCompact } from "xml-js";
 import { ImportedXmlComponent, convertToXmlComponent, type XmlComponent } from "docx";
 
-/** Fragment → one docx.js component per top-level element. The fragment must have passed canonicalize.
- *
- *  Not `ImportedXmlComponent.fromXmlString`: in docx 9.5.1 it writes an `<undefined>` wrapper element.
- *  The `<x>` wrapper lets a fragment of several elements parse. `captureSpacesBetweenElements` keeps a
- *  whitespace-only text such as `<w:t xml:space="preserve"> </w:t>`, which xml-js drops by default;
- *  `withoutIndentation` then removes the whitespace it also captures between elements. */
 export function rawXmlComponents(xml: string): XmlComponent[] {
   const parsed = xml2js(`<x>${xml}</x>`, { compact: false, captureSpacesBetweenElements: true });
   if (!isNonCompact(parsed)) throw new Error("xml2js returned its compact shape despite compact: false");
@@ -15,9 +20,6 @@ export function rawXmlComponents(xml: string): XmlComponent[] {
   return elements.map(elementsAndText).map(withoutIndentation).map(component);
 }
 
-/** Only elements and text, as docx.js writes them. A CDATA section, which docx.js drops, becomes text; a
- *  comment or processing instruction, which splits text into pieces docx.js writes only the last of, is
- *  dropped. Adjacent text is then joined, and docx.js escapes it. */
 function elementsAndText(element: XmlJsElement): XmlJsElement {
   const children = element.elements;
   if (children === undefined) return element;
@@ -39,14 +41,10 @@ function elementsAndText(element: XmlJsElement): XmlJsElement {
   return { ...element, elements: kept };
 }
 
-/** xml2js declares one return type for both its modes; the non-compact shape holds the document's `elements`. */
 function isNonCompact(parsed: XmlJsElement | ElementCompact): parsed is XmlJsElement {
   return Array.isArray(parsed.elements);
 }
 
-/** Drops whitespace text that sits beside a sibling element, at every depth. Such text is indentation,
- *  and docx.js loses the element before it when it writes a mix of text and elements. Whitespace that is
- *  an element's only content, as in `<w:t xml:space="preserve"> </w:t>`, is kept. */
 function withoutIndentation(element: XmlJsElement): XmlJsElement {
   const children = element.elements;
   if (children === undefined) return element;

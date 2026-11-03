@@ -1,3 +1,9 @@
+/** Expands Lists into list paragraphs with their numbering, and builds the list definitions that
+ *  numbering uses.
+ *
+ *  docx.js restarts a numbering instance only at level 0. So a List nested under a List of the other
+ *  type gets a definition of its own, whose level 0 sits at its depth ("NumberedList@2"). */
+
 import type * as docx from "docx";
 import { TreeError, isRecord, type AuthorNode, type IndexedChild } from "./author";
 
@@ -8,7 +14,6 @@ type ListType = "NumberedList" | "BulletList";
 const LEVEL_COUNT = 9;
 const NUMBERED_FORMATS = ["decimal", "lowerLetter", "lowerRoman"] as const;
 const BULLET_SYMBOLS = ["•", "◦", "▪"] as const;
-/** A level marker's `%1`–`%9`: the number of that level, counted from 1. */
 const LEVEL_NUMBER = /%([1-9])/g;
 
 function level(type: ListType, n: number): Level {
@@ -31,13 +36,8 @@ export const LIST_NUMBERING: { readonly config: readonly NumberingConfig[] } = {
   ],
 };
 
-/** The levels of each list definition the document's `numbering` configures, by reference. */
 export type ListLevels = ReadonlyMap<string, readonly Level[]>;
 
-/** A Document's `numbering.config`, checked once: Lists and numbered paragraphs both name its entries, so
- *  a malformed one throws here instead of being ignored or failing inside docx.js. Each entry must have a
- *  string `reference` and a `levels` array of objects with a whole-number `level`; the rest of each level is
- *  docx.js's options, passed on as authored. */
 export function numberingConfig(numbering: unknown, path: readonly string[]): readonly NumberingConfig[] {
   if (numbering === undefined) return [];
   if (!isRecord(numbering)) {
@@ -63,11 +63,8 @@ export function listLevels(config: readonly NumberingConfig[]): ListLevels {
   return new Map(config.map((entry) => [entry.reference, entry.levels]));
 }
 
-/** A list paragraph's numbering: which list definition, how deep in it, and which instance of it. */
 type ListNumbering = { readonly reference: string; readonly level: number; readonly instance: number };
 
-/** One paragraph a List expands into: the item, its own content (nested Lists excluded), its numbering,
- *  and the definition that numbering names. */
 export type ListEntry = {
   readonly item: AuthorNode;
   readonly content: readonly IndexedChild[];
@@ -76,14 +73,10 @@ export type ListEntry = {
   readonly definition: NumberingConfig;
 };
 
-/** What expanding Lists takes from the document: fresh numbering instances, so that separate lists number
- *  separately, and the levels each type numbers with. */
 type ListContext = { readonly nextInstance: () => number; readonly levels: ListLevels };
 
-/** A list definition, and why each level it leaves out is left out, for the item that needs one. */
 type Definition = { readonly config: NumberingConfig; readonly missing: (level: number) => string };
 
-/** Where a List sits: its type and depth, its definition, and its numbering. */
 type Nesting = {
   readonly type: ListType;
   readonly depth: number;
@@ -95,11 +88,6 @@ function listType(list: AuthorNode): ListType {
   return list.props.type === "numbered" ? "NumberedList" : "BulletList";
 }
 
-/** The definition for lists of `type` whose level 0 sits at depth `start`: "NumberedList" at depth 0, and
- *  "NumberedList@2" for one that starts two deep below a list of the other type. The document's own config
- *  for that reference is used as it is. Otherwise "NumberedList@2" is made of the type's levels from 2 on
- *  (the document's, or LIST_NUMBERING's), each moved up by 2 with its marker's level numbers. A level whose
- *  marker shows the number of a level above 2 is left out: there that level belongs to the enclosing list. */
 function definitionAt(type: ListType, start: number, configured: ListLevels): Definition {
   const reference = start === 0 ? type : `${type}@${start}`;
   const own = configured.get(reference);
@@ -126,9 +114,6 @@ function definitionAt(type: ListType, start: number, configured: ListLevels): De
   };
 }
 
-/** A nested List of its parent's type continues the parent's instance one level deeper. Any other List is
- *  level 0 of a fresh instance of the definition for its depth: docx.js restarts an instance at level 0
- *  only, and a definition of its own keeps it from counting on with an enclosing list of its type. */
 function nestingOf(list: AuthorNode, parent: Nesting | undefined, context: ListContext): Nesting {
   const type = listType(list);
   const depth = parent === undefined ? 0 : parent.depth + 1;
@@ -141,8 +126,6 @@ function nestingOf(list: AuthorNode, parent: Nesting | undefined, context: ListC
   return { type, depth, definition, numbering };
 }
 
-/** The items of a List in document order, each with its numbering. A List nested directly in the List,
- *  or in one of its ListItems, contributes its items one depth deeper. */
 export function listEntries(list: AuthorNode, path: readonly string[], context: ListContext, parent?: Nesting): ListEntry[] {
   if (list.props.level !== undefined) {
     throw new TreeError(path, "List.level was removed; nest <List> instead");
@@ -170,7 +153,6 @@ export function listEntries(list: AuthorNode, path: readonly string[], context: 
   return entries;
 }
 
-/** A ListItem's non-List children form its paragraph; its nested Lists follow one level deeper. */
 function itemEntries(item: AuthorNode, path: readonly string[], context: ListContext, nesting: Nesting): ListEntry[] {
   const { level } = nesting.numbering;
   if (!nesting.definition.config.levels.some((l) => l.level === level)) {

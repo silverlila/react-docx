@@ -1,3 +1,12 @@
+/** Renders JSX synchronously with the react-reconciler build that matches the user's React, then
+ *  canonicalizes the result.
+ *
+ *  React 18 (react-reconciler 0.29) has a legacy root (tag 0). It renders synchronously and throws
+ *  render errors straight out of updateContainer.
+ *
+ *  React 19 has no legacy root. updateContainerSync followed by flushSyncWork renders synchronously, but
+ *  render errors reach only the root's error callbacks, so the first uncaught one is rethrown afterwards. */
+
 import React from "react";
 import Reconciler29 from "react-reconciler-29";
 import Reconciler31 from "react-reconciler-31";
@@ -14,7 +23,6 @@ let reconciler29: ReturnType<typeof Reconciler29> | undefined;
 let reconciler31: ReturnType<typeof Reconciler31> | undefined;
 let reconciler33: ReturnType<typeof Reconciler33> | undefined;
 
-/** The first error React reports to a root, kept in a box so that a thrown `undefined` still fails the render. */
 function firstError(): { record: (error: unknown) => void; rethrow: () => void } {
   let first: { readonly error: unknown } | undefined;
   return {
@@ -27,12 +35,10 @@ function firstError(): { record: (error: unknown) => void; rethrow: () => void }
   };
 }
 
-/** An error an error boundary caught has been handled: its fallback renders. Logged, as React does by default. */
 function logCaught(error: unknown): void {
   console.error(error);
 }
 
-/** React 18: a legacy root (tag 0) renders synchronously and throws render errors directly. */
 function render29(element: React.ReactElement, container: HostContainer): void {
   reconciler29 ??= Reconciler29(hostConfig18);
   const errors = firstError();
@@ -41,7 +47,6 @@ function render29(element: React.ReactElement, container: HostContainer): void {
   errors.rethrow();
 }
 
-/** React 19 has no legacy root: render synchronously, then rethrow the first error no boundary caught. */
 function renderSync(
   reconciler: ReturnType<typeof Reconciler31> | ReturnType<typeof Reconciler33>,
   element: React.ReactElement,
@@ -60,7 +65,6 @@ const RENDER: Record<ReactLine, Render> = {
   "33": (element, container) => renderSync((reconciler33 ??= Reconciler33(hostConfig19)), element, container),
 };
 
-/** Renders synchronously and returns the root host instance, or throws the render error. */
 export function renderToHost(element: React.ReactElement): HostChild | null {
   const container: HostContainer = { rootInstance: null };
   RENDER[reactLine(React.version)](element, container);

@@ -1,31 +1,29 @@
+/** The element table: one row per kind, naming the docx.js class it builds, the child kinds it may hold
+ *  and its content model.
+ *
+ *  `spec<P>()` is curried because TypeScript cannot infer some type arguments while others are given,
+ *  and each row must keep its literal types.
+ *
+ *  docx.js facts the table encodes:
+ *  - Textbox accepts a `text` option and ignores it.
+ *  - Textbox children are typed as inline content but written into `<w:txbxContent>`, which holds
+ *    paragraphs, so a Textbox holds Paragraphs.
+ *  - The tracked-change run option types are not exported, and InsertedTextRun and DeletedTextRun take
+ *    `date` as a string.
+ *  - Footnote references are written only from body content, so a Footnote inside a Header, Footer,
+ *    Comment or Footnote (OUTSIDE_BODY) would never be written. */
+
 import type * as docx from "docx";
 
-/** What one kind is. Data only: the writer, and later the reader and the HTML preview,
- *  each keep their own exhaustive `{ [K in Kind]: … }` record checked against this table. */
 type Spec<P> = {
-  /** The docx.js export this kind constructs; null when it folds into a parent's option. */
   readonly docx: string | null;
-  /** Legal child kinds in canonical form. */
   readonly children: readonly string[];
-  /** What its children are, which decides how loose content standing in it is read. */
   readonly content: Content;
-  /** Phantom: never set at runtime, carries the props type. */
   readonly props?: P;
 };
 
-/** A kind's content model. test/content-models.test.ts checks each row's against its `children`.
- *  - `block`: paragraphs and tables. A RawXml here holds block roots.
- *  - `wrapped`: paragraphs and tables; loose text and inline content is wrapped into Paragraphs (rule 17).
- *  - `inline`: runs and other inline content; loose text, Breaks and run content are wrapped into TextRuns.
- *    A RawXml here holds inline roots.
- *  - `run`: literal text and run content, split at Breaks. A RawXml here holds run roots.
- *  - `math`: MathRuns; loose text is wrapped into one.
- *  - `literal`: literal text only.
- *  - `plain`: element children only, or none. */
 export type Content = "block" | "wrapped" | "inline" | "run" | "math" | "literal" | "plain";
 
-/** Curried so that `P` is given explicitly while the row itself keeps its literal types
- *  (`content: "run"`, the exact child tuple), which `Node<K>` reads. */
 const spec =
   <P>() =>
   <const S extends Omit<Spec<P>, "props">>(row: S): S & { readonly props?: P } =>
@@ -83,13 +81,9 @@ type RasterImage = { readonly type: "jpg" | "png" | "gif" | "bmp"; readonly data
 export type ImageProps = Omit<docx.IImageOptions, "type" | "data" | "fallback"> &
   (RasterImage | { readonly type: "svg"; readonly data: Uint8Array; readonly fallback: RasterImage });
 type HeaderFooterProps = { readonly type: "default" | "first" | "even" };
-/** docx.js does not export `ITextboxOptions`. */
 type TextboxOptions = ConstructorParameters<typeof docx.Textbox>[0];
-/** `text` is left out: docx.js's Textbox ignores it. `style` is the VML shape style, not a paragraph style. */
 type TextboxProps = Omit<TextboxOptions, "children" | "text">;
 type CommentIdProps = { readonly id: number };
-/** docx.js does not export the tracked-change run options. Like TextRun's, they keep `text`, which a canonical
- *  run carries only for a literal docx.js would misread as a child. `date` is a string. */
 type InsertedTextRunProps = Omit<ConstructorParameters<typeof docx.InsertedTextRun>[0], "children">;
 type DeletedTextRunProps = Omit<ConstructorParameters<typeof docx.DeletedTextRun>[0], "children">;
 
@@ -111,8 +105,6 @@ export const ELEMENTS = {
     children: INLINE,
     content: "inline",
   }),
-  /** `text` appears only on a childless run holding a literal docx.js would misread as a child:
-   *  `""` or a PageNumber value. Every other literal is a string child. */
   TextRun: spec<Omit<docx.IRunOptions, "children">>()({
     docx: "TextRun",
     children: RUN_CONTENT,
@@ -159,15 +151,12 @@ export const ELEMENTS = {
   PageBreak: spec<{}>()({ docx: "PageBreak", children: [], content: "plain" }),
   Math: spec<{}>()({ docx: "Math", children: ["MathRun"], content: "math" }),
   MathRun: spec<{}>()({ docx: "MathRun", children: [], content: "literal" }),
-  /** One or more sibling OOXML elements docx.js cannot express, written verbatim. */
   RawXml: spec<{ readonly xml: string }>()({ docx: "ImportedXmlComponent", children: [], content: "plain" }),
-  /** Stands where it is referenced and holds its own content; the writer numbers footnotes 1..n in body order. */
   Footnote: spec<{}>()({
     docx: "FootnoteReferenceRun",
     children: ["Paragraph", "Table"],
     content: "wrapped",
   }),
-  /** A Document child; ranges and references mark where it applies by its id. */
   Comment: spec<Omit<docx.ICommentOptions, "children">>()({
     docx: "Comment",
     children: ["Paragraph", "Table"],
@@ -193,8 +182,6 @@ export const ELEMENTS = {
     children: [],
     content: "plain",
   }),
-  /** docx.js types its children as inline content but writes them straight into `<w:txbxContent>`,
-   *  which holds paragraphs. */
   Textbox: spec<TextboxProps>()({ docx: "Textbox", children: ["Paragraph"], content: "wrapped" }),
   InsertedTextRun: spec<InsertedTextRunProps>()({
     docx: "InsertedTextRun",
@@ -257,18 +244,13 @@ export type Node<K extends Kind = Kind> = K extends Kind
   : never;
 export type DocumentNode = Node<"Document">;
 
-/** `Object.hasOwn` is ES2022; tsconfig's lib is ES2020. */
 export const isKind = (type: string): type is Kind =>
   Object.prototype.hasOwnProperty.call(ELEMENTS, type);
 
-/** Rule 18: the kinds whose content is outside the document body. docx.js writes footnote references only
- *  from body content, so no Footnote may stand anywhere inside one of these. */
 export const OUTSIDE_BODY: readonly Kind[] = ["Header", "Footer", "Comment", "Footnote"];
 
 const MATH_SLOTS = "named slots need a slot-component design (out of scope); author as <RawXml> OMML meanwhile";
 
-/** docx.js content classes that are not kinds, each with why. test/coverage.test.ts fails on a content class
- *  that is neither some `ELEMENTS[k].docx` nor a key here, and on a key that is no longer a content class. */
 export const NOT_MAPPED: Readonly<Record<string, string>> = {
   Comments: "the comments part container; built from <Comment> children of Document",
   AnnotationReference: "written by docx.js inside comment parts",

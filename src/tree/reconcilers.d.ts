@@ -1,6 +1,3 @@
-// The three react-reconciler builds are installed under aliased names, one per React line.
-// Their container APIs differ, so each declares only what src/tree/render.ts calls.
-
 declare module "react-reconciler-29" {
   type Root = unknown;
   interface Reconciler29 {

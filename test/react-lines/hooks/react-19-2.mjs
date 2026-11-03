@@ -1,9 +1,11 @@
-// Loaded with `node --import`: every "react" import, including the reconciler's CommonJS
-// require, resolves to the aliased react-19-2 instead of the repo's React 18.
+/** Loaded with `node --import`: every "react" import, the reconciler's CommonJS require included,
+ *  resolves to the aliased react-19-2 instead of the repo's React 18.
+ *
+ *  Under pnpm the aliased React is not resolvable from inside node_modules/.pnpm/react-reconciler@…,
+ *  so resolution starts at the repo root. */
+
 import { registerHooks } from "node:module";
 
-// The repo root, where react-19-2 is resolvable. Under pnpm it is not resolvable from inside
-// node_modules/.pnpm/react-reconciler@…, so resolution must start here.
 const root = new URL("../../../", import.meta.url).href;
 
 registerHooks({

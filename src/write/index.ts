@@ -12,7 +12,6 @@ function isTree(source: RenderSource): source is DocumentNode {
   return !isValidElement(source);
 }
 
-/** A tree is canonicalized again: it is idempotent, and a hand-built tree is normalized or rejected like JSX. */
 function toDocument(source: RenderSource): docx.Document {
   const tree = isTree(source) ? canonicalize(source) : renderToTree(source);
   return buildDocument(tree);

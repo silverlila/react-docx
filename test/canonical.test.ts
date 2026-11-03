@@ -7,7 +7,6 @@ import { LIST_NUMBERING } from "../src/tree/lists";
 import { xmlRoots } from "../src/tree/xml-roots";
 import { n } from "./support/nodes";
 
-/** canonicalize, asserting on every input that it is left untouched and that a second pass changes nothing. */
 function canon(input: AuthorNode): DocumentNode {
   const before = structuredClone(input);
   const output = canonicalize(input);
@@ -24,7 +23,6 @@ const run = (props: Record<string, unknown>, ...children: unknown[]) => ({ type:
 const tab = { type: "Tab", props: {}, children: [] };
 const page = (field: string) => ({ type: "PageNumber", props: { field }, children: [] });
 const paragraph = (props: Record<string, unknown>, ...children: unknown[]) => ({ type: "Paragraph", props, children });
-/** The tracked-change run kinds, which rules 1, 4 and 6 treat as they treat TextRun. */
 const TRACKED = ["InsertedTextRun", "DeletedTextRun"];
 const change = { id: 1, author: "A", date: "2026-01-01T00:00:00Z" };
 const runOf = (type: string, props: Record<string, unknown>, ...children: unknown[]) => ({ type, props, children });
@@ -305,8 +303,6 @@ describe("7. heading", () => {
 });
 
 describe("8. presence-only booleans", () => {
-  // docx.js 9.5.1 writes every boolean option as w:val="false" when false (test/presence-booleans.test.ts),
-  // so PRESENCE_ONLY is empty and no false boolean is removed.
   test("false booleans are kept, including tableHeader and a nested section property", () => {
     const tree = canon(
       n(
@@ -404,7 +400,6 @@ describe("11. image data", () => {
     expect(imageProps(canon(image(new Uint8Array([4, 5]).buffer))).data).toEqual(new Uint8Array([4, 5]));
   });
 
-  // Not through canon(): structuredClone turns a Buffer into a Uint8Array, so its purity check cannot see this input.
   test("a Node Buffer is copied into a plain Uint8Array", () => {
     const buffer = Buffer.from([6, 7]);
     const tree = canonicalize(image(buffer));
@@ -730,7 +725,6 @@ describe("16. styles.importedStyles", () => {
 });
 
 describe("17. loose content in Footnote, Comment and Textbox", () => {
-  /** Each host where it may stand, and how to find its canonical children again. */
   const hosts = {
     Footnote: {
       tree: (...children: (AuthorNode | string)[]) => doc(n("Paragraph", {}, n("Footnote", {}, ...children))),
@@ -1077,7 +1071,6 @@ describe("lists", () => {
     test("renumber every marker from the depth the list starts at", () => {
       const four = { level: 3, format: "decimal", text: "%3.%4", alignment: "left", style: indent(2880) };
       const bare = { level: 3, format: "decimal", alignment: "left", style: indent(2880) };
-      // numbered > bullet > numbered: the innermost list starts two deep, under the bullet list.
       const innermost = () => n("List", { type: "numbered" }, n("ListItem", {}, "n"));
       const twoDeep = (levels: readonly object[]) =>
         withNumbering(levels, n("List", { type: "numbered" }, n("ListItem", {}, "1", n("List", {}, n("ListItem", {}, "b", innermost())))));

@@ -5,9 +5,6 @@ import { docxXml } from "./support/docx-xml";
 
 type ProbedKind = "Paragraph" | "TextRun" | "Table" | "TableRow" | "TableCell" | "Section";
 
-/** Every boolean-typed option key in node_modules/docx/dist/index.d.ts (9.5.1) of IParagraphOptions,
- *  IRunOptions, ITableOptions, ITableRowOptions and ISectionOptions["properties"], including keys from
- *  intersected types and keys typed `boolean | …`. ITableCellOptions has no boolean option. */
 const BOOLEAN_OPTIONS: readonly { readonly kind: ProbedKind; readonly path: string }[] = [
   ...[
     "bidirectional",
@@ -50,7 +47,6 @@ const BOOLEAN_OPTIONS: readonly { readonly kind: ProbedKind; readonly path: stri
   { kind: "Section", path: "properties.titlePage" },
 ];
 
-/** `"a.b"`, true → `{ a: { b: true } }`; undefined → `{}`. */
 function optionAt(path: string, value: boolean | undefined): Record<string, unknown> {
   if (value === undefined) return {};
   const [head, ...rest] = path.split(".");

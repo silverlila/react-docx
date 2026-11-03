@@ -1,8 +1,27 @@
+/** Builds docx.js objects from a canonical tree.
+ *
+ *  docx.js facts the builders work around:
+ *  - Its child unions are closed and FileChild is branded, so they admit no raw component. Some also
+ *    leave out content docx.js writes correctly: CommentReference inside `<w:r>`, PageReference as a
+ *    paragraph child. At runtime docx.js pushes any XmlComponent child as-is.
+ *  - Textbox types its children as inline content but writes them into `<w:txbxContent>`.
+ *  - The `footnotes` option types content as Paragraphs, but a Table after the first Paragraph is
+ *    written just as well. It reserves footnote ids −1 and 0 for its separators, so footnotes are
+ *    numbered 1..n.
+ *  - It spreads `styles` over its default style list, so raw styles passed as `importedStyles` would
+ *    replace every default. They are appended after docx.js has built its own.
+ *  - It ignores a run's `text` whenever `children` is truthy, even `[]`.
+ *  - DeletedTextRun has no case for PageNumber.CURRENT_SECTION and writes the deleted word "SECTION",
+ *    so that field is written as raw XML.
+ *  - It stamps a Comment with no date with the time of writing, via `date.toISOString()`, and leaves out
+ *    an attribute whose value is undefined. An undated Comment gets a date whose toISOString returns
+ *    undefined, so it writes no w:date.
+ *  - It writes a run child string equal to a PageNumber value as that field. */
+
 import * as docx from "docx";
 import { OUTSIDE_BODY, type DocumentNode, type Kind, type Node } from "../schema/elements";
 import { rawXmlComponents } from "./raw-xml";
 
-/** What each kind's builder returns: the docx.js object, or the option bag its parent takes. */
 type Built = {
   Document: docx.Document;
   Section: docx.ISectionOptions;
@@ -23,15 +42,11 @@ type Built = {
   PageBreak: docx.PageBreak;
   Math: docx.Math;
   MathRun: docx.MathRun;
-  /** One component per top-level element of the fragment, written in the RawXml's place. */
   RawXml: docx.XmlComponent[];
   Footnote: docx.FootnoteReferenceRun;
-  /** Not built in place: the Document collects it into its `comments` option. */
   Comment: docx.ICommentOptions;
   CommentRangeStart: docx.CommentRangeStart;
   CommentRangeEnd: docx.CommentRangeEnd;
-  /** Spliced into its run like a RawXml's components: docx.js writes it inside `<w:r>`,
-   *  but its run child union leaves it out. */
   CommentReference: docx.XmlComponent[];
   TableOfContents: docx.TableOfContents;
   Textbox: docx.Textbox;
@@ -41,8 +56,6 @@ type Built = {
   SimpleField: docx.SimpleField;
   SimpleMailMergeField: docx.SimpleMailMergeField;
   SequentialIdentifier: docx.SequentialIdentifier;
-  /** Spliced into its parent like a RawXml's components: docx.js writes it as a paragraph child,
-   *  but its ParagraphChild union leaves it out. */
   PageReference: docx.XmlComponent[];
   CheckBox: docx.CheckBox;
   PositionalTab: docx.PositionalTab;
@@ -57,15 +70,11 @@ type Built = {
   YearLong: docx.YearLong;
 };
 
-/** What building a node needs beyond the node: per-build, so two documents rendered in one process both start at 1. */
 type BuildCtx = { readonly footnoteIds: ReadonlyMap<Node<"Footnote">, number> };
 
 type HeaderFooterSlots<T> = { default?: T; first?: T; even?: T };
 
-/** Builds one canonical node of any kind. */
 function build<N extends Node>(node: N, ctx: BuildCtx): Built[N["type"]] {
-  // The one cast: TypeScript cannot correlate BUILD[node.type] with node, though BUILD's type pairs each kind's
-  // builder with that kind's node.
   const builder = BUILD[node.type] as unknown as (node: N, ctx: BuildCtx) => Built[N["type"]];
   return builder(node, ctx);
 }
@@ -74,20 +83,14 @@ function buildAll<N extends Node>(nodes: readonly N[], ctx: BuildCtx): Built[N["
   return nodes.map((node) => build(node, ctx));
 }
 
-/** docx.js's child unions are closed and its FileChild type is branded, so they admit no raw component, and
- *  some leave out content docx.js writes correctly. At runtime docx.js pushes any XmlComponent child into its
- *  parent as-is. */
 function asChildren<T>(components: docx.XmlComponent[]): T[] {
   return components as unknown as T[];
 }
 
-/** Built children in order, with each RawXml's components spliced in where the RawXml stood. */
 function inPlace<T>(built: readonly (T | docx.XmlComponent[])[]): T[] {
   return built.flatMap((item) => (Array.isArray(item) ? asChildren<T>(item) : [item]));
 }
 
-/** Footnotes in body order: depth first through the Sections, never into an OUTSIDE_BODY kind,
- *  which canonical rule 18 keeps footnotes out of. */
 function bodyFootnotes(document: DocumentNode): Node<"Footnote">[] {
   const found: Node<"Footnote">[] = [];
   const visit = (node: Node): void => {
@@ -106,8 +109,6 @@ function footnoteId(node: Node<"Footnote">, ctx: BuildCtx): number {
   return id;
 }
 
-/** docx.js's `footnotes` option: each footnote's content under its number. docx.js types that content as
- *  Paragraphs; it writes a Table after the first Paragraph just as well. */
 function footnoteBodies(footnotes: readonly Node<"Footnote">[], ctx: BuildCtx) {
   return Object.fromEntries(
     footnotes.map((footnote) => [
@@ -117,12 +118,6 @@ function footnoteBodies(footnotes: readonly Node<"Footnote">[], ctx: BuildCtx) {
   );
 }
 
-/** Canonical tree → docx.js Document. The tree must come from `canonicalize`.
- *
- *  Footnotes are numbered 1..n in body order; docx.js reserves −1 and 0 for its separators.
- *
- *  Raw styles are appended after docx.js has built its own. Passing them as docx.js's `importedStyles`
- *  would replace its whole default style list, since it spreads `styles` over its defaults. */
 export function buildDocument(node: DocumentNode): docx.Document {
   const { styles, ...rest } = node.props;
   const { importedStyles = [], ...docxStyles } = styles ?? {};
@@ -134,7 +129,6 @@ export function buildDocument(node: DocumentNode): docx.Document {
     if (child.type === "Section") sections.push(build(child, ctx));
     else comments.push(build(child, ctx));
   }
-  // footnotes and comments are only given when there are some, so documents without notes are written as before.
   const document = new docx.Document({
     ...rest,
     ...(styles === undefined ? {} : { styles: docxStyles }),
@@ -160,12 +154,9 @@ function buildSection(node: Node<"Section">, ctx: BuildCtx): docx.ISectionOption
   return { ...node.props, headers, footers, children };
 }
 
-/** The three run kinds share their content kinds. */
 type RunChild = Node<"TextRun">["children"][number];
 type RunChildren = { readonly children?: NonNullable<docx.IRunOptions["children"]> };
 
-/** A canonical run holds either string and run-content children or, alone, a `text` literal.
- *  docx.js ignores `text` whenever `children` is truthy, even `[]`, so a childless run passes `undefined`. */
 function buildRun<P, R>(
   Run: new (options: NoInfer<P> & RunChildren) => R,
   { props, children }: { readonly props: P; readonly children: readonly RunChild[] },
@@ -175,8 +166,6 @@ function buildRun<P, R>(
   return new Run({ ...props, children: built.length === 0 ? undefined : inPlace(built) });
 }
 
-/** docx.js's DeletedTextRun writes PAGE, NUMPAGES and SECTIONPAGES as deleted fields but has no case for
- *  PageNumber.CURRENT_SECTION, which it writes as the deleted word "SECTION": that field is written here. */
 const DELETED_SECTION_FIELD: Node<"RawXml"> = {
   type: "RawXml",
   props: {
@@ -196,8 +185,6 @@ function buildDeletedRun(node: Node<"DeletedTextRun">, ctx: BuildCtx): docx.Dele
   return buildRun(docx.DeletedTextRun, { props: node.props, children }, ctx);
 }
 
-/** docx.js stamps a Comment without a date with the time of writing, as `date.toISOString()`, and leaves out
- *  an attribute whose value is undefined: this date writes no `w:date`, so the same tree writes the same bytes. */
 const UNDATED = { toISOString: () => undefined } as unknown as Date;
 
 const BUILD: { readonly [K in Kind]: (node: Node<K>, ctx: BuildCtx) => Built[K] } = {
@@ -212,7 +199,6 @@ const BUILD: { readonly [K in Kind]: (node: Node<K>, ctx: BuildCtx) => Built[K] 
   TableCell: ({ props, children }, ctx) =>
     new docx.TableCell({ ...props, children: inPlace(buildAll(children, ctx)) }),
   Tab: () => new docx.Tab(),
-  // The docx.js field sentinel: a run child string equal to a PageNumber value is written as that field.
   PageNumber: ({ props }) => props.field,
   ImageRun: ({ props }) => new docx.ImageRun(props),
   SymbolRun: ({ props }) => new docx.SymbolRun(props),
@@ -226,15 +212,12 @@ const BUILD: { readonly [K in Kind]: (node: Node<K>, ctx: BuildCtx) => Built[K] 
   Math: ({ children }, ctx) => new docx.Math({ children: buildAll(children, ctx) }),
   MathRun: ({ children }) => new docx.MathRun(children.join("")),
   RawXml: ({ props }) => rawXmlComponents(props.xml),
-  // The footnote's content is built once, by the Document, into its `footnotes` option.
   Footnote: (node, ctx) => new docx.FootnoteReferenceRun(footnoteId(node, ctx)),
   Comment: ({ props, children }, ctx) => ({ ...props, date: props.date ?? UNDATED, children: buildAll(children, ctx) }),
   CommentRangeStart: ({ props }) => new docx.CommentRangeStart(props.id),
   CommentRangeEnd: ({ props }) => new docx.CommentRangeEnd(props.id),
   CommentReference: ({ props }) => [new docx.CommentReference(props.id)],
   TableOfContents: ({ props: { alias, ...options } }) => new docx.TableOfContents(alias, options),
-  // docx.js types a Textbox's children as inline content but writes them into <w:txbxContent>, which holds
-  // paragraphs: the element table gives it Paragraph children.
   Textbox: ({ props, children }, ctx) =>
     new docx.Textbox({ ...props, children: asChildren<docx.ParagraphChild>(buildAll(children, ctx)) }),
   InsertedTextRun: (node, ctx) => buildRun(docx.InsertedTextRun, node, ctx),

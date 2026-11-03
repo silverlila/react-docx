@@ -49,8 +49,6 @@ import type {
   YearShortProps,
 } from "./types";
 
-/** A component rendering the `RD<kind>` host element. Each export below is created once, at module
- *  level: callers match components by identity (`el.type === Table`). */
 function element<P extends { children?: ReactNode }>(kind: string): React.FC<P> {
   const Component: React.FC<P> = ({ children, ...props }) => React.createElement(`RD${kind}`, props, children);
   Component.displayName = kind;

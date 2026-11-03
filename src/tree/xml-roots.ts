@@ -1,10 +1,18 @@
-/** A fragment's top-level element names, why the fragment is not well-formed, or why docx.js cannot write it. */
+/** Reads a RawXml fragment's top-level element names, or says why it is not well-formed or why docx.js
+ *  cannot write it. It uses no XML parser, because canonicalize also runs in browsers.
+ *
+ *  - XML whitespace is only space, tab, CR and LF. String.prototype.trim also strips U+00A0, U+FEFF and
+ *    others, so it is not used.
+ *  - docx.js writes an element's text after its last child element and drops the element before it, so
+ *    an element that mixes text and child elements is rejected.
+ *  - docx.js's writer-side parser also decodes HTML entities but the reader's parser does not, so only
+ *    XML's five entities and character references are accepted. */
+
 export type XmlRoots =
   | { readonly kind: "roots"; readonly roots: readonly string[] }
   | { readonly kind: "malformed"; readonly reason: string }
   | { readonly kind: "unwritable"; readonly reason: string };
 
-/** Markup that is skipped whole: where it starts, where it ends, and whether it may stand at the top level. */
 const SKIPPED = [
   { open: "<!--", close: "-->", topLevel: true },
   { open: "<?", close: "?>", topLevel: true },
@@ -13,21 +21,17 @@ const SKIPPED = [
 
 const NAME = /^[^\s/>]+/;
 const ATTRIBUTE = /\s+([^\s=/>]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/y;
-/** An ampersand, with the reference it starts when it starts one. */
 const AMPERSAND = /&(?:#([0-9]+);|#x([0-9a-fA-F]+);|([A-Za-z_:][\w.:-]*);)?/g;
 const CHARACTER_REFERENCE = /&#([0-9]+);|&#x([0-9a-fA-F]+);/g;
 const PREDEFINED_ENTITIES = new Set(["amp", "lt", "gt", "quot", "apos"]);
-/** XML's whitespace is these four characters only; String.prototype.trim also strips U+00A0, U+FEFF and others. */
 const XML_SPACE_AROUND = /^[ \t\r\n]+|[ \t\r\n]+$/g;
 
-/** An element still open: its name, and whether it holds text or elements so far. */
 type Open = { readonly name: string; text: string | null; hasElement: boolean };
 
 function malformed(reason: string): XmlRoots {
   return { kind: "malformed", reason };
 }
 
-/** docx.js writes an element's text after its last child element and drops the element before it. */
 function mixedContent(element: Open): XmlRoots | null {
   if (element.text === null || !element.hasElement) return null;
   const reason = `<${element.name}> mixes text "${element.text}" with elements, and docx.js drops the element before the text`;
@@ -38,7 +42,6 @@ function xmlTrim(text: string): string {
   return text.replace(XML_SPACE_AROUND, "");
 }
 
-/** The Char production of XML 1.0. */
 function isXmlCharacter(code: number): boolean {
   return (
     code === 0x9 ||
@@ -50,8 +53,6 @@ function isXmlCharacter(code: number): boolean {
   );
 }
 
-/** Text or an attribute value: every & must start one of XML's five entities or a reference to a character
- *  XML allows. The writer's parser also decodes HTML's entities, the reader's does not. */
 function referenceProblem(text: string): XmlRoots | null {
   for (const [reference, decimal, hex, entity] of text.matchAll(AMPERSAND)) {
     if (reference === "&") return malformed(`a bare "&" in "${xmlTrim(text)}": write &amp;`);
@@ -64,14 +65,12 @@ function referenceProblem(text: string): XmlRoots | null {
   return null;
 }
 
-/** Text with its character references decoded; they must already have passed `referenceProblem`. */
 function decodeCharacterReferences(text: string): string {
   return text.replace(CHARACTER_REFERENCE, (_, decimal: string | undefined, hex: string | undefined) =>
     String.fromCodePoint(decimal !== undefined ? parseInt(decimal, 10) : parseInt(hex ?? "", 16))
   );
 }
 
-/** A start tag's attributes, after its name: `name="value"` pairs, each name once. */
 function attributesProblem(name: string, attributes: string): XmlRoots | null {
   const seen = new Set<string>();
   let at = 0;
@@ -91,7 +90,6 @@ function attributesProblem(name: string, attributes: string): XmlRoots | null {
   return null;
 }
 
-/** The index of the `>` closing the tag that starts at `from`, skipping quoted attribute values; -1 if none. */
 function tagEnd(xml: string, from: number): number {
   let quote: string | null = null;
   for (let i = from; i < xml.length; i++) {
@@ -107,10 +105,6 @@ function tagEnd(xml: string, from: number): number {
   return -1;
 }
 
-/** Parser-free, because canonicalize also runs in the browser: tracks open elements over start, end and
- *  self-closing tags and records the names of those that open at the top level. Comments and processing
- *  instructions are skipped; text and CDATA are allowed only inside an element, and not beside a child
- *  element, since docx.js cannot write that mix. Attributes must be quoted pairs, and every & a reference. */
 export function xmlRoots(xml: string): XmlRoots {
   const roots: string[] = [];
   const open: Open[] = [];

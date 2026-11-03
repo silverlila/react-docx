@@ -42,7 +42,6 @@ import {
 export type CharacterizationCase = {
   readonly name: string;
   readonly element: ReactElement;
-  /** What 0.1.8 wrote wrong in this case; its snapshot pins the fix. */
   readonly fixed?: string;
 };
 

@@ -1,16 +1,21 @@
+/** Facts about docx.js 9.5.1's behaviour that canonicalization depends on.
+ *
+ *  - PAGE_NUMBER_VALUES: docx.PageNumber's values. docx.js turns these strings into fields when they are
+ *    run children.
+ *  - DEFAULT_STYLE_SLOTS: each of docx.js's built-in style ids, with the IDefaultStylesOptions key that
+ *    sets it and whether that key takes paragraph or character options.
+ *  - PRESENCE_ONLY: by kind, the dot paths of boolean options docx.js writes the same for true and false,
+ *    as probed by test/presence-booleans.test.ts. In 9.5.1 there are none.
+ *  - RAW_XML_ROOTS: the top-level OOXML elements a RawXml fragment may hold, by slot. */
+
 import type * as docx from "docx";
 import type { Kind } from "./elements";
 
-/** Facts about docx.js 9.5.1's behavior that canonicalization depends on.
- *  Each one is pinned by test/presence-booleans.test.ts. */
-
-/** Strings docx.js turns into fields when they are run children. Values of docx.PageNumber. */
 export const PAGE_NUMBER_VALUES = ["CURRENT", "TOTAL_PAGES", "TOTAL_PAGES_IN_SECTION", "SECTION"] as const;
 
 type DefaultStyleKey = Exclude<keyof NonNullable<docx.IStylesOptions["default"]>, "document">;
 type DefaultStyleSlot = { readonly key: DefaultStyleKey; readonly kind: "paragraph" | "character" };
 
-/** docx.js's built-in style ids → their IDefaultStylesOptions key, and which kind of options that key takes. */
 export const DEFAULT_STYLE_SLOTS = {
   Title: { key: "title", kind: "paragraph" },
   Heading1: { key: "heading1", kind: "paragraph" },
@@ -27,13 +32,8 @@ export const DEFAULT_STYLE_SLOTS = {
   FootnoteTextChar: { key: "footnoteTextChar", kind: "character" },
 } as const satisfies Record<string, DefaultStyleSlot>;
 
-/** Boolean options docx.js writes identically for `true` and `false`. Found by test/presence-booleans.test.ts.
- *  Paths are dot paths relative to the kind's props. */
 export const PRESENCE_ONLY: { readonly [K in Kind]?: readonly string[] } = {};
 
-/** The OOXML elements a RawXml fragment may hold at its top level, by the slot it stands in.
- *  `w:footnoteReference`, `w:endnoteReference` and `w:commentReference` are left out of `run`:
- *  their ids would point at notes the tree does not contain. */
 export const RAW_XML_ROOTS = {
   block: ["w:p", "w:tbl", "w:sdt", "w:customXml", "w:bookmarkStart", "w:bookmarkEnd"],
   inline: [

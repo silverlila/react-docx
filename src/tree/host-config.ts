@@ -1,7 +1,15 @@
+/** The react-reconciler host configs, for 0.29 (React 18) and 0.31/0.33 (React 19). They build a plain,
+ *  mutable `{ type, props, children }` tree that canonicalize reads.
+ *
+ *  - React moves a child it already placed by calling appendChild or insertBefore with it again, as with
+ *    the DOM, so the host takes it out of its old position first.
+ *  - HostTransitionContext must be a context of the React the library imports (the user's). A plain
+ *    object crashes react-reconciler 0.31 and later.
+ *  - `trackSchedulerEvent` is read only by react-reconciler 0.33. */
+
 import React from "react";
 import { TreeError } from "./author";
 
-/** What the reconciler builds. Mutable, internal, never exported from the package. */
 export type HostNode = { type: string; props: Record<string, unknown>; children: HostChild[] };
 type HostText = { type: "#text"; text: string };
 export type HostChild = HostNode | HostText;
@@ -9,33 +17,28 @@ export type HostContainer = { rootInstance: HostChild | null };
 
 type HostProps = Record<string, unknown>;
 
-/** Props without `children`, as host instances store them. */
 function ownProps(props: HostProps): HostProps {
   const { children, ...nodeProps } = props;
   return nodeProps;
 }
 
-/** The position of `child` in `parent`; React only names children it placed there. */
 function indexIn(parent: HostNode, child: HostChild): number {
   const index = parent.children.indexOf(child);
   if (index === -1) throw new Error(`react-docx host: a <${parent.type}> child React named is not in it`);
   return index;
 }
 
-/** React moves a child it already placed by appending or inserting it again: like the DOM, take it out first. */
 function detached(parent: HostNode, child: HostChild): void {
   const index = parent.children.indexOf(child);
   if (index !== -1) parent.children.splice(index, 1);
 }
 
-/** Host config members shared by react-reconciler 0.29, 0.31 and 0.33. */
 const base = {
   supportsMutation: true,
   supportsPersistence: false,
   supportsHydration: false,
   isPrimaryRenderer: false,
 
-  /** Components render `RD<Kind>` host elements; the prefix is stripped. Placement is checked by canonicalize. */
   createInstance(type: string, props: HostProps): HostNode {
     if (!type.startsWith("RD")) throw new TreeError([type], `Unknown element <${type}>`);
     return { type: type.slice(2), props: ownProps(props), children: [] };
@@ -96,7 +99,6 @@ const base = {
   detachDeletedInstance() {},
 } satisfies Record<string, unknown>;
 
-/** react-reconciler 0.29 (React 18). */
 export const hostConfig18 = {
   ...base,
   prepareUpdate: () => true,
@@ -109,12 +111,11 @@ export const hostConfig18 = {
   ): void {
     instance.props = ownProps(newProps);
   },
-  getCurrentEventPriority: () => 16, // DefaultEventPriority in 0.29
+  getCurrentEventPriority: () => 16,
 } satisfies Record<string, unknown>;
 
 let updatePriority = 0;
 
-/** react-reconciler 0.31 and 0.33 (React 19). */
 export const hostConfig19 = {
   ...base,
   commitUpdate(instance: HostNode, _type: string, _oldProps: HostProps, newProps: HostProps): void {
@@ -124,12 +125,11 @@ export const hostConfig19 = {
     updatePriority = priority;
   },
   getCurrentUpdatePriority: () => updatePriority,
-  resolveUpdatePriority: () => updatePriority || 32, // DefaultEventPriority in 0.31+
+  resolveUpdatePriority: () => updatePriority || 32,
   resolveEventType: () => null,
   resolveEventTimeStamp: () => -1.1,
   shouldAttemptEagerTransition: () => false,
   NotPendingTransition: null,
-  // Must be a context of the React the library imports (the user's); a plain object crashes 0.31+.
   HostTransitionContext: React.createContext(null),
   resetFormInstance() {},
   maySuspendCommit: () => false,
@@ -137,6 +137,5 @@ export const hostConfig19 = {
   startSuspendingCommit() {},
   suspendInstance() {},
   waitForCommitToBeReady: () => null,
-  // Read by 0.33 only.
   trackSchedulerEvent() {},
 } satisfies Record<string, unknown>;

@@ -14,7 +14,6 @@ import {
 } from "../src/index";
 import { docxXml } from "./support/docx-xml";
 
-/** A rendered part with docxXml's pretty-printing undone, so it compares against a fragment as authored. */
 async function part(element: ReactElement, name: string): Promise<string> {
   return docxXml(await renderToBuffer(element))[name].replaceAll("\n", "");
 }

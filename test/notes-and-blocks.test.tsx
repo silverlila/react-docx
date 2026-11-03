@@ -22,7 +22,6 @@ import {
 } from "../src/index";
 import { docxXml } from "./support/docx-xml";
 
-/** The rendered parts with docxXml's pretty-printing undone, so one element sits on one line. */
 async function parts(element: ReactElement): Promise<Record<string, string>> {
   const pretty = docxXml(await renderToBuffer(element));
   return Object.fromEntries(Object.entries(pretty).map(([name, xml]) => [name, xml.replaceAll("\n", "")]));

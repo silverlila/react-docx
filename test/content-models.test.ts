@@ -1,8 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { ELEMENTS, type Content } from "../src/schema/elements";
 
-/** The child each content model is known by, which a kind of that model must hold or must not.
- *  RawXml stands only in block, inline and run content, the three slots RAW_XML_ROOTS has roots for. */
 const MARKERS: { readonly [C in Content]: { readonly holds: readonly string[]; readonly lacks: readonly string[] } } = {
   block: { holds: ["Paragraph", "RawXml"], lacks: ["TextRun", "MathRun", "Tab"] },
   wrapped: { holds: ["Paragraph"], lacks: ["TextRun", "MathRun", "Tab", "RawXml"] },

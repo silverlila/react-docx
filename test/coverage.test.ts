@@ -1,3 +1,9 @@
+/** Checks that every content class docx.js declares in its index.d.ts is a kind in ELEMENTS or listed
+ *  in NOT_MAPPED.
+ *
+ *  docx.js declares Begin, FieldInstruction, Separate, End and Break but does not export them, so
+ *  declared names are filtered against the runtime exports. */
+
 import * as docx from "docx";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -5,8 +11,6 @@ import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { ELEMENTS, NOT_MAPPED } from "../src/schema/elements";
 
-/** docx.js's own declarations. A docx.js upgrade that changes their shape fails here, which is the signal:
- *  map the new content, or record in NOT_MAPPED why not. Do not loosen the patterns. */
 const declarations = readFileSync(join(createRequire(import.meta.url).resolve("docx"), "../index.d.ts"), "utf8");
 
 function captured(pattern: RegExp, what: string): string {
@@ -15,7 +19,6 @@ function captured(pattern: RegExp, what: string): string {
   return match[1];
 }
 
-/** The type names of a `A | B | C` union, every one of which must be a bare identifier. */
 function unionNames(union: string, what: string): string[] {
   return union.split("|").map((term) => {
     const name = term.trim();
@@ -24,7 +27,6 @@ function unionNames(union: string, what: string): string[] {
   });
 }
 
-/** `export { Math_2 as Math }`: the declared name → the names it is exported as. */
 function exportAliases(): Map<string, string[]> {
   const aliases = new Map<string, string[]>();
   for (const [, declared, exported] of declarations.matchAll(/^export \{ (\w+) as (\w+) \}$/gm)) {
@@ -35,7 +37,6 @@ function exportAliases(): Map<string, string[]> {
 
 const PAGE_NUMBER_TERM = "(typeof PageNumber)[keyof typeof PageNumber]";
 
-/** IRunOptions children, less the literal strings it also takes. */
 function runChildNames(): string[] {
   const union = captured(
     /export declare type IRunOptions = \{\s*readonly children\?: readonly \(([^;]+)\)\[\];/,
@@ -46,7 +47,6 @@ function runChildNames(): string[] {
   return unionNames(named.join("|"), "IRunOptions's children");
 }
 
-/** Every docx.js content class, by the name it is exported as at runtime. */
 function contentClasses(): Set<string> {
   const declared = [
     ...unionNames(captured(/export declare type ParagraphChild = ([^;]+);/, "ParagraphChild"), "ParagraphChild"),
@@ -56,7 +56,6 @@ function contentClasses(): Set<string> {
   ];
   const aliases = exportAliases();
   const exported = declared.flatMap((name) => aliases.get(name) ?? [name]);
-  // Drops the classes docx.js declares but does not export: Begin, FieldInstruction, Separate, End, Break.
   return new Set(exported.filter((name) => name in docx));
 }
 

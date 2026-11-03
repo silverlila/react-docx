@@ -30,7 +30,6 @@ import {
 import { PageNumber } from "docx";
 import { docxXml } from "./support/docx-xml";
 
-/** word/document.xml's body, with docxXml's pretty-printing undone so one element sits on one line. */
 async function bodyXml(inline: ReactElement): Promise<string> {
   const xml = docxXml(await renderToBuffer(<Document>{section(inline)}</Document>))["word/document.xml"];
   const body = xml.replaceAll("\n", "").match(/<w:body>(.*)<w:sectPr>/);
