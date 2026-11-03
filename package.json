@@ -10,8 +10,14 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.mjs",
       "require": "./dist/index.js"
+    },
+    "./reader": {
+      "types": "./dist/reader.d.ts",
+      "import": "./dist/reader.mjs",
+      "require": "./dist/reader.js"
     }
   },
+  "sideEffects": false,
   "files": [
     "dist"
   ],
