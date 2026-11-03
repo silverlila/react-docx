@@ -229,3 +229,5 @@ The user also confirmed two things for this phase: the work is split into two ph
 
 ## Landed
 
+
+01. ✔ 16 files. Deleted plugins/, pnpm-workspace.yaml and the html/dom transformers; `pnpm test` now runs vitest: 2 files, 24 tests (17 characterization snapshots with 6 labelled [bug], the stability test, 6 cleanup checks); type-check and build pass. Hyperlink rId normalization widened to `rId[a-z0-9_-]{20,}` because docx.js nanoid ids contain `_`.

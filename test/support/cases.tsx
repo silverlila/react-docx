@@ -1,0 +1,374 @@
+import type { ReactElement } from "react";
+import {
+  AlignmentType,
+  BorderStyle,
+  HeadingLevel,
+  PageNumber,
+  ShadingType,
+  WidthType,
+} from "docx";
+import {
+  Bookmark,
+  Break,
+  DEFAULT_NUMBERING,
+  Document,
+  ExternalHyperlink,
+  Footer,
+  Header,
+  ImageRun,
+  InternalHyperlink,
+  List,
+  ListItem,
+  Math,
+  PageBreak,
+  Paragraph,
+  Section,
+  SymbolRun,
+  Tab,
+  Table,
+  TableCell,
+  TableRow,
+  TextRun,
+} from "../../src/index";
+
+export type CharacterizationCase = {
+  readonly name: string;
+  readonly element: ReactElement;
+  /** Today's wrong output. Unit 04 changes the snapshots of exactly the cases that have one. */
+  readonly bug?: string;
+};
+
+export const PNG_1PX = Uint8Array.from(
+  atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="),
+  (c) => c.charCodeAt(0),
+);
+
+const CELL_BORDER = { style: BorderStyle.SINGLE, size: 4, color: "000000" };
+
+export const CASES: readonly CharacterizationCase[] = [
+  {
+    name: "paragraph-and-run-formatting",
+    element: (
+      <Document>
+        <Section>
+          <Paragraph
+            alignment={AlignmentType.CENTER}
+            spacing={{ before: 200, after: 120, line: 276 }}
+            indent={{ left: 720, firstLine: 360 }}
+          >
+            <TextRun text="bold " bold />
+            <TextRun text="italic " italics />
+            <TextRun text="sized and colored " size={28} color="FF0000" />
+            <TextRun text="font " font="Arial" />
+            <TextRun text="underlined" underline={{}} />
+          </Paragraph>
+        </Section>
+      </Document>
+    ),
+  },
+  {
+    name: "run-text-children",
+    element: (
+      <Document>
+        <Section>
+          <Paragraph>
+            <TextRun bold>Hello</TextRun>
+          </Paragraph>
+          <Paragraph>plain string</Paragraph>
+          <Paragraph>
+            <TextRun text="a" />
+          </Paragraph>
+        </Section>
+      </Document>
+    ),
+  },
+  {
+    name: "default-styles-and-heading",
+    element: (
+      <Document
+        styles={{
+          default: {
+            document: { run: { font: "Arial", size: 22 } },
+            heading1: { run: { size: 40, bold: true } },
+          },
+        }}
+      >
+        <Section>
+          <Paragraph heading={HeadingLevel.HEADING_1}>
+            <TextRun text="Heading one" />
+          </Paragraph>
+          <Paragraph heading={HeadingLevel.TITLE}>
+            <TextRun text="Title" />
+          </Paragraph>
+        </Section>
+      </Document>
+    ),
+  },
+  {
+    name: "page-number-children",
+    element: (
+      <Document>
+        <Section>
+          <Footer>
+            <Paragraph>
+              <TextRun children={["Page ", PageNumber.CURRENT, " of ", PageNumber.TOTAL_PAGES]} />
+            </Paragraph>
+          </Footer>
+          <Paragraph>
+            <TextRun text="body" />
+          </Paragraph>
+        </Section>
+      </Document>
+    ),
+  },
+  {
+    name: "header-footer-types",
+    element: (
+      <Document>
+        <Section properties={{ titlePage: true }}>
+          <Header>
+            <Paragraph>
+              <TextRun text="default header" />
+            </Paragraph>
+          </Header>
+          <Header type="first">
+            <Paragraph>
+              <TextRun text="first-page header" />
+            </Paragraph>
+          </Header>
+          <Footer>
+            <Paragraph>
+              <TextRun text="default footer" />
+            </Paragraph>
+          </Footer>
+          <Paragraph>
+            <TextRun text="body" />
+          </Paragraph>
+        </Section>
+      </Document>
+    ),
+  },
+  {
+    name: "tab-break-pagebreak",
+    element: (
+      <Document>
+        <Section>
+          <Paragraph>
+            <TextRun text="before tab" />
+            <Tab />
+            <TextRun text="after tab" />
+            <Break />
+            <TextRun text="after break" />
+          </Paragraph>
+          <Paragraph>
+            <PageBreak />
+          </Paragraph>
+        </Section>
+      </Document>
+    ),
+  },
+  {
+    name: "hyperlinks-and-bookmark",
+    element: (
+      <Document>
+        <Section>
+          <Paragraph>
+            <ExternalHyperlink link="https://example.com">
+              <TextRun text="site" />
+            </ExternalHyperlink>
+          </Paragraph>
+          <Paragraph>
+            <Bookmark id="top">
+              <TextRun text="bookmarked" />
+            </Bookmark>
+          </Paragraph>
+          <Paragraph>
+            <InternalHyperlink anchor="top">
+              <TextRun text="back to top" />
+            </InternalHyperlink>
+          </Paragraph>
+        </Section>
+      </Document>
+    ),
+  },
+  {
+    name: "image",
+    element: (
+      <Document>
+        <Section>
+          <Paragraph>
+            <ImageRun type="png" data={PNG_1PX} transformation={{ width: 10, height: 10 }} />
+          </Paragraph>
+        </Section>
+      </Document>
+    ),
+  },
+  {
+    name: "table",
+    element: (
+      <Document>
+        <Section>
+          <Table width={{ size: 4000, type: WidthType.DXA }} columnWidths={[2000, 2000]}>
+            <TableRow tableHeader>
+              <TableCell shading={{ type: ShadingType.CLEAR, fill: "D9D9D9", color: "auto" }}>
+                <Paragraph>
+                  <TextRun text="shaded" />
+                </Paragraph>
+              </TableCell>
+              <TableCell
+                borders={{
+                  top: CELL_BORDER,
+                  bottom: CELL_BORDER,
+                  left: CELL_BORDER,
+                  right: CELL_BORDER,
+                }}
+              >
+                <Paragraph>
+                  <TextRun text="bordered" />
+                </Paragraph>
+              </TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell columnSpan={2}>
+                <Paragraph>
+                  <TextRun text="spans two columns" />
+                </Paragraph>
+              </TableCell>
+            </TableRow>
+          </Table>
+        </Section>
+      </Document>
+    ),
+  },
+  {
+    name: "multi-section",
+    element: (
+      <Document>
+        <Section properties={{ page: { margin: { top: 720, right: 720, bottom: 720, left: 720 } } }}>
+          <Paragraph>
+            <TextRun text="narrow margins" />
+          </Paragraph>
+        </Section>
+        <Section properties={{ page: { margin: { top: 1440, right: 1800, bottom: 1440, left: 1800 } } }}>
+          <Paragraph>
+            <TextRun text="wide margins" />
+          </Paragraph>
+        </Section>
+      </Document>
+    ),
+  },
+  {
+    name: "list-item-outside-list",
+    element: (
+      <Document>
+        <Section>
+          <ListItem>
+            <TextRun text="plain" />
+          </ListItem>
+        </Section>
+      </Document>
+    ),
+  },
+  {
+    name: "bug-tab-in-run",
+    bug: "a w:r is nested inside a w:r",
+    element: (
+      <Document>
+        <Section>
+          <Paragraph>
+            <TextRun>
+              a<Tab />b
+            </TextRun>
+          </Paragraph>
+        </Section>
+      </Document>
+    ),
+  },
+  {
+    name: "bug-math-text",
+    bug: "writes an empty <m:oMath/>; the text is ignored",
+    element: (
+      <Document>
+        <Section>
+          <Paragraph>
+            <Math text="x+1" />
+          </Paragraph>
+        </Section>
+      </Document>
+    ),
+  },
+  {
+    name: "bug-symbolrun-props",
+    bug: "only char reaches docx.js; the font becomes Wingdings and bold is lost",
+    element: (
+      <Document>
+        <Section>
+          <Paragraph>
+            <SymbolRun char="F071" symbolfont="Symbol" bold />
+          </Paragraph>
+        </Section>
+      </Document>
+    ),
+  },
+  {
+    name: "bug-lists",
+    bug: "both numbered lists share one w:numId; level 1 is undefined in DEFAULT_NUMBERING",
+    element: (
+      <Document numbering={DEFAULT_NUMBERING as any}>
+        <Section>
+          <List type="numbered">
+            <ListItem text="first list, item one" />
+            <ListItem text="first list, item two" />
+          </List>
+          <List type="numbered">
+            <ListItem text="second list, item one" />
+          </List>
+          <List type="numbered" level={1}>
+            <ListItem text="level one item" />
+          </List>
+          <List type="bullet">
+            <ListItem text="bullet item" />
+          </List>
+        </Section>
+      </Document>
+    ),
+  },
+  {
+    name: "bug-heading-and-style",
+    bug: "two w:pStyle elements in one paragraph",
+    element: (
+      <Document>
+        <Section>
+          <Paragraph heading={HeadingLevel.HEADING_1} style="Heading1">
+            <TextRun text="heading" />
+          </Paragraph>
+        </Section>
+      </Document>
+    ),
+  },
+  {
+    name: "bug-duplicate-style-id",
+    bug: "styles.xml defines Heading1 twice",
+    element: (
+      <Document
+        styles={{
+          paragraphStyles: [
+            {
+              id: "Heading1",
+              name: "Heading 1",
+              basedOn: "Normal",
+              next: "Normal",
+              run: { color: "FF0000" },
+            },
+          ],
+        }}
+      >
+        <Section>
+          <Paragraph heading={HeadingLevel.HEADING_1}>
+            <TextRun text="red heading" />
+          </Paragraph>
+        </Section>
+      </Document>
+    ),
+  },
+];

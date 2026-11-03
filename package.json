@@ -20,7 +20,7 @@
     "run-example": "npx tsx examples/basic.tsx",
     "dev": "tsup --watch",
     "type-check": "tsc --noEmit",
-    "test": "echo \"Tests coming soon\"",
+    "test": "vitest run",
     "prepublishOnly": "pnpm run build"
   },
   "keywords": [
@@ -53,7 +53,6 @@
     "react-reconciler": "0.29.0"
   },
   "devDependencies": {
-    "@react-docx/core": "^0.1.4",
     "@types/node": "^24.3.1",
     "@types/react": "^18.2.0",
     "@types/react-reconciler": "^0.32.1",
@@ -62,12 +61,8 @@
     "tsup": "^8.5.0",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
-    "@babel/core": "^7.28.4",
-    "@babel/plugin-transform-modules-commonjs": "^7.27.1",
-    "@babel/preset-react": "^7.27.1",
-    "@babel/preset-typescript": "^7.27.1",
-    "@babel/register": "^7.28.3",
-    "mammoth": "^1.8.0"
+    "vitest": "3.2.4",
+    "fflate": "^0.8.3"
   },
   "engines": {
     "node": ">=16.0.0"
