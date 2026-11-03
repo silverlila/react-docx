@@ -3,9 +3,11 @@
  *  Reads each file and writes it back, into .roundtrip/<name>/:
  *  - roundtrip.docx: the file read with readDocx and written with renderToBuffer;
  *  - diagnostics.json: everything kept raw, resolved or dropped;
- *  - <Name>.tsx: the tree printed as a React component (PascalCase of the file name), plus assets/ when
- *    the document has images;
- *  - original.pdf and roundtrip.pdf, rendered by LibreOffice when `soffice` is on PATH.
+ *  - <Name>.tsx: the tree printed as a React component (PascalCase of the file name, prefixed with `Doc`
+ *    when that would clash with a name the module uses), plus assets/ when the document has images;
+ *  - preview.html: the read tree drawn by DocxPreview;
+ *  - original.pdf and roundtrip.pdf, rendered by LibreOffice when `soffice` is on PATH. When LibreOffice
+ *    fails on a file, that file's PDFs are skipped with an error and the run goes on.
  *  It prints a summary of the diagnostics per file, and exits 1 if any file failed to read or write. */
 
 import { execFileSync } from "node:child_process";
@@ -16,7 +18,8 @@ import { pathToFileURL } from "node:url";
 import { printJsx } from "../src/codegen/index";
 import { renderToBuffer } from "../src/index";
 import { readDocx, type Diagnostic } from "../src/read/index";
-import type { DocumentNode } from "../src/schema/elements";
+import { ELEMENTS, type DocumentNode } from "../src/schema/elements";
+import { previewHtml } from "./preview";
 
 const OUT = ".roundtrip";
 const TOP = 10;
@@ -46,13 +49,17 @@ function summary(name: string, dir: string, diagnostics: readonly Diagnostic[]):
   return lines.join("\n");
 }
 
-/** `my-resume` → `MyResume`; prefixed with `Doc` when it would start with a digit or be empty. */
+/** Names a printed module already uses: the kinds it imports, and the globals it calls. */
+const TAKEN_NAMES: ReadonlySet<string> = new Set([...Object.keys(ELEMENTS), "Date", "URL"]);
+
+/** `my-resume` → `MyResume`; prefixed with `Doc` when it would start with a digit, be empty, or take a
+ *  name the module uses (`document.docx` → `DocDocument`). */
 function componentName(name: string): string {
   const pascal = name
     .split(/[^A-Za-z0-9]+/)
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join("");
-  return /^[A-Za-z]/.test(pascal) ? pascal : `Doc${pascal}`;
+  return /^[A-Za-z]/.test(pascal) && !TAKEN_NAMES.has(pascal) ? pascal : `Doc${pascal}`;
 }
 
 /** Writes the tree as <componentName>.tsx and its assets into `dir`. */
@@ -77,10 +84,16 @@ function hasSoffice(): boolean {
 }
 
 /** Converts each .docx to a PDF beside it, with a LibreOffice profile of this run's own so parallel runs
- *  do not fight over one. soffice exits 0 when it cannot convert a file, so each PDF is checked. */
+ *  do not fight over one. soffice exits 0 when it cannot convert a file, so each PDF is checked. When it
+ *  exits non-zero, the failure is reported and these PDFs are skipped, so the run goes on. */
 function toPdf(files: readonly string[], dir: string, profile: string): void {
   const flag = `-env:UserInstallation=${pathToFileURL(profile).href}`;
-  execFileSync("soffice", [flag, "--headless", "--convert-to", "pdf", "--outdir", dir, ...files], { stdio: "ignore" });
+  try {
+    execFileSync("soffice", [flag, "--headless", "--convert-to", "pdf", "--outdir", dir, ...files], { stdio: "ignore" });
+  } catch (error) {
+    console.error(`  soffice failed on ${files.join(", ")}: ${error instanceof Error ? error.message : String(error)}`);
+    return;
+  }
   for (const file of files) {
     const pdf = join(dir, `${basename(file, extname(file))}.pdf`);
     if (!existsSync(pdf)) console.error(`  soffice wrote no ${pdf}: LibreOffice could not open ${file}`);
@@ -97,6 +110,7 @@ async function roundtrip(file: string, profile: string | null): Promise<boolean>
     writeFileSync(join(dir, "roundtrip.docx"), await renderToBuffer(document));
     writeFileSync(join(dir, "diagnostics.json"), `${JSON.stringify(diagnostics, null, 2)}\n`);
     writeComponent(document, name, dir);
+    writeFileSync(join(dir, "preview.html"), previewHtml(document, name));
     console.log(summary(name, dir, diagnostics));
   } catch (error) {
     console.error(`${file}: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}`);
