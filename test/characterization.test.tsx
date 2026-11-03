@@ -4,8 +4,8 @@ import { CASES } from "./support/cases";
 import { docxXml } from "./support/docx-xml";
 
 describe("writer output today", () => {
-  for (const { name, element, bug } of CASES) {
-    test(bug ? `[bug] ${name}` : name, async () => {
+  for (const { name, element } of CASES) {
+    test(name, async () => {
       expect(docxXml(await renderToBuffer(element))).toMatchSnapshot();
     });
   }

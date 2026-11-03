@@ -42,8 +42,8 @@ import {
 export type CharacterizationCase = {
   readonly name: string;
   readonly element: ReactElement;
-  /** Today's wrong output. Unit 04 changes the snapshots of exactly the cases that have one. */
-  readonly bug?: string;
+  /** What 0.1.8 wrote wrong in this case; its snapshot pins the fix. */
+  readonly fixed?: string;
 };
 
 export const PNG_1PX = Uint8Array.from(
@@ -279,7 +279,7 @@ export const CASES: readonly CharacterizationCase[] = [
   },
   {
     name: "bug-tab-in-run",
-    bug: "a w:r is nested inside a w:r",
+    fixed: "a w:r is nested inside a w:r",
     element: (
       <Document>
         <Section>
@@ -294,7 +294,7 @@ export const CASES: readonly CharacterizationCase[] = [
   },
   {
     name: "bug-math-text",
-    bug: "writes an empty <m:oMath/>; the text is ignored",
+    fixed: "writes an empty <m:oMath/>; the text is ignored",
     element: (
       <Document>
         <Section>
@@ -307,7 +307,7 @@ export const CASES: readonly CharacterizationCase[] = [
   },
   {
     name: "bug-symbolrun-props",
-    bug: "only char reaches docx.js; the font becomes Wingdings and bold is lost",
+    fixed: "only char reaches docx.js; the font becomes Wingdings and bold is lost",
     element: (
       <Document>
         <Section>
@@ -320,7 +320,7 @@ export const CASES: readonly CharacterizationCase[] = [
   },
   {
     name: "bug-lists",
-    bug: "both numbered lists share one w:numId; level 1 is undefined in DEFAULT_NUMBERING",
+    fixed: "both numbered lists share one w:numId; level 1 is undefined in DEFAULT_NUMBERING",
     element: (
       <Document numbering={DEFAULT_NUMBERING as any}>
         <Section>
@@ -346,7 +346,7 @@ export const CASES: readonly CharacterizationCase[] = [
   },
   {
     name: "bug-heading-and-style",
-    bug: "two w:pStyle elements in one paragraph",
+    fixed: "two w:pStyle elements in one paragraph",
     element: (
       <Document>
         <Section>
@@ -359,7 +359,7 @@ export const CASES: readonly CharacterizationCase[] = [
   },
   {
     name: "bug-duplicate-style-id",
-    bug: "styles.xml defines Heading1 twice",
+    fixed: "styles.xml defines Heading1 twice",
     element: (
       <Document
         styles={{

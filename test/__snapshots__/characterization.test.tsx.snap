@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`writer output today > [bug] bug-duplicate-style-id 1`] = `
+exports[`writer output today > bug-duplicate-style-id 1`] = `
 {
   "[Content_Types].xml": "<?xml version="1.0" encoding="UTF-8"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
@@ -340,7 +340,7 @@ exports[`writer output today > [bug] bug-duplicate-style-id 1`] = `
 }
 `;
 
-exports[`writer output today > [bug] bug-heading-and-style 1`] = `
+exports[`writer output today > bug-heading-and-style 1`] = `
 {
   "[Content_Types].xml": "<?xml version="1.0" encoding="UTF-8"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
@@ -682,7 +682,7 @@ exports[`writer output today > [bug] bug-heading-and-style 1`] = `
 }
 `;
 
-exports[`writer output today > [bug] bug-lists 1`] = `
+exports[`writer output today > bug-lists 1`] = `
 {
   "[Content_Types].xml": "<?xml version="1.0" encoding="UTF-8"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
@@ -1280,7 +1280,7 @@ exports[`writer output today > [bug] bug-lists 1`] = `
 }
 `;
 
-exports[`writer output today > [bug] bug-math-text 1`] = `
+exports[`writer output today > bug-math-text 1`] = `
 {
   "[Content_Types].xml": "<?xml version="1.0" encoding="UTF-8"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
@@ -1621,7 +1621,7 @@ exports[`writer output today > [bug] bug-math-text 1`] = `
 }
 `;
 
-exports[`writer output today > [bug] bug-symbolrun-props 1`] = `
+exports[`writer output today > bug-symbolrun-props 1`] = `
 {
   "[Content_Types].xml": "<?xml version="1.0" encoding="UTF-8"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
@@ -1964,7 +1964,7 @@ exports[`writer output today > [bug] bug-symbolrun-props 1`] = `
 }
 `;
 
-exports[`writer output today > [bug] bug-tab-in-run 1`] = `
+exports[`writer output today > bug-tab-in-run 1`] = `
 {
   "[Content_Types].xml": "<?xml version="1.0" encoding="UTF-8"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">

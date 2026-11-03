@@ -75,7 +75,7 @@ export type StylesProps = Omit<docx.IStylesOptions, "importedStyles" | "initialS
   /** Raw <w:style> elements, as XML strings, written after docx.js's own styles. */
   readonly importedStyles?: readonly string[];
 };
-export type DocumentProps = Omit<
+type DocumentProps = Omit<
   docx.IPropertiesOptions,
   "sections" | "footnotes" | "comments" | "externalStyles" | "styles"
 > & { readonly styles?: StylesProps };
@@ -86,12 +86,12 @@ type HeaderFooterProps = { readonly type: "default" | "first" | "even" };
 /** docx.js does not export `ITextboxOptions`. */
 type TextboxOptions = ConstructorParameters<typeof docx.Textbox>[0];
 /** `text` is left out: docx.js's Textbox ignores it. `style` is the VML shape style, not a paragraph style. */
-export type TextboxProps = Omit<TextboxOptions, "children" | "text">;
+type TextboxProps = Omit<TextboxOptions, "children" | "text">;
 type CommentIdProps = { readonly id: number };
 /** docx.js does not export the tracked-change run options. Like TextRun's, they keep `text`, which a canonical
  *  run carries only for a literal docx.js would misread as a child. `date` is a string. */
-export type InsertedTextRunProps = Omit<ConstructorParameters<typeof docx.InsertedTextRun>[0], "children">;
-export type DeletedTextRunProps = Omit<ConstructorParameters<typeof docx.DeletedTextRun>[0], "children">;
+type InsertedTextRunProps = Omit<ConstructorParameters<typeof docx.InsertedTextRun>[0], "children">;
+type DeletedTextRunProps = Omit<ConstructorParameters<typeof docx.DeletedTextRun>[0], "children">;
 
 export const ELEMENTS = {
   Document: spec<DocumentProps>()({

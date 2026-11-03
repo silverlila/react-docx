@@ -92,7 +92,6 @@ async function probePresenceOnly(): Promise<Record<string, string[]>> {
 describe("docx.js presence-only booleans", () => {
   test("PRESENCE_ONLY lists exactly the boolean options docx.js writes the same for true and false", async () => {
     const probed = await probePresenceOnly();
-    console.info("presence-only booleans probed from docx.js:", JSON.stringify(probed));
     expect(probed).toEqual(PRESENCE_ONLY);
   });
 

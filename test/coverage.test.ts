@@ -72,8 +72,6 @@ describe("docx.js content classes", () => {
   });
 
   test("each is a kind in ELEMENTS or listed in NOT_MAPPED", () => {
-    const rows = [...classes].sort().map((name) => `${name} → ${kindOf.get(name) ?? NOT_MAPPED[name] ?? "(unmapped)"}`);
-    console.info(rows.join("\n"));
     expect([...classes].filter((name) => !kindOf.has(name) && !(name in NOT_MAPPED))).toEqual([]);
   });
 
