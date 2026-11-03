@@ -105,4 +105,4 @@ export type {
   YearLongProps,
 } from "./types";
 
-export { DEFAULT_NUMBERING } from "./constants";
+export { LIST_NUMBERING as DEFAULT_NUMBERING } from "./tree/lists";

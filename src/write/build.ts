@@ -117,11 +117,13 @@ function footnoteBodies(footnotes: readonly Node<"Footnote">[], ctx: BuildCtx) {
   );
 }
 
-/** Footnotes are numbered 1..n in body order; docx.js reserves −1 and 0 for its separators.
+/** Canonical tree → docx.js Document. The tree must come from `canonicalize`.
+ *
+ *  Footnotes are numbered 1..n in body order; docx.js reserves −1 and 0 for its separators.
  *
  *  Raw styles are appended after docx.js has built its own. Passing them as docx.js's `importedStyles`
  *  would replace its whole default style list, since it spreads `styles` over its defaults. */
-function buildDocumentNode(node: Node<"Document">): docx.Document {
+export function buildDocument(node: DocumentNode): docx.Document {
   const { styles, ...rest } = node.props;
   const { importedStyles = [], ...docxStyles } = styles ?? {};
   const footnotes = bodyFootnotes(node);
@@ -199,7 +201,7 @@ function buildDeletedRun(node: Node<"DeletedTextRun">, ctx: BuildCtx): docx.Dele
 const UNDATED = { toISOString: () => undefined } as unknown as Date;
 
 const BUILD: { readonly [K in Kind]: (node: Node<K>, ctx: BuildCtx) => Built[K] } = {
-  Document: buildDocumentNode,
+  Document: buildDocument,
   Section: buildSection,
   Header: ({ children }, ctx) => new docx.Header({ children: inPlace(buildAll(children, ctx)) }),
   Footer: ({ children }, ctx) => new docx.Footer({ children: inPlace(buildAll(children, ctx)) }),
@@ -255,7 +257,3 @@ const BUILD: { readonly [K in Kind]: (node: Node<K>, ctx: BuildCtx) => Built[K] 
   YearLong: () => new docx.YearLong(),
 };
 
-/** Canonical tree → docx.js Document. The tree must come from `canonicalize`. */
-export function buildDocument(tree: DocumentNode): docx.Document {
-  return buildDocumentNode(tree);
-}

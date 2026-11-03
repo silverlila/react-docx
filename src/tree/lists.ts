@@ -1,5 +1,5 @@
 import type * as docx from "docx";
-import { TreeError, type AuthorNode, type IndexedChild } from "./canonical";
+import { TreeError, isRecord, type AuthorNode, type IndexedChild } from "./canonical";
 
 type NumberingConfig = docx.INumberingOptions["config"][number];
 type Level = NumberingConfig["levels"][number];
@@ -34,10 +34,6 @@ export const LIST_NUMBERING: { readonly config: readonly NumberingConfig[] } = {
 /** The levels of each list definition the document's `numbering` configures, by reference. */
 export type ListLevels = ReadonlyMap<string, readonly Level[]>;
 
-function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 /** Props are trusted as authored: a configured `levels` is docx.js's type. */
 export function listLevels(numbering: unknown): ListLevels {
   const config: readonly unknown[] = isRecord(numbering) && Array.isArray(numbering.config) ? numbering.config : [];
@@ -51,7 +47,7 @@ export function listLevels(numbering: unknown): ListLevels {
 }
 
 /** A list paragraph's numbering: which list definition, how deep in it, and which instance of it. */
-export type ListNumbering = { readonly reference: string; readonly level: number; readonly instance: number };
+type ListNumbering = { readonly reference: string; readonly level: number; readonly instance: number };
 
 /** One paragraph a List expands into: the item, its own content (nested Lists excluded), its numbering,
  *  and the definition that numbering names. */
@@ -65,7 +61,7 @@ export type ListEntry = {
 
 /** What expanding Lists takes from the document: fresh numbering instances, so that separate lists number
  *  separately, and the levels each type numbers with. */
-export type ListContext = { readonly nextInstance: () => number; readonly levels: ListLevels };
+type ListContext = { readonly nextInstance: () => number; readonly levels: ListLevels };
 
 /** A list definition, and why each level it leaves out is left out, for the item that needs one. */
 type Definition = { readonly config: NumberingConfig; readonly missing: (level: number) => string };

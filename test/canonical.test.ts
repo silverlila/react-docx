@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { DEFAULT_NUMBERING } from "../src/constants";
+import { DEFAULT_NUMBERING } from "../src/index";
 import type { DocumentNode } from "../src/schema/elements";
 import { canonicalize, TreeError, type AuthorNode } from "../src/tree/canonical";
 import { LIST_NUMBERING } from "../src/tree/lists";

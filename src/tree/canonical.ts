@@ -535,7 +535,7 @@ function omit(props: PropBag, ...keys: string[]): PropBag {
   return rest;
 }
 
-function isRecord(value: unknown): value is PropBag {
+export function isRecord(value: unknown): value is PropBag {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 

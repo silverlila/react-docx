@@ -3,7 +3,7 @@ import { TreeError } from "./canonical";
 
 /** What the reconciler builds. Mutable, internal, never exported from the package. */
 export type HostNode = { type: string; props: Record<string, unknown>; children: HostChild[] };
-export type HostText = { type: "#text"; text: string };
+type HostText = { type: "#text"; text: string };
 export type HostChild = HostNode | HostText;
 export type HostContainer = { rootInstance: HostChild | null };
 
@@ -84,10 +84,6 @@ const base = {
   cancelTimeout: clearTimeout,
   noTimeout: -1,
   getInstanceFromNode: () => null,
-  beforeActiveInstanceBlur() {},
-  afterActiveInstanceBlur() {},
-  prepareScopeUpdate() {},
-  getInstanceFromScope: () => null,
   detachDeletedInstance() {},
 } satisfies Record<string, unknown>;
 
@@ -127,7 +123,6 @@ export const hostConfig19 = {
   // Must be a context of the React the library imports (the user's); a plain object crashes 0.31+.
   HostTransitionContext: React.createContext(null),
   resetFormInstance() {},
-  requestPostPaintCallback() {},
   maySuspendCommit: () => false,
   preloadInstance: () => true,
   startSuspendingCommit() {},
@@ -135,5 +130,4 @@ export const hostConfig19 = {
   waitForCommitToBeReady: () => null,
   // Read by 0.33 only.
   trackSchedulerEvent() {},
-  resolveTransitionIndicator() {},
 } satisfies Record<string, unknown>;
