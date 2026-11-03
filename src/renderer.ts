@@ -1,8 +1,7 @@
 import { ReactElement } from "react";
 import * as docx from "docx";
-import { DocxReconciler } from "./reconciler-v19";
+import { renderToHost } from "./tree/render";
 import { transformNodeToDocx } from "./transformers/docx-transformer";
-import { DocxContainer } from "./types";
 import { DocumentNode, ListNode, MutableNode } from "./nodes";
 import { DEFAULT_NUMBERING } from "./constants";
 
@@ -36,22 +35,7 @@ function ensureNumberingConfig(documentNode: DocumentNode): void {
 }
 
 export const renderToDocx = async (element: ReactElement) => {
-  const container: DocxContainer = { rootInstance: null };
-
-  const fiberRoot = DocxReconciler.createContainer(
-    container,
-    0,
-    null,
-    false,
-    null,
-    "",
-    () => {},
-    null
-  );
-
-  DocxReconciler.updateContainer(element, fiberRoot, null, () => {});
-
-  const documentNode = container.rootInstance;
+  const documentNode = renderToHost(element);
 
   if (!documentNode || !(documentNode instanceof DocumentNode)) {
     throw new Error(

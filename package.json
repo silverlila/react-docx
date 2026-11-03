@@ -21,6 +21,7 @@
     "dev": "tsup --watch",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
+    "test:react": "pnpm run build && node test/react-lines/run.mjs",
     "prepublishOnly": "pnpm run build"
   },
   "keywords": [
@@ -46,23 +47,28 @@
   "author": "Silvi Lila",
   "license": "MIT",
   "peerDependencies": {
-    "react": ">=16.8.0",
+    "react": "^18.2.0 || ^19.0.0",
     "docx": "^8.0.0 || ^9.0.0"
   },
   "dependencies": {
-    "react-reconciler": "0.29.0"
+    "react-reconciler-29": "npm:react-reconciler@0.29.0",
+    "react-reconciler-31": "npm:react-reconciler@0.31.0",
+    "react-reconciler-33": "npm:react-reconciler@0.33.0"
   },
   "devDependencies": {
     "@types/node": "^24.3.1",
     "@types/react": "^18.2.0",
-    "@types/react-reconciler": "^0.32.1",
     "docx": "^9.5.1",
     "react": "^18.2.0",
     "tsup": "^8.5.0",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
     "vitest": "3.2.4",
-    "fflate": "^0.8.3"
+    "fflate": "^0.8.3",
+    "react-19-0": "npm:react@19.0.0",
+    "react-19-1": "npm:react@19.1.0",
+    "react-19-2": "npm:react@19.2.0",
+    "react-19-3": "npm:react@19.3.1"
   },
   "engines": {
     "node": ">=16.0.0"

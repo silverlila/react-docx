@@ -231,3 +231,4 @@ The user also confirmed two things for this phase: the work is split into two ph
 
 
 01. ✔ 16 files. Deleted plugins/, pnpm-workspace.yaml and the html/dom transformers; `pnpm test` now runs vitest: 2 files, 24 tests (17 characterization snapshots with 6 labelled [bug], the stability test, 6 cleanup checks); type-check and build pass. Hyperlink rId normalization widened to `rId[a-z0-9_-]{20,}` because docx.js nanoid ids contain `_`.
+02. ✔ 15 files. Reconcilers 0.29/0.31/0.33 picked from React.version; `pnpm test` 3 files, 36 tests (12-row react-line table); `pnpm run test:react` printed ok for 18.3.1, 19.0.0, 19.1.0, 19.2.0, 19.3.1 in esm and cjs. Carried should-fix: on React 19 an error caught by a user error boundary still rejects the render (spec passes the recorder as onCaughtError; React 18 renders the fallback); `throw undefined` is swallowed on React 19.
