@@ -2,19 +2,19 @@ import React from "react";
 import Reconciler29 from "react-reconciler-29";
 import Reconciler31 from "react-reconciler-31";
 import Reconciler33 from "react-reconciler-33";
-import { DocumentNode } from "../nodes";
-import { DocxContainer } from "../types";
-import { hostConfig18, hostConfig19 } from "./host-config";
+import type { DocumentNode } from "../schema/elements";
+import { canonicalize, TreeError, type AuthorNode } from "./canonical";
+import { hostConfig18, hostConfig19, type HostChild, type HostContainer, type HostNode } from "./host-config";
 import { ReactLine, reactLine } from "./react-line";
 
-type Render = (element: React.ReactElement, container: DocxContainer) => void;
+type Render = (element: React.ReactElement, container: HostContainer) => void;
 
 let reconciler29: ReturnType<typeof Reconciler29> | undefined;
 let reconciler31: ReturnType<typeof Reconciler31> | undefined;
 let reconciler33: ReturnType<typeof Reconciler33> | undefined;
 
 /** React 18: a legacy root (tag 0) renders synchronously and throws render errors directly. */
-function render29(element: React.ReactElement, container: DocxContainer): void {
+function render29(element: React.ReactElement, container: HostContainer): void {
   reconciler29 ??= Reconciler29(hostConfig18);
   let error: unknown = undefined;
   const record = (e: unknown) => {
@@ -29,7 +29,7 @@ function render29(element: React.ReactElement, container: DocxContainer): void {
 function renderSync(
   reconciler: ReturnType<typeof Reconciler31> | ReturnType<typeof Reconciler33>,
   element: React.ReactElement,
-  container: DocxContainer
+  container: HostContainer
 ): void {
   let error: unknown = undefined;
   const record = (e: unknown) => {
@@ -47,9 +47,25 @@ const RENDER: Record<ReactLine, Render> = {
   "33": (element, container) => renderSync((reconciler33 ??= Reconciler33(hostConfig19)), element, container),
 };
 
-/** Renders synchronously and returns the root host instance (the DocumentNode), or throws the render error. */
-export function renderToHost(element: React.ReactElement): DocumentNode | null {
-  const container: DocxContainer = { rootInstance: null };
+/** Renders synchronously and returns the root host instance, or throws the render error. */
+export function renderToHost(element: React.ReactElement): HostChild | null {
+  const container: HostContainer = { rootInstance: null };
   RENDER[reactLine(React.version)](element, container);
   return container.rootInstance;
+}
+
+function toAuthor(node: HostNode): AuthorNode {
+  return {
+    type: node.type,
+    props: node.props,
+    children: node.children.map((child) => ("text" in child ? child.text : toAuthor(child))),
+  };
+}
+
+/** JSX → canonical tree. Synchronous. Throws the render error, or TreeError. */
+export function renderToTree(element: React.ReactElement): DocumentNode {
+  const root = renderToHost(element);
+  if (root === null) throw new TreeError([], "Nothing rendered; the root must be <Document>");
+  if ("text" in root) throw new TreeError([], "Text rendered at the root; the root must be <Document>");
+  return canonicalize(toAuthor(root));
 }

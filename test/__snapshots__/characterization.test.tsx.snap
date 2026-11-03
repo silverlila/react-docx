@@ -220,9 +220,7 @@ exports[`writer output today > [bug] bug-duplicate-style-id 1`] = `
 <w:next w:val="Normal"/>
 <w:qFormat/>
 <w:rPr>
-<w:color w:val="2E74B5"/>
-<w:sz w:val="32"/>
-<w:szCs w:val="32"/>
+<w:color w:val="FF0000"/>
 </w:rPr>
 </w:style>
 <w:style w:type="paragraph" w:styleId="Heading2">
@@ -338,14 +336,6 @@ exports[`writer output today > [bug] bug-duplicate-style-id 1`] = `
 <w:szCs w:val="20"/>
 </w:rPr>
 </w:style>
-<w:style w:type="paragraph" w:styleId="Heading1">
-<w:name w:val="Heading 1"/>
-<w:basedOn w:val="Normal"/>
-<w:next w:val="Normal"/>
-<w:rPr>
-<w:color w:val="FF0000"/>
-</w:rPr>
-</w:style>
 </w:styles>",
 }
 `;
@@ -396,7 +386,6 @@ exports[`writer output today > [bug] bug-heading-and-style 1`] = `
 <w:body>
 <w:p>
 <w:pPr>
-<w:pStyle w:val="Heading1"/>
 <w:pStyle w:val="Heading1"/>
 </w:pPr>
 <w:r>
@@ -766,7 +755,7 @@ exports[`writer output today > [bug] bug-lists 1`] = `
 <w:pStyle w:val="ListParagraph"/>
 <w:numPr>
 <w:ilvl w:val="0"/>
-<w:numId w:val="2"/>
+<w:numId w:val="3"/>
 </w:numPr>
 </w:pPr>
 <w:r>
@@ -778,7 +767,7 @@ exports[`writer output today > [bug] bug-lists 1`] = `
 <w:pStyle w:val="ListParagraph"/>
 <w:numPr>
 <w:ilvl w:val="1"/>
-<w:numId w:val="2"/>
+<w:numId w:val="4"/>
 </w:numPr>
 </w:pPr>
 <w:r>
@@ -790,7 +779,7 @@ exports[`writer output today > [bug] bug-lists 1`] = `
 <w:pStyle w:val="ListParagraph"/>
 <w:numPr>
 <w:ilvl w:val="0"/>
-<w:numId w:val="3"/>
+<w:numId w:val="5"/>
 </w:numPr>
 </w:pPr>
 <w:r>
@@ -939,6 +928,78 @@ exports[`writer output today > [bug] bug-lists 1`] = `
 <w:ind w:left="720" w:hanging="360"/>
 </w:pPr>
 </w:lvl>
+<w:lvl w:ilvl="1" w15:tentative="1">
+<w:start w:val="1"/>
+<w:numFmt w:val="lowerLetter"/>
+<w:lvlText w:val="%2."/>
+<w:lvlJc w:val="left"/>
+<w:pPr>
+<w:ind w:left="1440" w:hanging="360"/>
+</w:pPr>
+</w:lvl>
+<w:lvl w:ilvl="2" w15:tentative="1">
+<w:start w:val="1"/>
+<w:numFmt w:val="lowerRoman"/>
+<w:lvlText w:val="%3."/>
+<w:lvlJc w:val="left"/>
+<w:pPr>
+<w:ind w:left="2160" w:hanging="360"/>
+</w:pPr>
+</w:lvl>
+<w:lvl w:ilvl="3" w15:tentative="1">
+<w:start w:val="1"/>
+<w:numFmt w:val="decimal"/>
+<w:lvlText w:val="%4."/>
+<w:lvlJc w:val="left"/>
+<w:pPr>
+<w:ind w:left="2880" w:hanging="360"/>
+</w:pPr>
+</w:lvl>
+<w:lvl w:ilvl="4" w15:tentative="1">
+<w:start w:val="1"/>
+<w:numFmt w:val="lowerLetter"/>
+<w:lvlText w:val="%5."/>
+<w:lvlJc w:val="left"/>
+<w:pPr>
+<w:ind w:left="3600" w:hanging="360"/>
+</w:pPr>
+</w:lvl>
+<w:lvl w:ilvl="5" w15:tentative="1">
+<w:start w:val="1"/>
+<w:numFmt w:val="lowerRoman"/>
+<w:lvlText w:val="%6."/>
+<w:lvlJc w:val="left"/>
+<w:pPr>
+<w:ind w:left="4320" w:hanging="360"/>
+</w:pPr>
+</w:lvl>
+<w:lvl w:ilvl="6" w15:tentative="1">
+<w:start w:val="1"/>
+<w:numFmt w:val="decimal"/>
+<w:lvlText w:val="%7."/>
+<w:lvlJc w:val="left"/>
+<w:pPr>
+<w:ind w:left="5040" w:hanging="360"/>
+</w:pPr>
+</w:lvl>
+<w:lvl w:ilvl="7" w15:tentative="1">
+<w:start w:val="1"/>
+<w:numFmt w:val="lowerLetter"/>
+<w:lvlText w:val="%8."/>
+<w:lvlJc w:val="left"/>
+<w:pPr>
+<w:ind w:left="5760" w:hanging="360"/>
+</w:pPr>
+</w:lvl>
+<w:lvl w:ilvl="8" w15:tentative="1">
+<w:start w:val="1"/>
+<w:numFmt w:val="lowerRoman"/>
+<w:lvlText w:val="%9."/>
+<w:lvlJc w:val="left"/>
+<w:pPr>
+<w:ind w:left="6480" w:hanging="360"/>
+</w:pPr>
+</w:lvl>
 </w:abstractNum>
 <w:abstractNum w:abstractNumId="3" w15:restartNumberingAfterBreak="0">
 <w:multiLevelType w:val="hybridMultilevel"/>
@@ -949,6 +1010,78 @@ exports[`writer output today > [bug] bug-lists 1`] = `
 <w:lvlJc w:val="left"/>
 <w:pPr>
 <w:ind w:left="720" w:hanging="360"/>
+</w:pPr>
+</w:lvl>
+<w:lvl w:ilvl="1" w15:tentative="1">
+<w:start w:val="1"/>
+<w:numFmt w:val="bullet"/>
+<w:lvlText w:val="◦"/>
+<w:lvlJc w:val="left"/>
+<w:pPr>
+<w:ind w:left="1440" w:hanging="360"/>
+</w:pPr>
+</w:lvl>
+<w:lvl w:ilvl="2" w15:tentative="1">
+<w:start w:val="1"/>
+<w:numFmt w:val="bullet"/>
+<w:lvlText w:val="▪"/>
+<w:lvlJc w:val="left"/>
+<w:pPr>
+<w:ind w:left="2160" w:hanging="360"/>
+</w:pPr>
+</w:lvl>
+<w:lvl w:ilvl="3" w15:tentative="1">
+<w:start w:val="1"/>
+<w:numFmt w:val="bullet"/>
+<w:lvlText w:val="•"/>
+<w:lvlJc w:val="left"/>
+<w:pPr>
+<w:ind w:left="2880" w:hanging="360"/>
+</w:pPr>
+</w:lvl>
+<w:lvl w:ilvl="4" w15:tentative="1">
+<w:start w:val="1"/>
+<w:numFmt w:val="bullet"/>
+<w:lvlText w:val="◦"/>
+<w:lvlJc w:val="left"/>
+<w:pPr>
+<w:ind w:left="3600" w:hanging="360"/>
+</w:pPr>
+</w:lvl>
+<w:lvl w:ilvl="5" w15:tentative="1">
+<w:start w:val="1"/>
+<w:numFmt w:val="bullet"/>
+<w:lvlText w:val="▪"/>
+<w:lvlJc w:val="left"/>
+<w:pPr>
+<w:ind w:left="4320" w:hanging="360"/>
+</w:pPr>
+</w:lvl>
+<w:lvl w:ilvl="6" w15:tentative="1">
+<w:start w:val="1"/>
+<w:numFmt w:val="bullet"/>
+<w:lvlText w:val="•"/>
+<w:lvlJc w:val="left"/>
+<w:pPr>
+<w:ind w:left="5040" w:hanging="360"/>
+</w:pPr>
+</w:lvl>
+<w:lvl w:ilvl="7" w15:tentative="1">
+<w:start w:val="1"/>
+<w:numFmt w:val="bullet"/>
+<w:lvlText w:val="◦"/>
+<w:lvlJc w:val="left"/>
+<w:pPr>
+<w:ind w:left="5760" w:hanging="360"/>
+</w:pPr>
+</w:lvl>
+<w:lvl w:ilvl="8" w15:tentative="1">
+<w:start w:val="1"/>
+<w:numFmt w:val="bullet"/>
+<w:lvlText w:val="▪"/>
+<w:lvlJc w:val="left"/>
+<w:pPr>
+<w:ind w:left="6480" w:hanging="360"/>
 </w:pPr>
 </w:lvl>
 </w:abstractNum>
@@ -965,6 +1098,18 @@ exports[`writer output today > [bug] bug-lists 1`] = `
 </w:lvlOverride>
 </w:num>
 <w:num w:numId="3">
+<w:abstractNumId w:val="2"/>
+<w:lvlOverride w:ilvl="0">
+<w:startOverride w:val="1"/>
+</w:lvlOverride>
+</w:num>
+<w:num w:numId="4">
+<w:abstractNumId w:val="2"/>
+<w:lvlOverride w:ilvl="0">
+<w:startOverride w:val="1"/>
+</w:lvlOverride>
+</w:num>
+<w:num w:numId="5">
 <w:abstractNumId w:val="3"/>
 <w:lvlOverride w:ilvl="0">
 <w:startOverride w:val="1"/>
@@ -1168,7 +1313,11 @@ exports[`writer output today > [bug] bug-math-text 1`] = `
 <w:document mc:Ignorable="w14 w15 wp14" xmlns:wpc="http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:wp14="http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:w10="urn:schemas-microsoft-com:office:word" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" xmlns:w15="http://schemas.microsoft.com/office/word/2012/wordml" xmlns:wpg="http://schemas.microsoft.com/office/word/2010/wordprocessingGroup" xmlns:wpi="http://schemas.microsoft.com/office/word/2010/wordprocessingInk" xmlns:wne="http://schemas.microsoft.com/office/word/2006/wordml" xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex" xmlns:cx1="http://schemas.microsoft.com/office/drawing/2015/9/8/chartex" xmlns:cx2="http://schemas.microsoft.com/office/drawing/2015/10/21/chartex" xmlns:cx3="http://schemas.microsoft.com/office/drawing/2016/5/9/chartex" xmlns:cx4="http://schemas.microsoft.com/office/drawing/2016/5/10/chartex" xmlns:cx5="http://schemas.microsoft.com/office/drawing/2016/5/11/chartex" xmlns:cx6="http://schemas.microsoft.com/office/drawing/2016/5/12/chartex" xmlns:cx7="http://schemas.microsoft.com/office/drawing/2016/5/13/chartex" xmlns:cx8="http://schemas.microsoft.com/office/drawing/2016/5/14/chartex" xmlns:aink="http://schemas.microsoft.com/office/drawing/2016/ink" xmlns:am3d="http://schemas.microsoft.com/office/drawing/2017/model3d" xmlns:w16cex="http://schemas.microsoft.com/office/word/2018/wordml/cex" xmlns:w16cid="http://schemas.microsoft.com/office/word/2016/wordml/cid" xmlns:w16="http://schemas.microsoft.com/office/word/2018/wordml" xmlns:w16sdtdh="http://schemas.microsoft.com/office/word/2020/wordml/sdtdatahash" xmlns:w16se="http://schemas.microsoft.com/office/word/2015/wordml/symex">
 <w:body>
 <w:p>
-<m:oMath/>
+<m:oMath>
+<m:r>
+<m:t>x+1</m:t>
+</m:r>
+</m:oMath>
 </w:p>
 <w:sectPr>
 <w:pgSz w:w="11906" w:h="16838" w:orient="portrait"/>
@@ -1506,7 +1655,11 @@ exports[`writer output today > [bug] bug-symbolrun-props 1`] = `
 <w:body>
 <w:p>
 <w:r>
-<w:sym w:char="F071" w:font="Wingdings"/>
+<w:rPr>
+<w:b/>
+<w:bCs/>
+</w:rPr>
+<w:sym w:char="F071" w:font="Symbol"/>
 </w:r>
 </w:p>
 <w:sectPr>
@@ -1846,9 +1999,7 @@ exports[`writer output today > [bug] bug-tab-in-run 1`] = `
 <w:p>
 <w:r>
 <w:t xml:space="preserve">a</w:t>
-<w:r>
 <w:tab/>
-</w:r>
 <w:t xml:space="preserve">b</w:t>
 </w:r>
 </w:p>

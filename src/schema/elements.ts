@@ -66,7 +66,9 @@ export const ELEMENTS = {
     text: false,
     ooxml: ["w:p"],
   }),
-  TextRun: spec<Omit<docx.IRunOptions, "children" | "text">>()({
+  /** `text` appears only on a childless run holding a literal docx.js would misread as a child:
+   *  `""` or a PageNumber value. Every other literal is a string child. */
+  TextRun: spec<Omit<docx.IRunOptions, "children">>()({
     docx: "TextRun",
     children: RUN_CONTENT,
     text: true,

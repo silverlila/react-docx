@@ -1,99 +1,11 @@
 import React from "react";
-import { ElementType, DocxInstance, DocxContainer } from "../types";
-import {
-  DocumentNode,
-  SectionNode,
-  HeaderNode,
-  FooterNode,
-  ParagraphNode,
-  TextRunNode,
-  TextNode,
-  TableNode,
-  TableRowNode,
-  TableCellNode,
-  TabNode,
-  ImageRunNode,
-  ExternalHyperlinkNode,
-  InternalHyperlinkNode,
-  PageBreakNode,
-  BookmarkNode,
-  SymbolRunNode,
-  MathNode,
-  BreakNode,
-  MutableNode,
-  ListItemNode,
-  ListNode,
-} from "../nodes";
+import { TreeError } from "./canonical";
 
-// Create mutable tree nodes based on element type
-function createMutableNode(type: ElementType, props: any): DocxInstance {
-  const { children, ...nodeProps } = props;
-
-  switch (type) {
-    case "RDDocument":
-      return new DocumentNode(nodeProps);
-
-    case "RDSection":
-      return new SectionNode(nodeProps);
-
-    case "RDHeader":
-      return new HeaderNode(nodeProps);
-
-    case "RDFooter":
-      return new FooterNode(nodeProps);
-
-    case "RDParagraph":
-      return new ParagraphNode(nodeProps);
-
-    case "RDTextRun":
-      return new TextRunNode(props);
-
-    case "RDTable":
-      return new TableNode(nodeProps);
-
-    case "RDTableRow":
-      return new TableRowNode(nodeProps);
-
-    case "RDTableCell":
-      return new TableCellNode(nodeProps);
-
-    case "RDTab":
-      return new TabNode(nodeProps);
-
-    case "RDImageRun":
-      return new ImageRunNode(props);
-
-    case "RDExternalHyperlink":
-      return new ExternalHyperlinkNode(nodeProps);
-
-    case "RDInternalHyperlink":
-      return new InternalHyperlinkNode(nodeProps);
-
-    case "RDPageBreak":
-      return new PageBreakNode(nodeProps);
-
-    case "RDBookmark":
-      return new BookmarkNode(nodeProps);
-
-    case "RDSymbolRun":
-      return new SymbolRunNode(props);
-
-    case "RDMath":
-      return new MathNode(nodeProps);
-
-    case "RDBreak":
-      return new BreakNode(nodeProps);
-
-    case "RDList":
-      return new ListNode(nodeProps);
-
-    case "RDListItem":
-      return new ListItemNode(nodeProps);
-
-    default:
-      throw new Error(`Unknown element type: ${type}`);
-  }
-}
+/** What the reconciler builds. Mutable, internal, never exported from the package. */
+export type HostNode = { type: string; props: Record<string, unknown>; children: HostChild[] };
+export type HostText = { type: "#text"; text: string };
+export type HostChild = HostNode | HostText;
+export type HostContainer = { rootInstance: HostChild | null };
 
 type HostProps = Record<string, unknown>;
 
@@ -110,61 +22,61 @@ const base = {
   supportsHydration: false,
   isPrimaryRenderer: false,
 
-  createInstance(type: ElementType, props: HostProps): DocxInstance {
-    return createMutableNode(type, props);
+  /** Components render `RD<Kind>` host elements; the prefix is stripped. Placement is checked by canonicalize. */
+  createInstance(type: string, props: HostProps): HostNode {
+    if (!type.startsWith("RD")) throw new TreeError([type], `Unknown element <${type}>`);
+    return { type: type.slice(2), props: ownProps(props), children: [] };
   },
 
-  createTextInstance(text: string): DocxInstance {
-    return new TextNode({ text });
+  createTextInstance(text: string): HostText {
+    return { type: "#text", text };
   },
 
-  appendInitialChild(parent: MutableNode, child: MutableNode): void {
+  appendInitialChild(parent: HostNode, child: HostChild): void {
     parent.children.push(child);
   },
 
-  appendChild(parent: MutableNode, child: MutableNode): void {
+  appendChild(parent: HostNode, child: HostChild): void {
     parent.children.push(child);
   },
 
-  appendChildToContainer(container: DocxContainer, child: MutableNode): void {
-    if (child instanceof DocumentNode) {
-      container.rootInstance = child;
-    }
+  appendChildToContainer(container: HostContainer, child: HostChild): void {
+    container.rootInstance = child;
   },
 
-  insertBefore(parent: MutableNode, child: MutableNode, beforeChild: MutableNode): void {
+  insertBefore(parent: HostNode, child: HostChild, beforeChild: HostChild): void {
     const index = parent.children.indexOf(beforeChild);
     if (index !== -1) {
       parent.children.splice(index, 0, child);
     }
   },
 
-  removeChild(parent: MutableNode, child: MutableNode): void {
+  removeChild(parent: HostNode, child: HostChild): void {
     const index = parent.children.indexOf(child);
     if (index !== -1) {
       parent.children.splice(index, 1);
     }
   },
 
-  removeChildFromContainer(container: DocxContainer, child: MutableNode): void {
+  removeChildFromContainer(container: HostContainer, child: HostChild): void {
     if (container.rootInstance === child) {
       container.rootInstance = null;
     }
   },
 
-  clearContainer(container: DocxContainer): void {
+  clearContainer(container: HostContainer): void {
     container.rootInstance = null;
   },
 
-  commitTextUpdate(textInstance: TextNode, _oldText: string, newText: string): void {
-    textInstance.props.text = newText;
+  commitTextUpdate(textInstance: HostText, _oldText: string, newText: string): void {
+    textInstance.text = newText;
   },
 
   finalizeInitialChildren: () => false,
   shouldSetTextContent: () => false,
   getRootHostContext: () => ({}),
   getChildHostContext: (parentHostContext: object) => parentHostContext,
-  getPublicInstance: (instance: DocxInstance) => instance,
+  getPublicInstance: (instance: HostChild) => instance,
   prepareForCommit: () => null,
   resetAfterCommit: () => {},
   preparePortalMount: () => {},
@@ -184,7 +96,7 @@ export const hostConfig18 = {
   ...base,
   prepareUpdate: () => true,
   commitUpdate(
-    instance: MutableNode,
+    instance: HostNode,
     _updatePayload: unknown,
     _type: string,
     _oldProps: HostProps,
@@ -200,7 +112,7 @@ let updatePriority = 0;
 /** react-reconciler 0.31 and 0.33 (React 19). */
 export const hostConfig19 = {
   ...base,
-  commitUpdate(instance: MutableNode, _type: string, _oldProps: HostProps, newProps: HostProps): void {
+  commitUpdate(instance: HostNode, _type: string, _oldProps: HostProps, newProps: HostProps): void {
     instance.props = ownProps(newProps);
   },
   setCurrentUpdatePriority: (priority: number) => {

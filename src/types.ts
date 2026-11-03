@@ -1,182 +1,32 @@
-import { ReactElement, ReactNode } from "react";
-import * as docx from "docx";
-import {
-  DocumentNode,
-  SectionNode,
-  HeaderNode,
-  FooterNode,
-  ParagraphNode,
-  TextRunNode,
-  TextNode,
-  TableNode,
-  TableRowNode,
-  TableCellNode,
-  TabNode,
-  ImageRunNode,
-  ExternalHyperlinkNode,
-  InternalHyperlinkNode,
-  PageBreakNode,
-  BookmarkNode,
-  SymbolRunNode,
-  MathNode,
-  BreakNode,
-  ListItemNode,
-  ListNode,
-} from "./nodes";
+import type { ReactNode } from "react";
+import type * as docx from "docx";
 
-export type MutableTreeNode =
-  | DocumentNode
-  | SectionNode
-  | HeaderNode
-  | FooterNode
-  | ParagraphNode
-  | TextRunNode
-  | TextNode
-  | TableNode
-  | TableRowNode
-  | TableCellNode
-  | TabNode
-  | ImageRunNode
-  | ExternalHyperlinkNode
-  | InternalHyperlinkNode
-  | PageBreakNode
-  | BookmarkNode
-  | SymbolRunNode
-  | MathNode
-  | BreakNode
-  | ListNode
-  | ListItemNode;
+/** Authoring props: docx.js option types verbatim, with element children in place of option-bag children. */
+type Kids = { children?: ReactNode };
+type NoKids = { children?: never };
+type HeaderFooterType = { type?: "default" | "first" | "even" };
 
-export type ElementType =
-  | "RDDocument"
-  | "RDSection"
-  | "RDHeader"
-  | "RDFooter"
-  | "RDParagraph"
-  | "RDTextRun"
-  | "RDTable"
-  | "RDTableRow"
-  | "RDTableCell"
-  | "RDTab"
-  | "RDImageRun"
-  | "RDExternalHyperlink"
-  | "RDInternalHyperlink"
-  | "RDPageBreak"
-  | "RDBookmark"
-  | "RDSymbolRun"
-  | "RDMath"
-  | "RDBreak"
-  | "RDList"
-  | "RDListItem";
-
-export type DocxInstance = MutableTreeNode;
-
-type NotReadonly<T> = {
-  -readonly [K in keyof T]: T[K] extends object
-    ? T[K] extends any[]
-      ? T[K]
-      : NotReadonly<T[K]>
-    : T[K];
-};
-
-export interface DocumentProps
-  extends NotReadonly<Omit<docx.IPropertiesOptions, "sections" | "children">> {
-  children?: ReactNode;
-}
-
-export interface SectionProps
-  extends NotReadonly<Omit<docx.ISectionOptions, "children">> {
-  children?: ReactNode;
-}
-
-export interface HeaderProps {
-  type?: "default" | "first" | "even";
-  children?: ReactNode;
-}
-
-export interface FooterProps {
-  type?: "default" | "first" | "even";
-  children?: ReactNode;
-}
-
-export interface ParagraphProps
-  extends NotReadonly<Omit<docx.IParagraphOptions, "children">> {
-  children?: ReactNode;
-}
-
-export interface TextRunProps
-  extends NotReadonly<Omit<docx.IRunOptions, "children">> {
-  children?: ReactNode;
-}
-
-export interface TableProps
-  extends NotReadonly<Omit<docx.ITableOptions, "rows" | "children">> {
-  children?: ReactNode;
-}
-
-export interface TableRowProps
-  extends NotReadonly<Omit<docx.ITableRowOptions, "children">> {
-  children?: ReactNode;
-}
-
-export interface TableCellProps
-  extends NotReadonly<Omit<docx.ITableCellOptions, "children">> {
-  children?: ReactNode;
-}
-
-export interface TabProps {
-  children?: never;
-}
-
-export type ImageRunProps = NotReadonly<docx.IImageOptions> & {
-  children?: never;
-};
-
-export interface ExternalHyperlinkProps {
-  link: string;
-  children?: ReactNode;
-}
-
-export interface InternalHyperlinkProps {
-  anchor: string;
-  children?: ReactNode;
-}
-
-export interface PageBreakProps {
-  children?: never;
-}
-
-export interface BookmarkProps {
-  id: string;
-  children?: ReactNode;
-}
-
-export type SymbolRunProps = NotReadonly<docx.ISymbolRunOptions> & {
-  children?: never;
-};
-
-export interface MathProps {
-  text: string;
-  children?: never;
-}
-
-export interface BreakProps {
-  children?: never;
-}
-
-export interface ListProps {
-  type?: "bullet" | "numbered";
-  level?: number;
-  children?: ReactNode;
-}
-
-export interface ListItemProps
-  extends NotReadonly<Omit<docx.IParagraphOptions, "children">> {
-  children?: ReactNode;
-}
-
-export interface DocxContainer {
-  rootInstance: DocumentNode | null;
-}
-
-export type RenderFunction = (element: ReactElement) => Promise<Buffer>;
+export type DocumentProps = Omit<docx.IPropertiesOptions, "sections" | "footnotes" | "comments" | "externalStyles"> &
+  Kids;
+export type SectionProps = Omit<docx.ISectionOptions, "children" | "headers" | "footers"> & Kids;
+export type HeaderProps = HeaderFooterType & Kids;
+export type FooterProps = HeaderFooterType & Kids;
+export type ParagraphProps = Omit<docx.IParagraphOptions, "children"> & Kids;
+export type TextRunProps = Omit<docx.IRunOptions, "children"> & Kids;
+export type TableProps = Omit<docx.ITableOptions, "rows"> & Kids;
+export type TableRowProps = Omit<docx.ITableRowOptions, "children"> & Kids;
+export type TableCellProps = Omit<docx.ITableCellOptions, "children"> & Kids;
+export type TabProps = NoKids;
+export type ImageRunProps = docx.IImageOptions & NoKids;
+export type ExternalHyperlinkProps = { link: string } & Kids;
+export type InternalHyperlinkProps = { anchor: string } & Kids;
+export type PageBreakProps = NoKids;
+export type BookmarkProps = { id: string } & Kids;
+export type SymbolRunProps = docx.ISymbolRunOptions & NoKids;
+/** `text` becomes a leading MathRun. */
+export type MathProps = { text?: string } & Kids;
+export type MathRunProps = Kids;
+export type BreakProps = NoKids;
+/** Nesting a List inside a List or ListItem sets the level. */
+export type ListProps = { type?: "bullet" | "numbered" } & Kids;
+export type ListItemProps = Omit<docx.IParagraphOptions, "children" | "numbering"> & Kids;

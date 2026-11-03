@@ -57,7 +57,9 @@ const AdvancedExample = () => (
         />
       </Paragraph>
 
-      <PageBreak />
+      <Paragraph>
+        <PageBreak />
+      </Paragraph>
     </Section>
 
     {/* Second Section - Content */}

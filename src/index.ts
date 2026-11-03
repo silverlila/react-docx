@@ -1,7 +1,10 @@
-// Main exports
-export { renderToBuffer, renderToBlob, renderToBase64 } from "./renderer";
+export { renderToBuffer, renderToBlob, renderToBase64 } from "./write/index";
+export type { RenderSource } from "./write/index";
+export { renderToTree } from "./tree/render";
+export { TreeError } from "./tree/canonical";
+export { ELEMENTS } from "./schema/elements";
+export type { DocumentNode, Node, Kind, Props } from "./schema/elements";
 
-// Component exports
 export {
   Document,
   Section,
@@ -20,12 +23,12 @@ export {
   Bookmark,
   SymbolRun,
   Math,
+  MathRun,
   Break,
   List,
   ListItem,
 } from "./components";
 
-// Type exports
 export type {
   DocumentProps,
   SectionProps,
@@ -44,7 +47,10 @@ export type {
   BookmarkProps,
   SymbolRunProps,
   MathProps,
+  MathRunProps,
   BreakProps,
+  ListProps,
+  ListItemProps,
 } from "./types";
 
-export * from "./constants";
+export { DEFAULT_NUMBERING } from "./constants";

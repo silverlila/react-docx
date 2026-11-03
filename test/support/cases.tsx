@@ -323,8 +323,10 @@ export const CASES: readonly CharacterizationCase[] = [
           <List type="numbered">
             <ListItem text="second list, item one" />
           </List>
-          <List type="numbered" level={1}>
-            <ListItem text="level one item" />
+          <List type="numbered">
+            <List type="numbered">
+              <ListItem text="level one item" />
+            </List>
           </List>
           <List type="bullet">
             <ListItem text="bullet item" />
