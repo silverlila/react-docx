@@ -65,7 +65,7 @@ A `w:drawing` inside a run splits the run (unit 04's split) and becomes `ImageRu
 - **`w:pict` with `v:shape` holding `v:imagedata@r:id`** → `ImageRun`. Bytes and type come as in Change 1. Size comes from the shape's `style` attribute (`width:72pt;height:36pt`): pt × 96 / 72, rounded to px, with a `resolved` note `"VML image converted to DrawingML"`.
 - **`w:pict` with `v:shape` holding `v:textbox/w:txbxContent`** → `Textbox`:
   - `style` comes from the `v:shape@style` declarations that `VmlShapeStyle` has (`width`, `height`, `position`, `margin-left` → `marginLeft`, `mso-position-horizontal` → `positionHorizontal`, …; map the hyphenated CSS names to the camelCase keys of `VmlShapeStyle` in `node_modules/docx/dist/index.d.ts`). Others give `dropped`.
-  - Children are `readBlocks(txbxContent)`.
+  - Children are `readBlocks(txbxContent)`. canonicalize gives a Textbox with no children one empty Paragraph (phase 1: `w:txbxContent` needs a block), so an empty text box reads as a Textbox holding one empty Paragraph.
   - docx.js writes a Textbox as its own `w:p` (verified, phase 1 unit 06). So when the `w:pict` is the only non-empty content of its paragraph, that paragraph **becomes** the Textbox: the paragraph's props go into the Textbox options (`ITextboxOptions` extends paragraph options), and a `w:pPr/w:pStyle` gives `dropped`, because Textbox omits `style`. Otherwise it gives `dropped`, `"text box sharing a paragraph with other content"`.
   - A text box in a header, footer or table cell gives `dropped`: Textbox is Section-body only.
 - **`w:pict` or `w:object` with anything else** (OLE `o:OLEObject`, VML shapes without text) → the generic fallback. These carry `r:id`, so they almost always end `dropped`.

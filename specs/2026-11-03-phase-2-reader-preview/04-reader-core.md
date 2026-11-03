@@ -116,7 +116,7 @@ A `w:r` becomes a `TextRun` with `readRunProperties(w:rPr).options`. Its content
 | `w:lastRenderedPageBreak` | `ignored` |
 | `w:drawing`, `w:pict`, `w:object` | `dropped` ("read in unit 05") |
 | `w:footnoteReference`, `w:endnoteReference`, `w:commentReference`, `w:annotationRef`, `w:footnoteRef`, `w:separator`, `w:continuationSeparator` | `dropped` ("read in unit 05") |
-| anything else | RawXml in run position if its name is in `RAW_XML_ROOTS.run` and it has no `r:` attribute, otherwise `dropped` |
+| anything else | the generic fallback (Change 7) in run position |
 
 An empty TextRun is dropped from the output unless it carries `break`.
 
@@ -148,14 +148,16 @@ The instruction is trimmed, its first token uppercased, and the only allowed swi
 
 **Complex fields.** A complex field is `w:fldChar w:fldCharType="begin"` … `w:instrText` … `"separate"` … result … `"end"`, possibly spread over several runs. Collect it from begin to the matching end, counting nested begin/end pairs.
 - A page-field instruction becomes a single `TextRun { props of the run holding the instrText }` with child `PageNumber`. The cached result is `ignored`.
-- Any other field becomes one RawXml in inline position, holding every `w:r` from the begin run to the end run, serialized in order. This only happens when no `r:` attribute appears; otherwise the result runs are read normally, so the cached text stays visible, and the field code is reported `dropped`.
+- Any other field becomes one RawXml in inline position, holding every `w:r` from the begin run to the end run, serialized in order. This only happens when the serialized runs pass `rawXmlOf` (Change 7); otherwise the result runs are read normally, so the cached text stays visible, and the field code is reported `dropped`.
 - If begin and end fall in the same run (docx.js writes them that way), the split rules of Change 4 still apply around it.
 
 ### 7. The generic fallback (decision 7)
 
 `fallback(el, slot: "block" | "inline" | "run", ctx)`:
 
-1. If `el.name` is in `RAW_XML_ROOTS[slot]` and `el` (deep) has no `r:` attribute → `RawXml { xml: serializeXml(el) }`, with a `raw` diagnostic.
+1. If `el.name` is in `RAW_XML_ROOTS[slot]` and `rawXmlOf(serializeXml(el))` accepts it → `RawXml { xml }`, with a `raw` diagnostic.
+
+   `rawXmlOf(xml)` is the one gate every RawXml the reader emits goes through, here, in fields (Change 6) and for raw styles (unit 03). It accepts a fragment only when it has no `r:` attribute (deep) and phase 1's `xmlRoots(xml)` returns `kind: "roots"`. `"malformed"` or `"unwritable"` means canonicalize would throw. That happens with vendor XML that holds text beside child elements, which docx.js cannot write. Such an element is not RawXml: it goes to step 2 or 3, and the diagnostic carries `xmlRoots`' reason.
 2. Else, if `el` is a wrapper → read its content in the same slot (`w:sdt` → `w:sdtContent`, `w:smartTag`/`w:customXml` → their children, `mc:AlternateContent` → `mc:Fallback`), with the wrapper reported `dropped`.
 3. Else → `dropped`.
 

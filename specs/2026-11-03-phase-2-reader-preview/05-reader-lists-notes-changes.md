@@ -104,7 +104,7 @@ Any other format renders as decimal, and the caller gives `resolved` with the de
 - A reference inside a header, footer or comment gives `dropped`, per phase 1's canonical rule 18.
 
 **Comments.**
-- Read `word/comments.xml` into `w:comment`s. Each becomes `Comment { id, author: w:author, initials: w:initials, date: new Date(w:date) }` with children `readBlocks(comment)`. The run holding `w:annotationRef` is removed and gives `ignored`.
+- Read `word/comments.xml` into `w:comment`s. Each becomes `Comment { id, author: w:author, initials: w:initials, date: new Date(w:date) }` with children `readBlocks(comment)`. `w:date` is optional: a comment without one has no `date` prop. Phase 1 writes a dateless Comment with no `w:date`, so this round-trips. The run holding `w:annotationRef` is removed and gives `ignored`.
 - Comment ids are ordinals of first appearance: body order of `w:commentRangeStart` or `w:commentReference`, then unreferenced comments in file order. The value is `ordinals.next("comment", w:id) - 1`, so ids start at 0 as in the phase-1 tests.
 - `w:commentRangeStart` and `w:commentRangeEnd` (inline) become `CommentRangeStart`/`CommentRangeEnd { id }`. `w:commentReference` (run content) becomes `CommentReference { id }`.
 - Comments become Document children, after all Sections.
@@ -135,13 +135,13 @@ Use the fixture builder, with `numbering`, `footnotes` and `comments` XML.
   - A reference mid-run gives `[TextRun "a", Footnote > Paragraph > TextRun "note", TextRun "b"]`, and the `w:footnoteRef` run is gone.
   - Two references to one id give the content twice and a `resolved` diagnostic.
   - A reference in a footer gives `dropped`.
-- **Comments.** Comments with `w:id`s 5 and 2, appearing in body order 5 then 2, get ids 0 and 1. Their `CommentRangeStart`, `CommentRangeEnd` and `CommentReference` carry the same ids, `Comment.date` is a `Date`, and `annotationRef` is gone.
+- **Comments.** Comments with `w:id`s 5 and 2, appearing in body order 5 then 2, get ids 0 and 1. Their `CommentRangeStart`, `CommentRangeEnd` and `CommentReference` carry the same ids, `Comment.date` is a `Date`, and `annotationRef` is gone. A comment without `w:date` gives a Comment with no `date`.
 - **Changes.**
   - `w:ins` with two runs gives two `InsertedTextRun`s with ordinal ids.
   - `w:del` with `w:delText` gives a `DeletedTextRun` whose child is the literal text.
   - `w:moveTo` gives `InsertedTextRun` plus `resolved`.
   - A `w:ins` around a hyperlink gives the hyperlink plus `dropped`.
-- **Phase-1 cases.** For each phase-1 `CASES` entry that has lists, footnotes or comments (`bug-lists` and `notes-and-blocks`), `readDocx(await renderToBuffer(el))` gives the same `numbering`, `Footnote` and `Comment` structure that `renderToTree(el)` has, with references renamed to `list-N`. Unit 07 makes this exact over all cases.
+- **Phase-1 cases.** For each phase-1 `CASES` entry that has lists, footnotes or comments (`bug-lists` and `notes-and-blocks`), `readDocx(await renderToBuffer(el))` gives the same `Footnote` and `Comment` structure that `renderToTree(el)` has, and each list paragraph the same `level`, with references renamed to `list-N`. Instance numbers are not compared: phase 1 numbers instances with one document-wide counter, and a List nested under a List of the other type takes its own reference (`NumberedList@1`) and instance, while the reader counts instances per reference. Compare instead that paragraphs sharing an instance in one tree share it in the other. Unit 07's fixed point (read, write, read) is exact over all cases.
 
 ## Verify
 
@@ -156,4 +156,4 @@ grep -rn "read in unit 05" src   # only drawing, VML and math lines remain, whic
 
 - The override rule in Change 1 must accept exactly what docx.js writes (`startOverride w:val="1"` on level 0 of every `w:num`), or no docx.js file will be a fixed point. If a docx.js upgrade changes that, the round-trip suite in unit 07 fails first.
 - Ordinals must be assigned in document order, so read the body in a single pass. Numbering references used only by a style come after all body uses.
-- `Comment.date` becomes a `Date`. Compare with `toEqual`, which handles `Date`.
+- `Comment.date` becomes a `Date` when the comment has `w:date`, and is absent otherwise. Compare with `toEqual`, which handles `Date`.

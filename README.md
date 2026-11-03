@@ -187,6 +187,26 @@ Use `<Break />` to add line breaks within a paragraph:
 </Table>
 ```
 
+### Lists
+
+A `<List>` becomes numbered paragraphs. Nest a `<List>` inside a `<ListItem>` for a deeper level:
+
+```tsx
+<List type="numbered">
+  <ListItem>First</ListItem>
+  <ListItem>
+    Second
+    <List type="bullet">
+      <ListItem>A point under the second</ListItem>
+    </List>
+  </ListItem>
+</List>
+```
+
+- `type` is `"bullet"` (the default) or `"numbered"`. Each `<List>` numbers from the start.
+- A list nests at most 9 deep, Word's level count, and must start with a `<ListItem>`.
+- To change the markers, give the `Document` a `numbering` config for the reference `"NumberedList"` or `"BulletList"`, in docx.js's format, with a level for each depth your lists reach. A list nested under a list of the other type numbers from the level of its depth, so a marker such as `"%1.%2."` that shows an enclosing level's number cannot be used there.
+
 ### Hyperlinks
 
 ```tsx
@@ -256,30 +276,27 @@ Put `<Header>` and `<Footer>` directly inside a `<Section>`. They take the same 
 
 ### Components
 
-- `Document` - Root document component
-- `Section` - Document section with page layout
-- `Header` - Page header of a section
-- `Footer` - Page footer of a section
-- `Paragraph` - Text paragraph
-- `TextRun` - Formatted text
-- `Break` - Line break within paragraph
-- `Table` - Table element
-- `TableRow` - Table row
-- `TableCell` - Table cell
-- `ExternalHyperlink` - External URL link
-- `InternalHyperlink` - Internal bookmark link
-- `PageBreak` - Page break
-- `Bookmark` - Bookmark anchor
-- `Tab` - Tab character
-- `ImageRun` - Embedded image
-- `SymbolRun` - Special symbol
-- `Math` - Mathematical equation
+Each component takes the options of its docx.js counterpart as props: the class of the same name, or for `Section` and `Footnote`, docx.js's section and footnote options. `List` and `ListItem` become numbered paragraphs, and `RawXml` is XML you write.
+
+- **Structure:** `Document`, `Section`, `Header`, `Footer`
+- **Blocks:** `Paragraph`, `Table`, `TableRow`, `TableCell`, `List`, `ListItem`, `TableOfContents`, `Textbox`
+- **Runs:** `TextRun`, `ImageRun`, `SymbolRun`, `Math`, `MathRun`
+- **Links and anchors:** `ExternalHyperlink`, `InternalHyperlink`, `Bookmark`, `PageReference`
+- **Breaks and spacing:** `Break`, `PageBreak`, `ColumnBreak`, `Tab`, `PositionalTab`, `CarriageReturn`, `SoftHyphen`, `NoBreakHyphen`
+- **Notes and comments:** `Footnote`, `Comment`, `CommentRangeStart`, `CommentRangeEnd`, `CommentReference`
+- **Tracked changes:** `InsertedTextRun`, `DeletedTextRun`
+- **Fields:** `SimpleField`, `SimpleMailMergeField`, `SequentialIdentifier`, `DayShort`, `DayLong`, `MonthShort`, `MonthLong`, `YearShort`, `YearLong`, and `PageNumber` values from `docx` as `TextRun` children
+- **Form controls:** `CheckBox`
+- **Anything else:** `RawXml`, whose `xml` prop is WordprocessingML written where the element stands
 
 ### Rendering Functions
 
-- `renderToBuffer(element)` - Returns `Promise<Buffer>`
-- `renderToBlob(element)` - Returns `Promise<Blob>`
-- `renderToBase64(element)` - Returns `Promise<string>`
+Each takes a JSX element, or a tree returned by `renderToTree`.
+
+- `renderToBuffer(source)` - Returns `Promise<Buffer>`
+- `renderToBlob(source)` - Returns `Promise<Blob>`
+- `renderToBase64(source)` - Returns `Promise<string>`
+- `renderToTree(element)` - Returns the document as plain data, the same for every way of writing it
 
 ## Type Safety
 

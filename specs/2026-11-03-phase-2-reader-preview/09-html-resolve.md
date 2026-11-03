@@ -145,7 +145,7 @@ export function resolveDocument(document: DocumentNode): readonly ResolvedSectio
 - The suffix is the level's `suffix` (default `tab`).
 
 **Inlines.**
-- `TextRun`: strings → `text`; `Tab` → `tab`; `break: n` → n `lineBreak`s first.
+- `TextRun`: `props.text`, when present, → one `text` (phase 1 keeps a literal page-number value or `""` there, in a run with no children); strings → `text`; `Tab` → `tab`; `break: n` → n `lineBreak`s first.
 - `CarriageReturn` → `lineBreak`; `PageBreak` → `pageBreak`; `ColumnBreak` → `columnBreak`.
 - `SoftHyphen` → text `"­"`; `NoBreakHyphen` → `"‑"`; `PositionalTab` → `tab`.
 - `SymbolRun` → text `String.fromCodePoint(parseInt(char, 16))` with the symbol font.

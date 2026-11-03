@@ -36,4 +36,5 @@ test("renderToTree throws a TreeError when nothing rendered", () => {
   const Empty = () => null;
   expect(() => renderToTree(<Empty />)).toThrow(TreeError);
   expect(() => renderToTree(<Empty />)).toThrow("Nothing rendered; the root must be <Document>");
+  expect(() => renderToTree(<Empty />)).toThrow(/^Nothing rendered/);
 });

@@ -127,6 +127,7 @@ export function readDocDefaults(docDefaults: XmlElement | null, env: CodecEnv): 
 
 - **Raw cases.** `w:default="1"` (or `"true"`) on a paragraph style gives raw `"default"`, because docx.js's `StyleForParagraph` never writes `w:default`. `w:type="table"` gives raw `"table"`, and `w:type="numbering"` gives raw `"numbering"`. The raw `xml` is `serializeXml(style)`.
   - If the element contains an `r:` attribute, return `dropped`. RawXml may not carry relationships (phase 1 decision 10).
+  - If phase 1's `xmlRoots(xml)` does not return `kind: "roots"` (for example, text beside child elements, which docx.js cannot write), return `dropped` with its reason. canonicalize validates `styles.importedStyles` with the same scanner. Unit 04's `rawXmlOf` is this check plus the `r:` one.
   - A character style with `w:default="1"` (usually `DefaultParagraphFont`) is also raw `"default"`.
 - **Options.**
   - `w:styleId` → `id`.

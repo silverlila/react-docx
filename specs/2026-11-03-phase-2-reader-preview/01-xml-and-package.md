@@ -129,5 +129,6 @@ pnpm run type-check
 ## Watch out
 
 - `htmlparser2`'s `parseDocument` in `xmlMode` decodes entities by default. Verify that `&amp;` comes back as `&` in text, and that `serializeXml` re-escapes it.
+- `serializeXml` writes text escaped, never as CDATA, and only XML's five entities or character references. Phase 1 rejects any other named entity in RawXml (`&nbsp;`), and its writer turns authored CDATA into escaped text. So a RawXml holding CDATA reads back as equivalent escaped text: equal after one write, not before.
 - Nothing in `src/read/` may import `docx` at runtime. `/reader` must stay docx-free (requirement 8).
 - Do not import anything from folio; copy and adapt. folio is a separate repo, and its modules import `@foliq/*` packages.

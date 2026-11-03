@@ -32,9 +32,11 @@ When this is done, a person can:
   - `TextRun.break` holds leading breaks only;
   - `heading` becomes `style`;
   - presence-only `false` values are stripped;
-  - lists become numbered paragraphs;
+  - lists become numbered paragraphs; a List nested under a List of the other type numbers with a definition of its own for its depth (`NumberedList@1`, built from the document's own `NumberedList` levels when it has them);
   - a style using a docx.js default id is folded into `styles.default.<key>`;
-  - RawXml must have allowed roots and no `r:` attributes;
+  - RawXml must have allowed roots and no `r:` attributes, and pass `xmlRoots` (`src/tree/xml-roots.ts`): well-formed, only XML's five entities, and no text beside child elements, which docx.js cannot write;
+  - an empty Textbox holds one empty Paragraph;
+  - props 0.1 took that 0.2 removed (`Document.footnotes`, `Section.headers`, …) throw;
   - a TableCell ends with a Paragraph;
   - Footnotes are inline and body-only;
   - Comment ids resolve.

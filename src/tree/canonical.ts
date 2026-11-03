@@ -1,6 +1,6 @@
 import { DEFAULT_STYLE_SLOTS, PAGE_NUMBER_VALUES, PRESENCE_ONLY, RAW_XML_ROOTS } from "../schema/docx-facts";
 import { ELEMENTS, isKind, type DocumentNode, type Kind } from "../schema/elements";
-import { LIST_NUMBERING, listEntries, type ListEntry } from "./lists";
+import { LIST_NUMBERING, listEntries, listLevels, type ListEntry, type ListLevels } from "./lists";
 import { xmlRoots } from "./xml-roots";
 
 /** The unnormalized `{ type, props, children }` the reconciler builds from JSX. */
@@ -15,7 +15,7 @@ export type IndexedChild = { readonly child: AuthorNode | string; readonly index
 
 export class TreeError extends Error {
   constructor(readonly path: readonly string[], message: string) {
-    super(`${path.join(" > ")}: ${message}`);
+    super(path.length === 0 ? message : `${path.join(" > ")}: ${message}`);
     this.name = "TreeError";
   }
 }
@@ -28,6 +28,8 @@ type DocumentState = {
   nextListInstance: number;
   /** Each list definition an expanded List numbers with, by reference, in first-use order. */
   readonly listDefinitions: Map<string, ListEntry["definition"]>;
+  /** The levels Lists of each type number with: the document's own, or LIST_NUMBERING's. */
+  readonly listLevels: ListLevels;
   /** Rule 19: every Comment id, and each id a comment range or reference names, with that node's path. */
   readonly commentIds: Set<unknown>;
   readonly commentMarks: { readonly id: unknown; readonly path: readonly string[] }[];
@@ -78,6 +80,28 @@ const TEXT_PROP_CHILD: { readonly [K in Kind]?: (text: string) => Built } = {
   Math: (text) => ({ type: "MathRun", props: {}, children: [text] }),
 };
 
+const IMPORTED_STYLES = "use styles.importedStyles, XML strings of <w:style> elements";
+
+/** Props 0.1 took that 0.2 replaced, each with its replacement. TypeScript rejects them; this rejects the
+ *  untyped callers that would otherwise have them ignored or passed to docx.js unchecked. */
+const REMOVED_PROPS: { readonly [K in Kind]?: Readonly<Record<string, string>> } = {
+  Document: {
+    footnotes: "put a <Footnote> in the paragraph where its number goes",
+    comments: "put <Comment> elements directly in the <Document>",
+    externalStyles: IMPORTED_STYLES,
+  },
+  Section: { headers: "use <Header> children", footers: "use <Footer> children" },
+};
+
+function assertNoRemovedProps(kind: Kind, props: PropBag, path: readonly string[]): void {
+  for (const [prop, replacement] of Object.entries(REMOVED_PROPS[kind] ?? {})) {
+    if (props[prop] !== undefined) throw new TreeError(path, `${kind}.${prop} was removed: ${replacement}`);
+  }
+  if (kind === "Document" && isRecord(props.styles) && props.styles.initialStyles !== undefined) {
+    throw new TreeError(path, `styles.initialStyles was removed: ${IMPORTED_STYLES}`);
+  }
+}
+
 /** Per-kind prop rules. `children` is dropped from every kind before these run. */
 const PROP_RULES: { readonly [K in Kind]?: (props: PropBag, path: readonly string[]) => PropBag } = {
   Document: (props, path) => assertImportedStyles(foldDefaultStyles(props, path), path),
@@ -101,7 +125,13 @@ export function canonicalize(root: AuthorNode): DocumentNode {
   if (root.type !== "Document") {
     throw new TreeError([root.type], `The root must be <Document>, got <${root.type}>`);
   }
-  const state: DocumentState = { nextListInstance: 0, listDefinitions: new Map(), commentIds: new Set(), commentMarks: [] };
+  const state: DocumentState = {
+    nextListInstance: 0,
+    listDefinitions: new Map(),
+    listLevels: listLevels(root.props.numbering),
+    commentIds: new Set(),
+    commentMarks: [],
+  };
   const document = canonicalNode("Document", root, indexed(root.children), ["Document"], {
     document: state,
     outsideBody: false,
@@ -493,6 +523,7 @@ function assertCommentIdsResolve(state: DocumentState): void {
 // ─── Props ─────────────────────────────────────────────────────────────────────
 
 function canonicalProps(kind: Kind, props: PropBag, path: readonly string[]): PropBag {
+  assertNoRemovedProps(kind, props, path);
   const own = omit(props, "children");
   const rule = PROP_RULES[kind];
   return withoutPresenceOnlyFalse(kind, rule ? rule(own, path) : own);
@@ -654,8 +685,8 @@ function partitionStyles(
 }
 
 function listParagraphs(list: AuthorNode, path: readonly string[], context: Context): Built[] {
-  const nextInstance = () => context.document.nextListInstance++;
-  return listEntries(list, path, nextInstance).map((entry) => {
+  const lists = { nextInstance: () => context.document.nextListInstance++, levels: context.document.listLevels };
+  return listEntries(list, path, lists).map((entry) => {
     context.document.listDefinitions.set(entry.definition.reference, entry.definition);
     const paragraph = canonicalNode("Paragraph", entry.item, entry.content, entry.path, context);
     return { ...paragraph, props: { ...paragraph.props, numbering: entry.numbering } };

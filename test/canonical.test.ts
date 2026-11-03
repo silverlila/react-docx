@@ -876,6 +876,27 @@ describe("TableOfContents and Textbox are Section-body blocks", () => {
   });
 });
 
+describe("removed props", () => {
+  test.each([
+    ["Document", "footnotes", "Document.footnotes was removed: put a <Footnote> in the paragraph where its number goes"],
+    ["Document", "comments", "Document.comments was removed: put <Comment> elements directly in the <Document>"],
+    ["Document", "externalStyles", "Document.externalStyles was removed: use styles.importedStyles, XML strings of <w:style> elements"],
+    ["Section", "headers", "Section.headers was removed: use <Header> children"],
+    ["Section", "footers", "Section.footers was removed: use <Footer> children"],
+  ])("%s.%s throws", (kind, prop, message) => {
+    const input = kind === "Document" ? n("Document", { [prop]: {} }, n("Section")) : n("Document", {}, n("Section", { [prop]: {} }));
+    const error = treeError(() => canon(input));
+    expect(error.path).toEqual(kind === "Document" ? ["Document"] : ["Document", "Section[0]"]);
+    expect(error.message).toContain(message);
+  });
+
+  test("styles.initialStyles throws", () => {
+    expect(() => canon(n("Document", { styles: { initialStyles: {} } }, n("Section")))).toThrow(
+      "Document: styles.initialStyles was removed: use styles.importedStyles, XML strings of <w:style> elements"
+    );
+  });
+});
+
 describe("lists", () => {
   const numbering = (reference: string, level: number, instance: number) => ({ numbering: { reference, level, instance } });
 
@@ -1004,6 +1025,97 @@ describe("lists", () => {
         "Lists nest at most 9 deep: Word numbers 9 levels"
       );
     }
+  });
+
+  describe("a document's own NumberedList or BulletList levels", () => {
+    const indent = (left: number) => ({ paragraph: { indent: { left, hanging: 360 } } });
+    const roman = { level: 0, format: "upperRoman", text: "%1)", alignment: "left", style: indent(720) };
+    const letter = { level: 1, format: "upperLetter", text: "%2)", alignment: "left", style: indent(1440) };
+    const digit = { level: 2, format: "decimal", text: "%3)", alignment: "left", style: indent(2160) };
+    const withNumbering = (levels: readonly object[], ...body: AuthorNode[]) =>
+      n("Document", { numbering: { config: [{ reference: "NumberedList", levels }] } }, n("Section", {}, ...body));
+    const numberedUnderBullet = (...items: AuthorNode[]) =>
+      n("List", {}, n("ListItem", {}, "b", n("List", { type: "numbered" }, ...items)));
+
+    test("also number a List of that type nested under the other type, from the depth it starts at", () => {
+      const tree = canon(withNumbering([roman, letter, digit], numberedUnderBullet(n("ListItem", {}, "n"))));
+      expect(blocks(tree)[1]).toEqual(paragraph(numbering("NumberedList@1", 0, 1), run({}, "n")));
+      const config = (tree.props.numbering as typeof LIST_NUMBERING).config;
+      expect(config.map((c) => c.reference)).toEqual(["NumberedList", "BulletList", "NumberedList@1"]);
+      expect(config[2].levels).toEqual([
+        { ...letter, level: 0, text: "%1)" },
+        { ...digit, level: 1, text: "%2)" },
+      ]);
+    });
+
+    test("apply to BulletList too, and leave the type the document does not configure on its defaults", () => {
+      const square = (level: number) => ({ level, format: "bullet", text: "■", alignment: "left", style: indent(720 * (level + 1)) });
+      const input = n(
+        "Document",
+        { numbering: { config: [{ reference: "BulletList", levels: [square(0), square(1), square(2)] }] } },
+        n("Section", {}, n("List", { type: "numbered" }, n("ListItem", {}, "1", n("List", {}, n("ListItem", {}, "b")))))
+      );
+      const config = (canon(input).props.numbering as typeof LIST_NUMBERING).config;
+      expect(config.map((c) => c.reference)).toEqual(["BulletList", "NumberedList", "BulletList@1"]);
+      expect(config[1]).toEqual(LIST_NUMBERING.config[0]);
+      expect(config[2].levels).toEqual([square(1), square(2)].map((l) => ({ ...l, level: l.level - 1 })));
+    });
+
+    test("renumber every marker from the depth the list starts at", () => {
+      const four = { level: 3, format: "decimal", text: "%3.%4", alignment: "left", style: indent(2880) };
+      const bare = { level: 3, format: "decimal", alignment: "left", style: indent(2880) };
+      // numbered > bullet > numbered: the innermost list starts two deep, under the bullet list.
+      const innermost = () => n("List", { type: "numbered" }, n("ListItem", {}, "n"));
+      const twoDeep = (levels: readonly object[]) =>
+        withNumbering(levels, n("List", { type: "numbered" }, n("ListItem", {}, "1", n("List", {}, n("ListItem", {}, "b", innermost())))));
+      const definition = (levels: readonly object[], reference: string) => {
+        const config = (canon(twoDeep(levels)).props.numbering as typeof LIST_NUMBERING).config;
+        return config.find((c) => c.reference === reference);
+      };
+      expect(definition([roman, letter, digit, four], "NumberedList@2")?.levels.map((l) => l.text)).toEqual(["%1)", "%1.%2"]);
+      expect(definition([roman, letter, digit, bare], "NumberedList@2")?.levels[1]).toEqual({ ...bare, level: 1 });
+    });
+
+    test("throw when a marker there would show the number of a level the enclosing list owns", () => {
+      const dotted = { ...letter, text: "%1.%2." };
+      expect(() => canon(withNumbering([roman, dotted, digit], numberedUnderBullet(n("ListItem", {}, "n"))))).toThrow(
+        'numbering NumberedList level 1 marker "%1.%2." shows the number of level 0, which belongs to the enclosing list here'
+      );
+    });
+
+    test("restrict only the levels a nested list's items reach", () => {
+      const dottedFive = { level: 5, format: "decimal", text: "%1.%6.", alignment: "left", style: indent(4320) };
+      const tree = canon(withNumbering([roman, letter, digit, dottedFive], numberedUnderBullet(n("ListItem", {}, "n"))));
+      expect(blocks(tree)[1]).toEqual(paragraph(numbering("NumberedList@1", 0, 1), run({}, "n")));
+      expect(() => canon(withNumbering([roman, letter, digit], numberedUnderBullet()))).not.toThrow();
+    });
+
+    test("use a definition the document configures for the nested reference itself, as it is", () => {
+      const own = { level: 0, format: "upperLetter", text: "(%1)", alignment: "left", style: indent(1440) };
+      const input = n(
+        "Document",
+        { numbering: { config: [{ reference: "NumberedList", levels: [roman] }, { reference: "NumberedList@1", levels: [own] }] } },
+        n("Section", {}, numberedUnderBullet(n("ListItem", {}, "n")))
+      );
+      const config = (canon(input).props.numbering as typeof LIST_NUMBERING).config;
+      expect(config.find((c) => c.reference === "NumberedList@1")?.levels).toEqual([own]);
+    });
+
+    test("throw when they define no level a list item needs", () => {
+      const nestedSameType = n("List", { type: "numbered" }, n("ListItem", {}, "a", n("List", { type: "numbered" }, n("ListItem", {}, "b"))));
+      for (const body of [nestedSameType, numberedUnderBullet(n("ListItem", {}, "n"))]) {
+        expect(() => canon(withNumbering([roman], body))).toThrow("numbering NumberedList defines no level 1, which this list item needs");
+      }
+    });
+  });
+
+  test("a List must start with a ListItem: numbering restarts at a list's first item", () => {
+    const error = treeError(() => canon(doc(n("List", {}, n("List", {}, n("ListItem", {}, "a"))))));
+    expect(error.path).toEqual(["Document", "Section[0]", "List[0]", "List[0]"]);
+    expect(error.message).toContain("A <List> must start with a <ListItem>, the item its numbering restarts at");
+    expect(() => canon(doc(n("List", {}, n("ListItem", {}, "a", n("List", {}, n("List", {}, n("ListItem", {}, "b")))))))).toThrow(
+      "A <List> must start with a <ListItem>"
+    );
   });
 
   test("List.level throws", () => {

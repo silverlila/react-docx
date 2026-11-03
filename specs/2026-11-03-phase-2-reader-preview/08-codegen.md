@@ -65,11 +65,7 @@ export default Resume;
 - **Values.** Numbers and booleans print as literals. Strings use `JSON.stringify`. Arrays and objects print as literals with keys unquoted when they are identifiers, and quoted otherwise. A `Date` prints as `new Date("<toISOString()>")`. A `Uint8Array` becomes an asset (below). Nesting is indented by 2 spaces. An object or array literal that would exceed 100 columns breaks onto lines.
 - **Strings in children.** A string prints as JSX text only when it has no leading or trailing whitespace and no `{`, `}`, `<`, `>`, `&` or newline. Otherwise it prints as `{"…"}`.
 - **`PageNumber`.** Prints as `{PageNumber.<KEY>}`, where KEY is the `docx.PageNumber` key whose value is `field`. `"SECTION"` maps to `CURRENT_SECTION`.
-- **Literal sentinel text.** A literal string child of a run kind that equals a `PAGE_NUMBER_VALUES` member would become a field when re-rendered (phase 1 canonical rule 1).
-  - If it is the run's first child, print it as the `text` prop. The `text` prop is always literal (rule 4).
-  - Otherwise, split it into its own run of the same kind and props, printed with `text`.
-
-  This split changes the tree's shape. It is the one case excluded from the identity test, and has its own test.
+- **Literal sentinel text.** A canonical run never holds a literal string equal to a `PAGE_NUMBER_VALUES` member, or `""`, as a child. Phase 1 keeps such a literal in the `text` prop of a run of its own (canonical invariant, `src/tree/canonical.ts`). It prints as an ordinary `text` prop, which is always literal (rule 4), so no case is excluded from the identity test.
 - **`RawXml`.** Prints as `<RawXml xml={\`…\`} />`, a template literal with `\`, `` ` `` and `${` escaped.
 - **Assets.**
   - Each `ImageRun` `data` (and `fallback.data`) becomes `assets/image<N>.<ext>`, numbered in document order. The extension comes from `type` (`jpg` → `.jpg`, `svg` → `.svg`).
@@ -106,7 +102,7 @@ vitest's transform handles the `.tsx`. Its `resolve.alias` maps `@react-docx/cor
 - A `Date` prints as `new Date("2026-01-01T00:00:00.000Z")`.
 - RawXml containing a backtick and `${x}` prints escaped and round trips.
 - Two ImageRuns with the same bytes give one asset.
-- A run `["x", "CURRENT"]` (literal) prints as two TextRuns, the second with `text="CURRENT"`. Re-rendered, the second run's child is the literal string, not a PageNumber.
+- `<TextRun text="CURRENT">x</TextRun>` (the `text` prop is literal; a "CURRENT" string child would be `PageNumber.CURRENT` itself) canonicalizes to two TextRuns: `{ text: "CURRENT" }` with no children, then one with child `"x"`. The first prints as `<TextRun text="CURRENT" />`, and re-rendered it is the literal text, not a PageNumber.
 - The import list contains only the kinds used, sorted, and imports `PageNumber` only when used.
 
 ## Verify
