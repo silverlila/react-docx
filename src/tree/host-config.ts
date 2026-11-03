@@ -1,5 +1,5 @@
 import React from "react";
-import { TreeError } from "./canonical";
+import { TreeError } from "./author";
 
 /** What the reconciler builds. Mutable, internal, never exported from the package. */
 export type HostNode = { type: string; props: Record<string, unknown>; children: HostChild[] };

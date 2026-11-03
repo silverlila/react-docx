@@ -1,26 +1,17 @@
 import { DEFAULT_STYLE_SLOTS, PAGE_NUMBER_VALUES, PRESENCE_ONLY, RAW_XML_ROOTS } from "../schema/docx-facts";
-import { ELEMENTS, isKind, type DocumentNode, type Kind } from "../schema/elements";
+import {
+  ELEMENTS,
+  OUTSIDE_BODY,
+  isKind,
+  type ChildKind,
+  type Content,
+  type DocumentNode,
+  type Kind,
+} from "../schema/elements";
+import { TreeError, isRecord, type AuthorNode, type IndexedChild, type PropBag } from "./author";
 import { LIST_NUMBERING, listEntries, listLevels, type ListEntry, type ListLevels } from "./lists";
 import { xmlRoots } from "./xml-roots";
 
-/** The unnormalized `{ type, props, children }` the reconciler builds from JSX. */
-export type AuthorNode = {
-  readonly type: string;
-  readonly props: Readonly<Record<string, unknown>>;
-  readonly children: readonly (AuthorNode | string)[];
-};
-
-/** An authored child with its index among its parent's authored children, which names it in paths. */
-export type IndexedChild = { readonly child: AuthorNode | string; readonly index: number };
-
-export class TreeError extends Error {
-  constructor(readonly path: readonly string[], message: string) {
-    super(path.length === 0 ? message : `${path.join(" > ")}: ${message}`);
-    this.name = "TreeError";
-  }
-}
-
-type PropBag = Readonly<Record<string, unknown>>;
 /** A canonical node before its props are trusted as `Props<K>`: they are not validated, TSX type-checked them. */
 type Built = { readonly type: Kind; readonly props: PropBag; readonly children: readonly (Built | string)[] };
 /** One canonicalize call's document-wide state, shared by every node. */
@@ -36,10 +27,14 @@ type DocumentState = {
 };
 type Context = {
   readonly document: DocumentState;
-  /** Rule 18: inside a Header, Footer, Comment or Footnote, whose content docx.js reads no footnote references from. */
+  /** Rule 18: inside an OUTSIDE_BODY kind, whose content docx.js reads no footnote references from. */
   readonly outsideBody: boolean;
 };
-type Parent = { readonly kind: Kind; readonly name: string; readonly path: readonly string[] };
+type Parent<K extends Kind = Kind> = { readonly kind: K; readonly name: string; readonly path: readonly string[] };
+/** The kinds whose string children are literal text, split at Breaks and read for PageNumber values. */
+type RunKind = { [K in Kind]: (typeof ELEMENTS)[K]["content"] extends "run" ? K : never }[Kind];
+/** Every other kind, which canonicalNode builds as one node; `runs` may split a run into several. */
+type UnsplitKind = Exclude<Kind, RunKind>;
 
 const SUGAR: readonly string[] = ["List", "ListItem", "Break"];
 const PAGE_NUMBERS: readonly string[] = PAGE_NUMBER_VALUES;
@@ -48,30 +43,15 @@ const DATA_URL_PREFIX = /^data:[^,]*;base64,/;
 /** Only relationship attributes live in the `r:` namespace, so a regex needs no parser and has no false positives. */
 const RELATIONSHIP_ATTRIBUTE = /\sr:[A-Za-z]+\s*=/;
 const STYLE_ID = /w:styleId="([^"]+)"/g;
-const OUTSIDE_BODY: readonly Kind[] = ["Header", "Footer", "Comment", "Footnote"];
-/** The kinds whose string children are literal text, split at Breaks and read for PageNumber values. */
-type RunKind = "TextRun" | "InsertedTextRun" | "DeletedTextRun";
-const RUN_KINDS: readonly Kind[] = ["TextRun", "InsertedTextRun", "DeletedTextRun"];
-/** Rule 17: the kinds whose loose strings and inline content are wrapped into Paragraphs. */
-const WRAPS_LOOSE_CONTENT: readonly Kind[] = ["Footnote", "Comment", "Textbox"];
 const COMMENT_MARKS: readonly Kind[] = ["CommentRangeStart", "CommentRangeEnd", "CommentReference"];
 /** The author node a rule-17 Paragraph is built from: its children are the loose content, given separately. */
 const LOOSE_PARAGRAPH: AuthorNode = { type: "Paragraph", props: {}, children: [] };
 
-/** The kinds a RawXml may stand in, and which RAW_XML_ROOTS list its fragment's roots come from there. */
-type RawXmlParent = { [K in Kind]: "RawXml" extends (typeof ELEMENTS)[K]["children"][number] ? K : never }[Kind];
-const RAW_XML_SLOT: { readonly [K in RawXmlParent]: Exclude<keyof typeof RAW_XML_ROOTS, "style"> } = {
-  Section: "block",
-  Header: "block",
-  Footer: "block",
-  TableCell: "block",
-  Paragraph: "inline",
-  ExternalHyperlink: "inline",
-  InternalHyperlink: "inline",
-  Bookmark: "inline",
-  TextRun: "run",
-  InsertedTextRun: "run",
-  DeletedTextRun: "run",
+/** The content models a RawXml may stand in, and which RAW_XML_ROOTS list its fragment's roots come from there. */
+const RAW_XML_SLOT: { readonly [C in Content]?: Exclude<keyof typeof RAW_XML_ROOTS, "style"> } = {
+  block: "block",
+  inline: "inline",
+  run: "run",
 };
 
 /** The child a non-empty `text` prop becomes, inserted first. A run kind's `text` is handled in `runs`. */
@@ -155,7 +135,7 @@ function childPath(path: readonly string[], child: AuthorNode, index: number): s
 }
 
 function canonicalNode(
-  kind: Kind,
+  kind: UnsplitKind,
   node: AuthorNode,
   content: readonly IndexedChild[],
   path: readonly string[],
@@ -166,7 +146,7 @@ function canonicalNode(
     throw new TreeError(path, "Footnote is only allowed in the document body");
   }
   recordCommentId(kind, node.props, path, context.document);
-  const parent: Parent = { kind, name: node.type, path };
+  const parent: Parent<UnsplitKind> = { kind, name: node.type, path };
   const inner = OUTSIDE_BODY.includes(kind) ? { ...context, outsideBody: true } : context;
   const authored = [...textPropChild(kind, node.props, path), ...canonicalChildren(parent, content, inner)];
   // w:txbxContent must hold at least one block; Word writes an empty text box with one empty paragraph.
@@ -185,10 +165,10 @@ function nodesFor(parent: Parent, kind: Kind, node: AuthorNode, path: readonly s
 }
 
 function isRunKind(kind: Kind): kind is RunKind {
-  return RUN_KINDS.includes(kind);
+  return ELEMENTS[kind].content === "run";
 }
 
-function isLegalIn(parent: Kind, type: string): type is Kind {
+function isLegalIn<P extends Kind>(parent: P, type: string): type is ChildKind<P> {
   const legal: readonly string[] = ELEMENTS[parent].children;
   return legal.includes(type);
 }
@@ -206,15 +186,27 @@ function textNotAllowed(parent: Parent): TreeError {
   return new TreeError(parent.path, `Text is not allowed directly in <${parent.name}>`);
 }
 
-// ─── Children, by the kind of slot the parent is ───────────────────────────────
+// ─── Children, by the parent's content model ───────────────────────────────────
 
-function canonicalChildren(parent: Parent, content: readonly IndexedChild[], context: Context): (Built | string)[] {
-  if (ELEMENTS[parent.kind].text) return literalChildren(parent, content, context);
-  if (WRAPS_LOOSE_CONTENT.includes(parent.kind)) return wrappedBlockChildren(parent, content, context);
-  if (isLegalIn(parent.kind, "Paragraph")) return blockChildren(parent, content, context);
-  if (isLegalIn(parent.kind, "TextRun")) return inlineChildren(parent, content, context);
-  if (isLegalIn(parent.kind, "MathRun")) return mathChildren(parent, content, context);
-  return plainChildren(parent, content, context);
+function canonicalChildren(
+  parent: Parent<UnsplitKind>,
+  content: readonly IndexedChild[],
+  context: Context
+): (Built | string)[] {
+  switch (ELEMENTS[parent.kind].content) {
+    case "block":
+      return blockChildren(parent, content, context);
+    case "wrapped":
+      return wrappedBlockChildren(parent, content, context);
+    case "inline":
+      return inlineChildren(parent, content, context);
+    case "math":
+      return mathChildren(parent, content, context);
+    case "literal":
+      return literalChildren(parent, content, context);
+    case "plain":
+      return plainChildren(parent, content, context);
+  }
 }
 
 /** Section, Header, Footer, TableCell: Lists expand into paragraphs, a stray ListItem is a Paragraph. */
@@ -472,15 +464,12 @@ function assertFragment({ xml, label, allowedRoots, where }: Fragment, path: rea
   }
 }
 
-function isRawXmlParent(kind: Kind): kind is RawXmlParent {
-  return Object.prototype.hasOwnProperty.call(RAW_XML_SLOT, kind);
-}
-
 function assertRawXmlFits(parent: Parent, node: AuthorNode, path: readonly string[]): void {
   const { xml } = node.props;
   if (typeof xml !== "string") throw new TreeError(path, `RawXml xml must be a string, got ${typeof xml}`);
-  if (!isRawXmlParent(parent.kind)) throw new TreeError(path, `<RawXml> is not allowed in <${parent.name}>`);
-  const allowedRoots = RAW_XML_ROOTS[RAW_XML_SLOT[parent.kind]];
+  const slot = RAW_XML_SLOT[ELEMENTS[parent.kind].content];
+  if (slot === undefined) throw new TreeError(path, `<RawXml> is not allowed in <${parent.name}>`);
+  const allowedRoots = RAW_XML_ROOTS[slot];
   assertFragment({ xml, label: "RawXml", allowedRoots, where: `<${parent.name}>` }, path);
 }
 
@@ -533,10 +522,6 @@ function omit(props: PropBag, ...keys: string[]): PropBag {
   const rest = { ...props };
   for (const key of keys) delete rest[key];
   return rest;
-}
-
-export function isRecord(value: unknown): value is PropBag {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function textProp(props: PropBag, path: readonly string[]): string | undefined {

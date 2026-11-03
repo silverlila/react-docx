@@ -3,7 +3,8 @@ import Reconciler29 from "react-reconciler-29";
 import Reconciler31 from "react-reconciler-31";
 import Reconciler33 from "react-reconciler-33";
 import type { DocumentNode } from "../schema/elements";
-import { canonicalize, TreeError, type AuthorNode } from "./canonical";
+import { TreeError, type AuthorNode } from "./author";
+import { canonicalize } from "./canonical";
 import { hostConfig18, hostConfig19, type HostChild, type HostContainer, type HostNode } from "./host-config";
 import { ReactLine, reactLine } from "./react-line";
 

@@ -1,5 +1,5 @@
 import * as docx from "docx";
-import type { DocumentNode, Kind, Node } from "../schema/elements";
+import { OUTSIDE_BODY, type DocumentNode, type Kind, type Node } from "../schema/elements";
 import { rawXmlComponents } from "./raw-xml";
 
 /** What each kind's builder returns: the docx.js object, or the option bag its parent takes. */
@@ -86,13 +86,13 @@ function inPlace<T>(built: readonly (T | docx.XmlComponent[])[]): T[] {
   return built.flatMap((item) => (Array.isArray(item) ? asChildren<T>(item) : [item]));
 }
 
-/** Footnotes in body order: depth first through the Sections, never into a Header, Footer or Comment,
+/** Footnotes in body order: depth first through the Sections, never into an OUTSIDE_BODY kind,
  *  which canonical rule 18 keeps footnotes out of. */
 function bodyFootnotes(document: DocumentNode): Node<"Footnote">[] {
   const found: Node<"Footnote">[] = [];
   const visit = (node: Node): void => {
     if (node.type === "Footnote") found.push(node);
-    else if (node.type !== "Header" && node.type !== "Footer" && node.type !== "Comment") {
+    else if (!OUTSIDE_BODY.includes(node.type)) {
       for (const child of node.children) if (typeof child !== "string") visit(child);
     }
   };

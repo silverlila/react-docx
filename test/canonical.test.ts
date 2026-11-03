@@ -1,7 +1,8 @@
 import { describe, expect, test } from "vitest";
 import { DEFAULT_NUMBERING } from "../src/index";
 import type { DocumentNode } from "../src/schema/elements";
-import { canonicalize, TreeError, type AuthorNode } from "../src/tree/canonical";
+import { TreeError, type AuthorNode } from "../src/tree/author";
+import { canonicalize } from "../src/tree/canonical";
 import { LIST_NUMBERING } from "../src/tree/lists";
 import { xmlRoots } from "../src/tree/xml-roots";
 import { n } from "./support/nodes";

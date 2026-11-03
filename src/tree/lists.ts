@@ -1,5 +1,5 @@
 import type * as docx from "docx";
-import { TreeError, isRecord, type AuthorNode, type IndexedChild } from "./canonical";
+import { TreeError, isRecord, type AuthorNode, type IndexedChild } from "./author";
 
 type NumberingConfig = docx.INumberingOptions["config"][number];
 type Level = NumberingConfig["levels"][number];
