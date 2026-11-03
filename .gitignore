@@ -55,3 +55,7 @@ examples/*.docx
 
 # Local planning documents, not published
 specs/
+
+# Round-trip script output and private real-file fixtures (unit 07)
+.roundtrip/
+test/fixtures/real/

@@ -4,7 +4,8 @@
  *  - `within` gives a context for another part or block; everything else is shared.
  *  - Codec notes become diagnostics at the current part and path: `ignored` notes are counted.
  *  - The empty path is the Document itself, which is not a block, so it reports `at: null`.
- *  - `readPart` is how a reader opens a part, so the parts nobody read can be reported at the end. */
+ *  - `readPart` is how a reader opens a part, so the parts nobody read can be reported at the end. A reader
+ *    that carries a part's bytes over without parsing it (a picture's media) marks it with `consume`. */
 
 import type { CodecEnv, Note } from "../ooxml/codec";
 import { createDiagnostics, type DiagnosticCollector, type LocatedDiagnostic, type TreePath } from "./diagnostics";
@@ -26,6 +27,7 @@ export type ReadContext = {
   ignore(element: string): void;
   notes(notes: readonly Note[]): void;
   readPart(path: string): XmlElement | null;
+  consume(path: string): void;
   within(part: string | null, at: TreePath): ReadContext;
 };
 
@@ -35,7 +37,7 @@ export type ReadSession = {
   readonly consumed: ReadonlySet<string>;
 };
 
-type Shared = Pick<ReadContext, "pkg" | "env" | "ordinals" | "ignore" | "readPart"> & {
+type Shared = Pick<ReadContext, "pkg" | "env" | "ordinals" | "ignore" | "readPart" | "consume"> & {
   readonly diagnostics: DiagnosticCollector;
 };
 
@@ -57,6 +59,7 @@ function contextAt(shared: Shared, part: string, at: TreePath): ReadContext {
       }
     },
     readPart: shared.readPart,
+    consume: shared.consume,
     within: (nextPart, nextAt) => contextAt(shared, nextPart ?? part, nextAt),
   };
 }
@@ -83,6 +86,7 @@ export function createReadSession(pkg: OpcPackage): ReadSession {
       consumed.add(path);
       return pkg.part(path);
     },
+    consume: (path) => consumed.add(path),
     diagnostics,
   };
   return { ctx: contextAt(shared, pkg.mainPart, []), diagnostics, consumed };

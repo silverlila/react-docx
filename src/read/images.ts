@@ -8,9 +8,11 @@
  *  - What docx.js writes the same way for every picture is accepted without a note: wp:cNvGraphicFramePr,
  *    pic:nvPicPr, a:stretch, an empty a:srcRect, a rect a:prstGeom, a:noFill, the blip's cstate, a zero
  *    wp:simplePos, and a wp:effectExtent equal to the one docx.js computes. Anchor flags, margins and the
- *    z-index equal to docx.js's defaults are left out.
+ *    z-index equal to docx.js's defaults are left out. Word's `<a:ln><a:noFill/></a:ln>` draws no line, as
+ *    docx.js's picture without an outline does, so it is read as no outline.
  *  - Parsing returns notes instead of reporting them, so mc:AlternateContent can ask whether a drawing is a
- *    picture without a report. */
+ *    picture without a report. It also returns the media parts a picture uses, which are marked consumed
+ *    only when the picture is read. */
 
 import type * as docx from "docx";
 import { dropped, isOneOf, isOnValue, resolved, type Note } from "../ooxml/codec";
@@ -31,7 +33,7 @@ type Outline = NonNullable<docx.IImageOptions["outline"]>;
 type Position<R, A> = { readonly relative?: R; readonly align?: A; readonly offset?: number };
 
 export type DrawingRead =
-  | { readonly kind: "image"; readonly props: ImageProps; readonly notes: readonly Note[] }
+  | { readonly kind: "image"; readonly props: ImageProps; readonly media: readonly string[]; readonly notes: readonly Note[] }
   | { readonly kind: "refused"; readonly notes: readonly Note[] };
 
 const PICTURE_URI = "http://schemas.openxmlformats.org/drawingml/2006/picture";
@@ -41,6 +43,7 @@ const DEFAULT_OUTLINE_WIDTH = 9525;
 const NO_OPTION = "docx.js has no option for it";
 const CROP = "crop is not expressible; image kept uncropped";
 const WHOLE = /^-?[0-9]+$/;
+const DECIMAL = /^-?[0-9]+(?:\.[0-9]+)?$/;
 const VML_LENGTH = /^(-?[0-9]+(?:\.[0-9]+)?)(pt|in|cm|mm|pc|px)?$/;
 
 const RASTER_TYPES: Readonly<Record<string, Raster["type"]>> = { png: "png", jpg: "jpg", jpeg: "jpg", gif: "gif", bmp: "bmp" };
@@ -93,8 +96,8 @@ function wholeAt(el: XmlElement | null, name: string): number | null {
   return value !== null && WHOLE.test(value) ? Number(value) : null;
 }
 
-/** The embedded part `relId` names from the current part, or null with a dropped note. */
-function mediaOf(relId: string | null, element: string, ctx: ReadContext, notes: Note[]): { path: string; data: Uint8Array } | null {
+/** The embedded part `relId` names from the current part, added to `media`; or null with a dropped note. */
+function mediaOf(relId: string | null, element: string, ctx: ReadContext, notes: Note[], media: string[]): { path: string; data: Uint8Array } | null {
   if (relId === null) {
     notes.push(dropped(element, "the picture is not embedded (a linked file), which docx.js cannot write"));
     return null;
@@ -109,23 +112,24 @@ function mediaOf(relId: string | null, element: string, ctx: ReadContext, notes:
     notes.push(dropped(element, `${rel.target} is missing from the package`));
     return null;
   }
+  media.push(rel.target);
   return { path: rel.target, data };
 }
 
 /** The bytes and docx.js type of a raster picture, or null with a dropped note. */
-function rasterOf(relId: string | null, element: string, ctx: ReadContext, notes: Note[]): Raster | null {
-  const media = mediaOf(relId, element, ctx, notes);
-  if (media === null) return null;
-  const extension = media.path.slice(media.path.lastIndexOf(".") + 1).toLowerCase();
+function rasterOf(relId: string | null, element: string, ctx: ReadContext, notes: Note[], media: string[]): Raster | null {
+  const part = mediaOf(relId, element, ctx, notes, media);
+  if (part === null) return null;
+  const extension = part.path.slice(part.path.lastIndexOf(".") + 1).toLowerCase();
   if (!has(RASTER_TYPES, extension)) {
-    notes.push(dropped(element, `${media.path}: docx.js writes only png, jpg, gif and bmp pictures`));
+    notes.push(dropped(element, `${part.path}: docx.js writes only png, jpg, gif and bmp pictures`));
     return null;
   }
-  return { type: RASTER_TYPES[extension], data: media.data };
+  return { type: RASTER_TYPES[extension], data: part.data };
 }
 
 /** pic:blipFill → the picture's bytes, or null when they cannot be written. */
-function pictureOf(blipFill: XmlElement | null, ctx: ReadContext, notes: Note[]): Picture | null {
+function pictureOf(blipFill: XmlElement | null, ctx: ReadContext, notes: Note[], media: string[]): Picture | null {
   for (const child of elementsOf(blipFill)) {
     if (!BLIP_FILL_PARTS.has(child.name)) notes.push(dropped(child.name, NO_OPTION));
     else if (child.name === "a:srcRect" && Object.values(child.attributes).some((value) => value !== "0")) notes.push(dropped(child.name, CROP));
@@ -140,16 +144,18 @@ function pictureOf(blipFill: XmlElement | null, ctx: ReadContext, notes: Note[])
     for (const ext of elementsOf(child)) {
       const svgBlip = childNamed(ext, "asvg:svgBlip");
       if (svgBlip === null) notes.push(dropped(ext.name, `${attrOf(ext, "uri") ?? "(no uri)"}: ${NO_OPTION}`));
-      else svg = mediaOf(attrOf(svgBlip, "r:embed"), svgBlip.name, ctx, notes);
+      else svg = mediaOf(attrOf(svgBlip, "r:embed"), svgBlip.name, ctx, notes, media);
     }
   }
-  const raster = rasterOf(attrOf(blip, "r:embed"), "a:blip", ctx, notes);
+  const raster = rasterOf(attrOf(blip, "r:embed"), "a:blip", ctx, notes, media);
   if (raster === null) return null;
   return svg === null ? raster : { type: "svg", data: svg.data, fallback: raster };
 }
 
-/** a:ln → docx.js's outline: a solid RGB line, with its width. */
+/** a:ln → docx.js's outline: a solid RGB line, with its width; or null for a line with no fill. */
 function outlineOf(ln: XmlElement, notes: Note[]): Outline | null {
+  const [only, ...others] = elementsOf(ln);
+  if (only?.name === "a:noFill" && others.length === 0) return null;
   const fill = childNamed(ln, "a:solidFill");
   const rgb = childNamed(fill, "a:srgbClr");
   const value = attrOf(rgb, "val");
@@ -167,13 +173,26 @@ function outlineOf(ln: XmlElement, notes: Note[]): Outline | null {
 
 type Shape = { readonly flip?: Transformation["flip"]; readonly rotation?: number; readonly outline?: Outline };
 
+/** a:xfrm's rot, in 60000ths of a degree. docx.js writes rotation × 60000 unrounded, so for about 6% of whole
+ *  values it writes float noise (rot="31904.999999999996" for 31905); that is rounded back to the whole
+ *  angle it stands for, or the second read would lose the rotation. */
+function rotationOf(xfrm: XmlElement, notes: Note[]): number | null {
+  const rot = attrOf(xfrm, "rot");
+  if (rot === null) return null;
+  if (!DECIMAL.test(rot)) {
+    notes.push(dropped(xfrm.name, `rot="${rot}" is not an angle`));
+    return null;
+  }
+  return Math.round(Number(rot));
+}
+
 /** pic:spPr → rotation and flip from a:xfrm, and the outline. */
 function shapeOf(spPr: XmlElement | null, notes: Note[]): Shape {
   let shape: Shape = {};
   for (const child of elementsOf(spPr)) {
     switch (child.name) {
       case "a:xfrm": {
-        const rot = wholeAt(child, "rot");
+        const rot = rotationOf(child, notes);
         const horizontal = isOnValue(attrOf(child, "flipH") ?? "0");
         const vertical = isOnValue(attrOf(child, "flipV") ?? "0");
         const flip = { ...(horizontal ? { horizontal } : {}), ...(vertical ? { vertical } : {}) };
@@ -316,7 +335,8 @@ export function parseDrawing(drawing: XmlElement, ctx: ReadContext): DrawingRead
   if (cx === null || cy === null) return refused(notes, dropped(drawing.name, "the picture has no wp:extent size"));
   const pic = childNamed(graphicData, "pic:pic");
   for (const child of elementsOf(pic)) if (!PIC_PARTS.has(child.name)) notes.push(dropped(child.name, NO_OPTION));
-  const picture = pictureOf(childNamed(pic, "pic:blipFill"), ctx, notes);
+  const media: string[] = [];
+  const picture = pictureOf(childNamed(pic, "pic:blipFill"), ctx, notes, media);
   if (picture === null) return { kind: "refused", notes };
   const { outline, ...transform } = shapeOf(childNamed(pic, "pic:spPr"), notes);
   checkContainer(container, outline, notes);
@@ -330,7 +350,7 @@ export function parseDrawing(drawing: XmlElement, ctx: ReadContext): DrawingRead
     ...(altText === undefined ? {} : { altText }),
     ...(outline === undefined ? {} : { outline }),
   };
-  return { kind: "image", props, notes };
+  return { kind: "image", props, media, notes };
 }
 
 /** A VML length → px, or null when it has a unit VML pictures do not use. */
@@ -352,16 +372,18 @@ export function parseVmlImage(pict: XmlElement, ctx: ReadContext): DrawingRead |
   if (width === null || height === null) {
     return refused(notes, dropped("v:shape", "its style gives no width and height in pt, in, cm, mm, pc or px"));
   }
-  const raster = rasterOf(attrOf(imagedata, "r:id"), imagedata.name, ctx, notes);
+  const media: string[] = [];
+  const raster = rasterOf(attrOf(imagedata, "r:id"), imagedata.name, ctx, notes, media);
   if (raster === null) return { kind: "refused", notes };
-  return { kind: "image", props: { ...raster, transformation: { width, height } }, notes: [resolved("w:pict", "VML image converted to DrawingML"), ...notes] };
+  return { kind: "image", props: { ...raster, transformation: { width, height } }, media, notes: [resolved("w:pict", "VML image converted to DrawingML"), ...notes] };
 }
 
-/** Reports a parsed picture's notes and gives its ImageRun, or null when it was refused. docx.js writes an
- *  image's run without properties, so the run's own are dropped. */
+/** Reports a parsed picture's notes, marks its media consumed and gives its ImageRun, or null when it was
+ *  refused. docx.js writes an image's run without properties, so the run's own are dropped. */
 export function readPicture(read: DrawingRead, runProps: RunOptions, ctx: ReadContext): AuthorNode | null {
   ctx.notes(read.notes);
   if (read.kind === "refused") return null;
+  for (const path of read.media) ctx.consume(path);
   if (Object.keys(runProps).length > 0) {
     ctx.report({ kind: "dropped", element: "w:rPr", detail: "docx.js writes a picture's run without properties" });
   }
