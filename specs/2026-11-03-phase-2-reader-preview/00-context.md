@@ -23,11 +23,12 @@ When this is done, a person can:
 
 **What phase 1 leaves behind.** These are specified in `specs/2026-11-03-phase-1-document-tree/`. **Before unit 01 here, read that folder's `## Landed` section**, and if it records deviations, fix the affected units in this folder first.
 
-- **`src/schema/elements.ts`** holds the element table `ELEMENTS` (a row per kind: `docx` class name, legal `children`, `text` flag, `ooxml` names), plus the types `Kind`, `Props<K>`, `Node<K>`, `DocumentNode`, `StylesProps` (with `importedStyles?: readonly string[]`), `DocumentProps`, `ImageProps`, and `NOT_MAPPED`.
+- **`src/schema/elements.ts`** holds the element table `ELEMENTS` (a row per kind: `docx` class name, legal `children`, and its `content` model: `block`, `wrapped`, `inline`, `run`, `math`, `literal` or `plain`). Read a kind's slot from `content`; do not derive it again from `children`. It also holds `OUTSIDE_BODY` (Header, Footer, Comment and Footnote, where footnotes may not stand), the types `Kind`, `Props<K>` (`Props<"Document">` is the canonical Document props), `Node<K>`, `DocumentNode`, `Content`, `StylesProps` (with `importedStyles?: readonly string[]`) and `ImageProps`, and `NOT_MAPPED`.
   - The kinds: Document, Section, Header, Footer, Paragraph, TextRun, InsertedTextRun, DeletedTextRun, Table, TableRow, TableCell, Tab, PositionalTab, CarriageReturn, SoftHyphen, NoBreakHyphen, the six Day/Month/Year fields, PageNumber, ImageRun, SymbolRun, ExternalHyperlink, InternalHyperlink, Bookmark, PageBreak, ColumnBreak, SimpleField, SimpleMailMergeField, SequentialIdentifier, PageReference, CheckBox, Footnote, Comment, CommentRangeStart, CommentRangeEnd, CommentReference, TableOfContents, Textbox, Math, MathRun, RawXml.
   - The slot lists: `BLOCK` (Paragraph, Table, RawXml), `INLINE`, `RUN_CONTENT`.
 - **`src/schema/docx-facts.ts`** holds `PAGE_NUMBER_VALUES`, `DEFAULT_STYLE_SLOTS` (docx.js's 13 built-in style ids → `styles.default.<key>`), `PRESENCE_ONLY` (booleans docx.js writes the same for `true` and `false`; the exact set is in phase 1 unit 03's Landed line) and `RAW_XML_ROOTS`.
-- **`src/tree/canonical.ts`** holds `AuthorNode` (`{ type: string; props; children: (AuthorNode | string)[] }`), `TreeError` (with `.path`), and `canonicalize(root: AuthorNode): DocumentNode`. It is the only producer of canonical trees and enforces rules 1–19, among them:
+- **`src/tree/author.ts`** holds `AuthorNode` (`{ type: string; props; children: (AuthorNode | string)[] }`), `TreeError` (with `.path`), `IndexedChild`, `PropBag` and `isRecord`. It imports nothing; the reader imports these from here.
+- **`src/tree/canonical.ts`** holds `canonicalize(root: AuthorNode): DocumentNode`. It is the only producer of canonical trees and enforces rules 1–19, among them:
   - strings are literal, and `PageNumber` is a node;
   - `TextRun.break` holds leading breaks only;
   - `heading` becomes `style`;
@@ -37,6 +38,7 @@ When this is done, a person can:
   - RawXml must have allowed roots and no `r:` attributes, and pass `xmlRoots` (`src/tree/xml-roots.ts`): well-formed, only XML's five entities, and no text beside child elements, which docx.js cannot write;
   - an empty Textbox holds one empty Paragraph;
   - props 0.1 took that 0.2 removed (`Document.footnotes`, `Section.headers`, …) throw;
+  - `Document.numbering` must be `{ config: [...] }` whose entries have a string `reference` and `levels` with whole-number `level`s, or canonicalize throws (`numberingConfig` in `src/tree/lists.ts`), so the reader must build it that way;
   - a TableCell ends with a Paragraph;
   - Footnotes are inline and body-only;
   - Comment ids resolve.
