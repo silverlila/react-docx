@@ -1,6 +1,11 @@
 import type { ReactNode } from "react";
 import type * as docx from "docx";
-import type { StylesProps, TextboxProps as TextboxOptions } from "./schema/elements";
+import type {
+  DeletedTextRunProps as DeletedTextRunOptions,
+  InsertedTextRunProps as InsertedTextRunOptions,
+  StylesProps,
+  TextboxProps as TextboxOptions,
+} from "./schema/elements";
 
 /** Authoring props: docx.js option types verbatim, with element children in place of option-bag children. */
 type Kids = { children?: ReactNode };
@@ -46,3 +51,24 @@ export type CommentReferenceProps = { id: number } & NoKids;
 export type TableOfContentsProps = { alias?: string } & docx.ITableOfContentsOptions & NoKids;
 /** Holds Paragraphs; loose text becomes one. `style` is the VML shape style, such as `{ width: "200pt" }`. */
 export type TextboxProps = TextboxOptions & Kids;
+/** A tracked insertion: `id`, `author` and `date` (a string) mark the change, the rest are TextRun's props. */
+export type InsertedTextRunProps = InsertedTextRunOptions & Kids;
+/** A tracked deletion, written as `w:delText`. Props as InsertedTextRun's. */
+export type DeletedTextRunProps = DeletedTextRunOptions & Kids;
+export type ColumnBreakProps = NoKids;
+export type SimpleFieldProps = { instruction: string; cachedValue?: string } & NoKids;
+export type SimpleMailMergeFieldProps = { fieldName: string } & NoKids;
+export type SequentialIdentifierProps = { identifier: string } & NoKids;
+/** A `PAGEREF` field to the Bookmark with id `bookmarkId`. */
+export type PageReferenceProps = { bookmarkId: string } & docx.IPageReferenceOptions & NoKids;
+export type CheckBoxProps = docx.ICheckboxSymbolOptions & NoKids;
+export type PositionalTabProps = docx.PositionalTabOptions & NoKids;
+export type CarriageReturnProps = NoKids;
+export type SoftHyphenProps = NoKids;
+export type NoBreakHyphenProps = NoKids;
+export type DayShortProps = NoKids;
+export type DayLongProps = NoKids;
+export type MonthShortProps = NoKids;
+export type MonthLongProps = NoKids;
+export type YearShortProps = NoKids;
+export type YearLongProps = NoKids;

@@ -23,6 +23,10 @@ const run = (props: Record<string, unknown>, ...children: unknown[]) => ({ type:
 const tab = { type: "Tab", props: {}, children: [] };
 const page = (field: string) => ({ type: "PageNumber", props: { field }, children: [] });
 const paragraph = (props: Record<string, unknown>, ...children: unknown[]) => ({ type: "Paragraph", props, children });
+/** The tracked-change run kinds, which rules 1, 4 and 6 treat as they treat TextRun. */
+const TRACKED = ["InsertedTextRun", "DeletedTextRun"];
+const change = { id: 1, author: "A", date: "2026-01-01T00:00:00Z" };
+const runOf = (type: string, props: Record<string, unknown>, ...children: unknown[]) => ({ type, props, children });
 
 function treeError(build: () => unknown): TreeError {
   try {
@@ -62,6 +66,18 @@ describe("1. strings directly in a TextRun", () => {
       run({ italics: true, break: 1 }, "a", tab),
       run({ italics: true, text: "CURRENT" }),
       run({ italics: true }, tab),
+    ]);
+  });
+
+  test.each(TRACKED)('in a %s, "CURRENT" becomes a PageNumber field and other strings merge', (kind) => {
+    const tree = canon(doc(n("Paragraph", {}, n(kind, change, "Page ", "", "CURRENT"))));
+    expect(inline(tree)).toEqual([runOf(kind, change, "Page ", page("CURRENT"))]);
+  });
+
+  test.each(TRACKED)("in a %s, strings that merge into a PageNumber value are the text of a run of the same kind", (kind) => {
+    expect(inline(canon(doc(n("Paragraph", {}, n(kind, change, "a", n("Tab"), "TOTAL_", "PAGES")))))).toEqual([
+      runOf(kind, change, "a", tab),
+      runOf(kind, { ...change, text: "TOTAL_PAGES" }),
     ]);
   });
 });
@@ -163,6 +179,14 @@ describe("4. the text prop", () => {
     ]);
   });
 
+  test.each(TRACKED)("on a %s it becomes the first child, and stays the text when it is a PageNumber value", (kind) => {
+    const tree = canon(doc(n("Paragraph", {}, n(kind, { ...change, text: "a" }, "b"), n(kind, { ...change, text: "SECTION" }))));
+    expect(inline(tree)).toEqual([
+      runOf(kind, change, "ab"),
+      runOf(kind, { ...change, text: "SECTION" }),
+    ]);
+  });
+
   test("a non-string text throws", () => {
     expect(() => canon(doc(n("Paragraph", {}, n("TextRun", { text: 5 }))))).toThrow(
       "Document > Section[0] > Paragraph[0] > TextRun[0]: text must be a string, got number"
@@ -183,6 +207,19 @@ describe("5. run content directly in an inline slot", () => {
     const tree = canon(doc(n("Paragraph", {}, n("InternalHyperlink", { anchor: "a" }, n("PageNumber", { field: "TOTAL_PAGES" })))));
     expect(inline(tree)).toEqual([
       { type: "InternalHyperlink", props: { anchor: "a" }, children: [run({}, page("TOTAL_PAGES"))] },
+    ]);
+  });
+
+  test.each(["PositionalTab", "CarriageReturn", "SoftHyphen", "NoBreakHyphen", "DayShort", "YearLong"])(
+    "a %s in a Paragraph is wrapped in its own TextRun",
+    (kind) => {
+      expect(inline(canon(doc(n("Paragraph", {}, n(kind)))))).toEqual([run({}, { type: kind, props: {}, children: [] })]);
+    }
+  );
+
+  test.each(TRACKED)("a %s in a Paragraph is not wrapped, and holds run content", (kind) => {
+    expect(inline(canon(doc(n("Paragraph", {}, n(kind, change, n("Tab"), n("CarriageReturn"))))))).toEqual([
+      runOf(kind, change, tab, { type: "CarriageReturn", props: {}, children: [] }),
     ]);
   });
 
@@ -222,6 +259,14 @@ describe("6. Break", () => {
   test("a trailing Break produces a final run with no children", () => {
     const tree = canon(doc(n("Paragraph", {}, n("TextRun", { italics: true }, "a", n("Break")))));
     expect(inline(tree)).toEqual([run({ italics: true }, "a"), run({ italics: true, break: 1 })]);
+  });
+
+  test.each(TRACKED)("a Break inside a %s splits it into two of the same kind with the same props", (kind) => {
+    const tree = canon(doc(n("Paragraph", {}, n(kind, { ...change, bold: true }, "a", n("Break"), "b"))));
+    expect(inline(tree)).toEqual([
+      runOf(kind, { ...change, bold: true }, "a"),
+      runOf(kind, { ...change, bold: true, break: 1 }, "b"),
+    ]);
   });
 
   test("a Break in a Section throws", () => {

@@ -36,8 +36,31 @@ const INLINE = [
   "Footnote",
   "CommentRangeStart",
   "CommentRangeEnd",
+  "InsertedTextRun",
+  "DeletedTextRun",
+  "ColumnBreak",
+  "SimpleField",
+  "SimpleMailMergeField",
+  "SequentialIdentifier",
+  "PageReference",
+  "CheckBox",
 ] as const;
-const RUN_CONTENT = ["Tab", "PageNumber", "RawXml", "CommentReference"] as const;
+const RUN_CONTENT = [
+  "Tab",
+  "PageNumber",
+  "RawXml",
+  "CommentReference",
+  "PositionalTab",
+  "CarriageReturn",
+  "SoftHyphen",
+  "NoBreakHyphen",
+  "DayShort",
+  "DayLong",
+  "MonthShort",
+  "MonthLong",
+  "YearShort",
+  "YearLong",
+] as const;
 
 export type StylesProps = Omit<docx.IStylesOptions, "importedStyles" | "initialStyles"> & {
   /** Raw <w:style> elements, as XML strings, written after docx.js's own styles. */
@@ -56,6 +79,10 @@ type TextboxOptions = ConstructorParameters<typeof docx.Textbox>[0];
 /** `text` is left out: docx.js's Textbox ignores it. `style` is the VML shape style, not a paragraph style. */
 export type TextboxProps = Omit<TextboxOptions, "children" | "text">;
 type CommentIdProps = { readonly id: number };
+/** docx.js does not export the tracked-change run options. Like TextRun's, they keep `text`, which a canonical
+ *  run carries only for a literal docx.js would misread as a child. `date` is a string. */
+export type InsertedTextRunProps = Omit<ConstructorParameters<typeof docx.InsertedTextRun>[0], "children">;
+export type DeletedTextRunProps = Omit<ConstructorParameters<typeof docx.DeletedTextRun>[0], "children">;
 
 export const ELEMENTS = {
   Document: spec<DocumentProps>()({
@@ -177,6 +204,59 @@ export const ELEMENTS = {
   /** docx.js types its children as inline content but writes them straight into `<w:txbxContent>`,
    *  which holds paragraphs. */
   Textbox: spec<TextboxProps>()({ docx: "Textbox", children: ["Paragraph"], text: false, ooxml: ["w:pict"] }),
+  InsertedTextRun: spec<InsertedTextRunProps>()({
+    docx: "InsertedTextRun",
+    children: RUN_CONTENT,
+    text: true,
+    ooxml: ["w:ins"],
+  }),
+  DeletedTextRun: spec<DeletedTextRunProps>()({
+    docx: "DeletedTextRun",
+    children: RUN_CONTENT,
+    text: true,
+    ooxml: ["w:del"],
+  }),
+  ColumnBreak: spec<{}>()({ docx: "ColumnBreak", children: [], text: false, ooxml: ["w:br"] }),
+  SimpleField: spec<{ readonly instruction: string; readonly cachedValue?: string }>()({
+    docx: "SimpleField",
+    children: [],
+    text: false,
+    ooxml: ["w:fldSimple"],
+  }),
+  SimpleMailMergeField: spec<{ readonly fieldName: string }>()({
+    docx: "SimpleMailMergeField",
+    children: [],
+    text: false,
+    ooxml: ["w:fldSimple"],
+  }),
+  SequentialIdentifier: spec<{ readonly identifier: string }>()({
+    docx: "SequentialIdentifier",
+    children: [],
+    text: false,
+    ooxml: ["w:instrText"],
+  }),
+  PageReference: spec<{ readonly bookmarkId: string } & docx.IPageReferenceOptions>()({
+    docx: "PageReference",
+    children: [],
+    text: false,
+    ooxml: ["w:instrText"],
+  }),
+  CheckBox: spec<docx.ICheckboxSymbolOptions>()({ docx: "CheckBox", children: [], text: false, ooxml: ["w:sdt"] }),
+  PositionalTab: spec<docx.PositionalTabOptions>()({
+    docx: "PositionalTab",
+    children: [],
+    text: false,
+    ooxml: ["w:ptab"],
+  }),
+  CarriageReturn: spec<{}>()({ docx: "CarriageReturn", children: [], text: false, ooxml: ["w:cr"] }),
+  SoftHyphen: spec<{}>()({ docx: "SoftHyphen", children: [], text: false, ooxml: ["w:softHyphen"] }),
+  NoBreakHyphen: spec<{}>()({ docx: "NoBreakHyphen", children: [], text: false, ooxml: ["w:noBreakHyphen"] }),
+  DayShort: spec<{}>()({ docx: "DayShort", children: [], text: false, ooxml: ["w:dayShort"] }),
+  DayLong: spec<{}>()({ docx: "DayLong", children: [], text: false, ooxml: ["w:dayLong"] }),
+  MonthShort: spec<{}>()({ docx: "MonthShort", children: [], text: false, ooxml: ["w:monthShort"] }),
+  MonthLong: spec<{}>()({ docx: "MonthLong", children: [], text: false, ooxml: ["w:monthLong"] }),
+  YearShort: spec<{}>()({ docx: "YearShort", children: [], text: false, ooxml: ["w:yearShort"] }),
+  YearLong: spec<{}>()({ docx: "YearLong", children: [], text: false, ooxml: ["w:yearLong"] }),
 } as const satisfies Record<string, Spec<unknown>>;
 
 export type Kind = keyof typeof ELEMENTS;
@@ -195,3 +275,30 @@ export type DocumentNode = Node<"Document">;
 /** `Object.hasOwn` is ES2022; tsconfig's lib is ES2020. */
 export const isKind = (type: string): type is Kind =>
   Object.prototype.hasOwnProperty.call(ELEMENTS, type);
+
+const MATH_SLOTS = "named slots need a slot-component design (out of scope); author as <RawXml> OMML meanwhile";
+
+/** docx.js content classes that are not kinds, each with why. test/coverage.test.ts fails on a content class
+ *  that is neither some `ELEMENTS[k].docx` nor a key here, and on a key that is no longer a content class. */
+export const NOT_MAPPED: Readonly<Record<string, string>> = {
+  Comments: "the comments part container; built from <Comment> children of Document",
+  AnnotationReference: "written by docx.js inside comment parts",
+  FootnoteReferenceElement: "written by docx.js inside footnote parts",
+  Separator: "a footnote separator, written by docx.js",
+  ContinuationSeparator: "a footnote continuation separator, written by docx.js",
+  EndnoteReference: "docx.js has no endnotes part (out of scope)",
+  LastRenderedPageBreak: "a layout cache Word writes and recomputes",
+  PageNumberElement: "written by docx.js for PageNumber field values",
+  MathFraction: MATH_SLOTS,
+  MathSum: MATH_SLOTS,
+  MathIntegral: MATH_SLOTS,
+  MathSuperScript: MATH_SLOTS,
+  MathSubScript: MATH_SLOTS,
+  MathSubSuperScript: MATH_SLOTS,
+  MathRadical: MATH_SLOTS,
+  MathFunction: MATH_SLOTS,
+  MathRoundBrackets: MATH_SLOTS,
+  MathCurlyBrackets: MATH_SLOTS,
+  MathAngledBrackets: MATH_SLOTS,
+  MathSquareBrackets: MATH_SLOTS,
+};

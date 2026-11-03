@@ -46,6 +46,9 @@ const DATA_URL_PREFIX = /^data:[^,]*;base64,/;
 const RELATIONSHIP_ATTRIBUTE = /\sr:[A-Za-z]+\s*=/;
 const STYLE_ID = /w:styleId="([^"]+)"/g;
 const OUTSIDE_BODY: readonly Kind[] = ["Header", "Footer", "Comment", "Footnote"];
+/** The kinds whose string children are literal text, split at Breaks and read for PageNumber values. */
+type RunKind = "TextRun" | "InsertedTextRun" | "DeletedTextRun";
+const RUN_KINDS: readonly Kind[] = ["TextRun", "InsertedTextRun", "DeletedTextRun"];
 /** Rule 17: the kinds whose loose strings and inline content are wrapped into Paragraphs. */
 const WRAPS_LOOSE_CONTENT: readonly Kind[] = ["Footnote", "Comment", "Textbox"];
 const COMMENT_MARKS: readonly Kind[] = ["CommentRangeStart", "CommentRangeEnd", "CommentReference"];
@@ -64,9 +67,11 @@ const RAW_XML_SLOT: { readonly [K in RawXmlParent]: Exclude<keyof typeof RAW_XML
   InternalHyperlink: "inline",
   Bookmark: "inline",
   TextRun: "run",
+  InsertedTextRun: "run",
+  DeletedTextRun: "run",
 };
 
-/** The child a non-empty `text` prop becomes, inserted first. TextRun's `text` is handled in `textRuns`. */
+/** The child a non-empty `text` prop becomes, inserted first. A run kind's `text` is handled in `runs`. */
 const TEXT_PROP_CHILD: { readonly [K in Kind]?: (text: string) => Built } = {
   Paragraph: (text) => literalRun({}, text),
   Math: (text) => ({ type: "MathRun", props: {}, children: [text] }),
@@ -79,16 +84,18 @@ const PROP_RULES: { readonly [K in Kind]?: (props: PropBag, path: readonly strin
   Footer: defaultHeaderFooterType,
   Paragraph: (props, path) => headingToStyle(omit(props, "text"), path),
   TextRun: (props) => omit(props, "text"),
+  InsertedTextRun: (props) => omit(props, "text"),
+  DeletedTextRun: (props) => omit(props, "text"),
   Math: (props) => omit(props, "text"),
   ImageRun: imageBytes,
 };
 
 /** Pure. Never mutates its input. canonicalize(canonicalize(x)) deep-equals canonicalize(x).
  *
- *  Invariant that makes it so: a canonical TextRun's `children` never contain a string equal to a
- *  PAGE_NUMBER_VALUES member, nor `""`, since a second pass would read the first as a field and drop the
- *  second. Such a literal lives in `props.text` of a TextRun of its own: no children, the same other props
- *  as the run it came from. `text` on a canonical TextRun appears only in that form. */
+ *  Invariant that makes it so: a canonical run's `children` (TextRun, InsertedTextRun, DeletedTextRun) never
+ *  contain a string equal to a PAGE_NUMBER_VALUES member, nor `""`, since a second pass would read the first as
+ *  a field and drop the second. Such a literal lives in `props.text` of a run of its own: the same kind, no
+ *  children, the same other props as the run it came from. `text` on a canonical run appears only in that form. */
 export function canonicalize(root: AuthorNode): DocumentNode {
   if (root.type !== "Document") {
     throw new TreeError([root.type], `The root must be <Document>, got <${root.type}>`);
@@ -132,12 +139,16 @@ function canonicalNode(
   return { type: kind, props: canonicalProps(kind, node.props, path), children };
 }
 
-/** A placed author node as canonical nodes: a TextRun may split into several at its Breaks,
+/** A placed author node as canonical nodes: a run may split into several at its Breaks,
  *  and a RawXml is checked against the slot its parent gives it. */
 function nodesFor(parent: Parent, kind: Kind, node: AuthorNode, path: readonly string[], context: Context): Built[] {
-  if (kind === "TextRun") return textRuns(node, path, context);
+  if (isRunKind(kind)) return runs(kind, node, path, context);
   if (kind === "RawXml") assertRawXmlFits(parent, node, path);
   return [canonicalNode(kind, node, indexed(node.children), path, context)];
+}
+
+function isRunKind(kind: Kind): kind is RunKind {
+  return RUN_KINDS.includes(kind);
 }
 
 function isLegalIn(parent: Kind, type: string): type is Kind {
@@ -289,7 +300,11 @@ function groupChildren(content: readonly IndexedChild[]): Group[] {
 }
 
 function textRun(props: PropBag, children: readonly (Built | string)[]): Built {
-  return { type: "TextRun", props, children };
+  return run("TextRun", props, children);
+}
+
+function run(kind: RunKind, props: PropBag, children: readonly (Built | string)[]): Built {
+  return { type: kind, props, children };
 }
 
 /** A literal a second pass would reinterpret as a run child: a PageNumber value becomes a field, `""` is dropped. */
@@ -312,7 +327,7 @@ function mergeStrings<T>(items: readonly (T | string)[]): (T | string)[] {
   return merged;
 }
 
-// ─── TextRun: fields, the text prop, and splitting at Breaks ───────────────────
+// ─── Runs: fields, the text prop, and splitting at Breaks ──────────────────────
 
 const BREAK: unique symbol = Symbol("Break");
 /** A protected literal, which never merges with its neighbours and is written as a `text` run of its own. */
@@ -321,9 +336,10 @@ type SegmentItem = Built | string | Literal;
 type RunItem = SegmentItem | typeof BREAK;
 type Segment = { breaks: number; content: SegmentItem[] };
 
-function textRuns(node: AuthorNode, path: readonly string[], context: Context): Built[] {
-  const parent: Parent = { kind: "TextRun", name: node.type, path };
-  const props = canonicalProps("TextRun", node.props, path);
+/** TextRun, InsertedTextRun and DeletedTextRun alike: a split keeps the kind and props for every part. */
+function runs(kind: RunKind, node: AuthorNode, path: readonly string[], context: Context): Built[] {
+  const parent: Parent = { kind, name: node.type, path };
+  const props = canonicalProps(kind, node.props, path);
   const text = textProp(node.props, path);
   const items: RunItem[] = text === undefined ? [] : [isProtected(text) ? { literal: text } : text];
   for (const { child, index } of indexed(node.children)) {
@@ -336,7 +352,9 @@ function textRuns(node: AuthorNode, path: readonly string[], context: Context): 
       items.push(...nodesFor(parent, placedKind(parent, child, childAt), child, childAt, context));
     }
   }
-  return segmentsAtBreaks(items).flatMap((segment, i) => segmentRuns(segmentProps(props, segment, i === 0), segment));
+  return segmentsAtBreaks(items).flatMap((segment, i) =>
+    segmentRuns(kind, segmentProps(props, segment, i === 0), segment)
+  );
 }
 
 function isLiteral(item: SegmentItem): item is Literal {
@@ -346,7 +364,7 @@ function isLiteral(item: SegmentItem): item is Literal {
 /** A segment's runs. Adjacent strings merge first, and a merged string that is protected becomes a Literal.
  *  Each Literal is a `text` run of its own; the content between Literals shares a run. Only the first run
  *  keeps the segment's `break`, so `break` still counts only the Breaks that lead the content. */
-function segmentRuns(props: PropBag, segment: Segment): Built[] {
+function segmentRuns(kind: RunKind, props: PropBag, segment: Segment): Built[] {
   const content = mergeStrings(segment.content).map((item) =>
     typeof item === "string" && isProtected(item) ? { literal: item } : item
   );
@@ -357,10 +375,10 @@ function segmentRuns(props: PropBag, segment: Segment): Built[] {
     else if (Array.isArray(last)) last.push(item);
     else chunks.push([item]);
   }
-  if (chunks.length === 0) return [textRun(props, [])];
+  if (chunks.length === 0) return [run(kind, props, [])];
   return chunks.map((chunk, i) => {
     const runProps = i === 0 ? props : omit(props, "break");
-    return Array.isArray(chunk) ? textRun(runProps, chunk) : textRun({ ...runProps, text: chunk.literal }, []);
+    return Array.isArray(chunk) ? run(kind, runProps, chunk) : run(kind, { ...runProps, text: chunk.literal }, []);
   });
 }
 

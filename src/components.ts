@@ -2,33 +2,51 @@ import React, { type ReactNode } from "react";
 import type {
   BookmarkProps,
   BreakProps,
+  CarriageReturnProps,
+  CheckBoxProps,
+  ColumnBreakProps,
   CommentProps,
   CommentRangeEndProps,
   CommentRangeStartProps,
   CommentReferenceProps,
+  DayLongProps,
+  DayShortProps,
+  DeletedTextRunProps,
   DocumentProps,
   ExternalHyperlinkProps,
   FooterProps,
   FootnoteProps,
   HeaderProps,
   ImageRunProps,
+  InsertedTextRunProps,
   InternalHyperlinkProps,
   ListItemProps,
   ListProps,
   MathProps,
   MathRunProps,
+  MonthLongProps,
+  MonthShortProps,
+  NoBreakHyphenProps,
   PageBreakProps,
+  PageReferenceProps,
   ParagraphProps,
+  PositionalTabProps,
   RawXmlProps,
   SectionProps,
+  SequentialIdentifierProps,
+  SimpleFieldProps,
+  SimpleMailMergeFieldProps,
+  SoftHyphenProps,
   SymbolRunProps,
-  TabProps,
   TableCellProps,
   TableOfContentsProps,
   TableProps,
   TableRowProps,
+  TabProps,
   TextboxProps,
   TextRunProps,
+  YearLongProps,
+  YearShortProps,
 } from "./types";
 
 /** A component rendering the `RD<kind>` host element. Each export below is created once, at module
@@ -70,3 +88,21 @@ export const CommentRangeEnd = element<CommentRangeEndProps>("CommentRangeEnd");
 export const CommentReference = element<CommentReferenceProps>("CommentReference");
 export const TableOfContents = element<TableOfContentsProps>("TableOfContents");
 export const Textbox = element<TextboxProps>("Textbox");
+export const InsertedTextRun = element<InsertedTextRunProps>("InsertedTextRun");
+export const DeletedTextRun = element<DeletedTextRunProps>("DeletedTextRun");
+export const ColumnBreak = element<ColumnBreakProps>("ColumnBreak");
+export const SimpleField = element<SimpleFieldProps>("SimpleField");
+export const SimpleMailMergeField = element<SimpleMailMergeFieldProps>("SimpleMailMergeField");
+export const SequentialIdentifier = element<SequentialIdentifierProps>("SequentialIdentifier");
+export const PageReference = element<PageReferenceProps>("PageReference");
+export const CheckBox = element<CheckBoxProps>("CheckBox");
+export const PositionalTab = element<PositionalTabProps>("PositionalTab");
+export const CarriageReturn = element<CarriageReturnProps>("CarriageReturn");
+export const SoftHyphen = element<SoftHyphenProps>("SoftHyphen");
+export const NoBreakHyphen = element<NoBreakHyphenProps>("NoBreakHyphen");
+export const DayShort = element<DayShortProps>("DayShort");
+export const DayLong = element<DayLongProps>("DayLong");
+export const MonthShort = element<MonthShortProps>("MonthShort");
+export const MonthLong = element<MonthLongProps>("MonthLong");
+export const YearShort = element<YearShortProps>("YearShort");
+export const YearLong = element<YearLongProps>("YearLong");

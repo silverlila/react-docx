@@ -35,6 +35,26 @@ type Built = {
   CommentReference: docx.XmlComponent[];
   TableOfContents: docx.TableOfContents;
   Textbox: docx.Textbox;
+  InsertedTextRun: docx.InsertedTextRun;
+  DeletedTextRun: docx.DeletedTextRun;
+  ColumnBreak: docx.ColumnBreak;
+  SimpleField: docx.SimpleField;
+  SimpleMailMergeField: docx.SimpleMailMergeField;
+  SequentialIdentifier: docx.SequentialIdentifier;
+  /** Spliced into its parent like a RawXml's components: docx.js writes it as a paragraph child,
+   *  but its ParagraphChild union leaves it out. */
+  PageReference: docx.XmlComponent[];
+  CheckBox: docx.CheckBox;
+  PositionalTab: docx.PositionalTab;
+  CarriageReturn: docx.CarriageReturn;
+  SoftHyphen: docx.SoftHyphen;
+  NoBreakHyphen: docx.NoBreakHyphen;
+  DayShort: docx.DayShort;
+  DayLong: docx.DayLong;
+  MonthShort: docx.MonthShort;
+  MonthLong: docx.MonthLong;
+  YearShort: docx.YearShort;
+  YearLong: docx.YearLong;
 };
 
 /** What building a node needs beyond the node: per-build, so two documents rendered in one process both start at 1. */
@@ -138,12 +158,19 @@ function buildSection(node: Node<"Section">, ctx: BuildCtx): docx.ISectionOption
   return { ...node.props, headers, footers, children };
 }
 
-/** A canonical TextRun holds either string and run-content children or, alone, a `text` literal.
- *  docx.js ignores `text` whenever `children` is present, even empty, so children go through only when there are some. */
-function buildTextRun({ props, children }: Node<"TextRun">, ctx: BuildCtx): docx.TextRun {
-  if (children.length === 0) return new docx.TextRun(props);
+/** The three run kinds share their content kinds. */
+type RunChild = Node<"TextRun">["children"][number];
+type RunChildren = { readonly children?: NonNullable<docx.IRunOptions["children"]> };
+
+/** A canonical run holds either string and run-content children or, alone, a `text` literal.
+ *  docx.js ignores `text` whenever `children` is truthy, even `[]`, so a childless run passes `undefined`. */
+function buildRun<P, R>(
+  Run: new (options: NoInfer<P> & RunChildren) => R,
+  { props, children }: { readonly props: P; readonly children: readonly RunChild[] },
+  ctx: BuildCtx
+): R {
   const built = children.map((child) => (typeof child === "string" ? child : build(child, ctx)));
-  return new docx.TextRun({ ...props, children: inPlace(built) });
+  return new Run({ ...props, children: built.length === 0 ? undefined : inPlace(built) });
 }
 
 const BUILD: { readonly [K in Kind]: (node: Node<K>, ctx: BuildCtx) => Built[K] } = {
@@ -152,7 +179,7 @@ const BUILD: { readonly [K in Kind]: (node: Node<K>, ctx: BuildCtx) => Built[K] 
   Header: ({ children }, ctx) => new docx.Header({ children: inPlace(buildAll(children, ctx)) }),
   Footer: ({ children }, ctx) => new docx.Footer({ children: inPlace(buildAll(children, ctx)) }),
   Paragraph: ({ props, children }, ctx) => new docx.Paragraph({ ...props, children: inPlace(buildAll(children, ctx)) }),
-  TextRun: buildTextRun,
+  TextRun: (node, ctx) => buildRun(docx.TextRun, node, ctx),
   Table: ({ props, children }, ctx) => new docx.Table({ ...props, rows: buildAll(children, ctx) }),
   TableRow: ({ props, children }, ctx) => new docx.TableRow({ ...props, children: buildAll(children, ctx) }),
   TableCell: ({ props, children }, ctx) =>
@@ -183,6 +210,24 @@ const BUILD: { readonly [K in Kind]: (node: Node<K>, ctx: BuildCtx) => Built[K] 
   // paragraphs: the element table gives it Paragraph children.
   Textbox: ({ props, children }, ctx) =>
     new docx.Textbox({ ...props, children: asChildren<docx.ParagraphChild>(buildAll(children, ctx)) }),
+  InsertedTextRun: (node, ctx) => buildRun(docx.InsertedTextRun, node, ctx),
+  DeletedTextRun: (node, ctx) => buildRun(docx.DeletedTextRun, node, ctx),
+  ColumnBreak: () => new docx.ColumnBreak(),
+  SimpleField: ({ props }) => new docx.SimpleField(props.instruction, props.cachedValue),
+  SimpleMailMergeField: ({ props }) => new docx.SimpleMailMergeField(props.fieldName),
+  SequentialIdentifier: ({ props }) => new docx.SequentialIdentifier(props.identifier),
+  PageReference: ({ props: { bookmarkId, ...options } }) => [new docx.PageReference(bookmarkId, options)],
+  CheckBox: ({ props }) => new docx.CheckBox(props),
+  PositionalTab: ({ props }) => new docx.PositionalTab(props),
+  CarriageReturn: () => new docx.CarriageReturn(),
+  SoftHyphen: () => new docx.SoftHyphen(),
+  NoBreakHyphen: () => new docx.NoBreakHyphen(),
+  DayShort: () => new docx.DayShort(),
+  DayLong: () => new docx.DayLong(),
+  MonthShort: () => new docx.MonthShort(),
+  MonthLong: () => new docx.MonthLong(),
+  YearShort: () => new docx.YearShort(),
+  YearLong: () => new docx.YearLong(),
 };
 
 /** Canonical tree → docx.js Document. The tree must come from `canonicalize`. */
