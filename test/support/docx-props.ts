@@ -48,6 +48,12 @@ export async function runPropertiesXml(options: RunOptions): Promise<string> {
   return xmlOf(childNamed(childNamed(paragraph, "w:r"), "w:rPr"));
 }
 
+/** The <w:drawing> docx.js writes for an ImageRun with these options, or "". */
+export async function imageRunXml(options: docx.IImageOptions): Promise<string> {
+  const paragraph = await firstParagraph(new docx.Paragraph({ children: [new docx.ImageRun(options)] }));
+  return xmlOf(childNamed(childNamed(paragraph, "w:r"), "w:drawing"));
+}
+
 /** The <w:pPr> docx.js writes for a Paragraph with these options (and one "x" run), or "". */
 export async function paragraphPropertiesXml(options: ParagraphOptions): Promise<string> {
   const paragraph = await firstParagraph(new docx.Paragraph({ ...options, children: [new docx.TextRun("x")] }));

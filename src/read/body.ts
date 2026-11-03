@@ -24,8 +24,15 @@
  *    numbered paragraph elsewhere gets its marker as leading text (decision 2), and a footnote reference
  *    elsewhere is dropped.
  *  - A paragraph with a list but no w:pStyle gets `custom: true`, because docx.js adds pStyle ListParagraph
- *    to a numbered paragraph otherwise. */
+ *    to a numbered paragraph otherwise.
+ *  - docx.js writes a Textbox as its own paragraph, so a VML text box that is a paragraph's only content
+ *    (directly in the w:p, as docx.js writes it, or in its only run, as Word does) makes that paragraph a
+ *    Textbox, in a Section body only. A text box anywhere else is dropped.
+ *  - mc:AlternateContent is read as its first Choice whose elements all map to a kind other than RawXml in
+ *    the slot (`mapsToKind`), else as its Fallback. */
 
+import type * as docx from "docx";
+import { isOneOf, type Note } from "../ooxml/codec";
 import { readParagraphProperties, type ParagraphOptions, type ParagraphRead } from "../ooxml/paragraph";
 import { readRunProperties, type RunOptions } from "../ooxml/run";
 import { readCellProperties, readRowProperties, readTableProperties } from "../ooxml/table";
@@ -47,6 +54,9 @@ import {
   simpleField,
   type Item,
 } from "./fields";
+import { parseDrawing, parseVmlImage, readDrawing, readPicture } from "./images";
+import { isPlainMath, readMath } from "./math";
+import { alternateContent, textBoxOf, textBoxStyle, type TextBox } from "./objects";
 import { attrOf, childNamed, elementsOf, hasRelationship, serializeXml, textOf, type XmlElement } from "./xml";
 
 type Slot = "block" | "inline" | "run";
@@ -84,9 +94,9 @@ export type BlockOptions = {
   /** The index of the container's first block among its parent's children: a Section's body blocks come
    *  after its Header and Footer children. Defaults to 0. */
   readonly start?: number;
+  /** False in a text box, which holds only Paragraphs. Defaults to true. */
+  readonly tables?: boolean;
 };
-
-export const READ_IN_UNIT_06 = "read in unit 06";
 
 const PROTECTED_TEXT: readonly string[] = PAGE_NUMBER_VALUES;
 const BOOKMARK_ID_BASE = 100000;
@@ -109,12 +119,10 @@ const RUN_KINDS: Readonly<Record<string, string>> = {
   "w:yearLong": "YearLong",
 };
 
-/** Elements a later unit reads, dropped until then. */
-const LATER_IN_RUN: Readonly<Record<string, string>> = {
-  "w:drawing": READ_IN_UNIT_06,
-  "w:pict": READ_IN_UNIT_06,
-  "w:object": READ_IN_UNIT_06,
-};
+/** Run content other than pictures that maps to a tree kind, for mc:AlternateContent's Choice. */
+const MAPPED_RUN_CONTENT = new Set([...Object.keys(RUN_KINDS), "w:t", "w:br", "w:sym", "w:ptab"]);
+
+const HEADINGS = ["Title", "Heading1", "Heading2", "Heading3", "Heading4", "Heading5", "Heading6"] as const satisfies readonly (typeof docx.HeadingLevel)[keyof typeof docx.HeadingLevel][];
 
 /** Run content no kind holds, and why. */
 const DROPPED_IN_RUN: Readonly<Record<string, string>> = {
@@ -124,19 +132,11 @@ const DROPPED_IN_RUN: Readonly<Record<string, string>> = {
   "w:continuationSeparator": "only a separator footnote, which docx.js writes itself, holds it",
 };
 
-const LATER_INLINE: Readonly<Record<string, string>> = {
-  "m:oMath": READ_IN_UNIT_06,
-  "m:oMathPara": READ_IN_UNIT_06,
-  "w:pict": READ_IN_UNIT_06,
-  "w:object": READ_IN_UNIT_06,
-};
-
 /** Wrappers the fallback unwraps: the content it reads in the wrapper's slot. */
 const WRAPPED_CONTENT: Readonly<Record<string, (el: XmlElement) => XmlElement[]>> = {
   "w:sdt": (el) => elementsOf(childNamed(el, "w:sdtContent")),
   "w:smartTag": (el) => elementsOf(el).filter((child) => child.name !== "w:smartTagPr"),
   "w:customXml": (el) => elementsOf(el).filter((child) => child.name !== "w:customXmlPr"),
-  "mc:AlternateContent": (el) => elementsOf(childNamed(el, "mc:Fallback")),
 };
 
 const node = (type: string, props: Readonly<Record<string, unknown>> = {}, children: Children = []): AuthorNode => ({
@@ -183,6 +183,36 @@ function fallback(el: XmlElement, slot: Slot, ctx: ReadContext, rawAllowed = tru
   }
   ctx.report({ kind: "dropped", element: el.name, detail: why });
   return { kind: "dropped" };
+}
+
+/** Whether `el` read in `slot` gives a tree kind other than RawXml: the test for mc:AlternateContent's Choice. */
+function mapsToKind(el: XmlElement, slot: Slot, ctx: ReadContext): boolean {
+  switch (slot) {
+    case "block":
+      return el.name === "w:p" || el.name === "w:tbl";
+    case "inline":
+      if (el.name === "m:oMath") return isPlainMath(el);
+      return el.name === "w:r" && elementsOf(el).every((child) => child.name === "w:rPr" || mapsToKind(child, "run", ctx));
+    case "run":
+      if (el.name === "w:drawing") return parseDrawing(el, ctx).kind === "image";
+      if (el.name === "w:pict") return parseVmlImage(el, ctx)?.kind === "image";
+      return MAPPED_RUN_CONTENT.has(el.name);
+    default: {
+      const exhaustive: never = slot;
+      throw new Error(`mapsToKind: unknown slot ${JSON.stringify(exhaustive)}`);
+    }
+  }
+}
+
+/** mc:AlternateContent's chosen content for `slot`, reported resolved, or nothing, reported dropped. */
+function alternateElements(el: XmlElement, slot: Slot, ctx: ReadContext): readonly XmlElement[] {
+  const chosen = alternateContent(el, (child) => mapsToKind(child, slot, ctx));
+  if (chosen === null) {
+    ctx.report({ kind: "dropped", element: el.name, detail: "its Choice holds content no tree kind maps, and it has no Fallback content" });
+    return [];
+  }
+  ctx.report({ kind: "resolved", element: el.name, detail: `alternate content: used ${chosen.used}` });
+  return chosen.elements;
 }
 
 /** Removes Word's _GoBack bookmark (start and end, anywhere in the part), counting it ignored. */
@@ -232,6 +262,7 @@ export function readBlocks(container: XmlElement, ctx: BodyContext, options: Blo
     rawBlocks: options.rawBlocks ?? true,
     inSection: container.name === "w:body",
     start: options.start ?? 0,
+    tables: options.tables ?? true,
     blocks,
   };
   readBlockElements(elementsOf(container), ctx, list);
@@ -243,6 +274,7 @@ type BlockList = {
   /** A Section body (document.ts reads each section's blocks from a w:body), where TableOfContents may stand. */
   readonly inSection: boolean;
   readonly start: number;
+  readonly tables: boolean;
   readonly blocks: AuthorNode[];
 };
 
@@ -254,9 +286,13 @@ function readBlockElements(elements: readonly XmlElement[], ctx: BodyContext, li
     if (NOISE.has(el.name) || MOVE_RANGES.has(el.name)) {
       ctx.ignore(el.name);
     } else if (el.name === "w:p") {
-      list.blocks.push(readParagraph(el, here));
-    } else if (el.name === "w:tbl") {
+      list.blocks.push(readParagraph(el, here, list.inSection));
+    } else if (el.name === "w:tbl" && list.tables) {
       list.blocks.push(readTable(el, here));
+    } else if (el.name === "w:tbl") {
+      here.report({ kind: "dropped", element: el.name, detail: "table in a text box, which holds only Paragraphs" });
+    } else if (el.name === "mc:AlternateContent") {
+      readBlockElements(alternateElements(el, "block", here), ctx, list);
     } else if (toc !== null) {
       list.blocks.push(toc);
     } else if (BOOKMARKS.has(el.name) && list.rawBlocks) {
@@ -272,13 +308,19 @@ function readBlockElements(elements: readonly XmlElement[], ctx: BodyContext, li
   }
 }
 
-function readParagraph(p: XmlElement, ctx: BodyContext): AuthorNode {
+function readParagraph(p: XmlElement, ctx: BodyContext, inSection: boolean): AuthorNode {
   const read = readParagraphProperties(childNamed(p, "w:pPr"), ctx.env);
   ctx.notes(read.notes);
   if (read.sectPr !== null) {
     ctx.report({ kind: "dropped", element: "w:sectPr", detail: "only a paragraph in the document body ends a section" });
   }
-  const content = elementsOf(p).filter((el) => el.name !== "w:pPr");
+  const all = elementsOf(p).filter((el) => el.name !== "w:pPr");
+  const lone = loneTextBox(all, ctx);
+  if (lone !== null && inSection) return textboxNode(read, lone, ctx);
+  if (lone !== null) {
+    ctx.report({ kind: "dropped", element: "w:pict", detail: "a text box outside a Section body: Textbox stands only in a Section" });
+  }
+  const content = lone === null ? all : all.filter((el) => el !== lone.holder);
   const { numPr } = read;
   if (numPr !== null && numPr.numId !== "0" && ctx.part !== ctx.pkg.mainPart) {
     return markedParagraph(read.options, numPr, content, ctx);
@@ -315,6 +357,66 @@ function markedParagraph(
   const indent = options.indent ?? marker.level?.style?.paragraph?.indent;
   const props = indent === undefined ? options : { ...options, indent };
   return node("Paragraph", props, [...markerRuns, ...readInline(content, ctx)]);
+}
+
+/** A text box that is its paragraph's only content, with what holds it there. */
+type LoneTextBox = {
+  readonly box: TextBox;
+  /** The paragraph child holding it: the w:pict itself, or the run around it. */
+  readonly holder: XmlElement;
+  readonly run: XmlElement | null;
+  readonly alternate: XmlElement | null;
+};
+
+/** The text box that is a paragraph's only content besides proofing and permission marks: a w:pict directly
+ *  in the paragraph, as docx.js writes it, or the only content of its only run, alone or as the Fallback of
+ *  an mc:AlternateContent, as Word writes it. Nothing is reported. */
+function loneTextBox(content: readonly XmlElement[], ctx: ReadContext): LoneTextBox | null {
+  const significant = content.filter((el) => !NOISE.has(el.name));
+  const [holder] = significant;
+  if (significant.length !== 1) return null;
+  if (holder.name === "w:pict") {
+    const box = textBoxOf(holder);
+    return box === null ? null : { box, holder, run: null, alternate: null };
+  }
+  const inRun = holder.name === "w:r" ? elementsOf(holder).filter((el) => el.name !== "w:rPr") : [];
+  const [only] = inRun;
+  if (inRun.length !== 1) return null;
+  if (only.name === "w:pict") {
+    const box = textBoxOf(only);
+    return box === null ? null : { box, holder, run: holder, alternate: null };
+  }
+  if (only.name !== "mc:AlternateContent") return null;
+  const chosen = alternateContent(only, (el) => mapsToKind(el, "run", ctx));
+  const [pict, ...rest] = chosen?.used === "Fallback" ? chosen.elements : [];
+  const box = pict?.name === "w:pict" && rest.length === 0 ? textBoxOf(pict) : null;
+  return box === null ? null : { box, holder, run: holder, alternate: only };
+}
+
+/** A lone text box's paragraph as a Textbox: the paragraph's options with a heading style as `heading`, the
+ *  shape's style, and the text box's paragraphs. */
+function textboxNode(read: ParagraphRead, lone: LoneTextBox, ctx: BodyContext): AuthorNode {
+  if (lone.alternate !== null) {
+    ctx.report({ kind: "resolved", element: lone.alternate.name, detail: "alternate content: used Fallback" });
+  }
+  if (lone.run !== null && elementsOf(childNamed(lone.run, "w:rPr")).length > 0) {
+    ctx.report({ kind: "dropped", element: "w:rPr", detail: "the run holding a text box: docx.js writes none" });
+  }
+  if (read.numPr !== null) ctx.report({ kind: "dropped", element: "w:numPr", detail: "a Textbox cannot be numbered" });
+  const { style, ...options } = read.options;
+  const heading = style !== undefined && isOneOf(HEADINGS, style) ? style : undefined;
+  if (style !== undefined && heading === undefined) {
+    ctx.report({ kind: "dropped", element: "w:pStyle", detail: `"${style}": a Textbox takes only a heading style` });
+  }
+  const notes: Note[] = [];
+  const shapeStyle = textBoxStyle(lone.box, notes);
+  ctx.notes(notes);
+  const props = {
+    ...options,
+    ...(heading === undefined ? {} : { heading }),
+    ...(shapeStyle === undefined ? {} : { style: shapeStyle }),
+  };
+  return node("Textbox", props, readBlocks(lone.box.content, ctx, { rawBlocks: false, tables: false }));
 }
 
 // Tables
@@ -504,12 +606,16 @@ function elementPieces(el: XmlElement, scope: InlineScope): Piece[] {
     ctx.ignore(el.name);
     return [];
   }
-  if (Object.prototype.hasOwnProperty.call(LATER_INLINE, el.name)) {
-    ctx.report({ kind: "dropped", element: el.name, detail: LATER_INLINE[el.name] });
-    return [];
-  }
   if (isChange(el.name)) return changePieces(el, ctx);
   switch (el.name) {
+    case "m:oMath": {
+      const math = readMath(el, ctx);
+      return math === null ? fallbackPieces(el, ctx) : inline([math]);
+    }
+    case "w:pict":
+      return pictPieces(el, {}, ctx, () => fallbackPieces(el, ctx));
+    case "mc:AlternateContent":
+      return inline(readInline(alternateElements(el, "inline", ctx), ctx));
     case "w:hyperlink":
       return hyperlinkPieces(el, ctx);
     case "w:fldSimple":
@@ -569,6 +675,21 @@ function changePieces(el: XmlElement, ctx: BodyContext): Piece[] {
       return deleted ? [] : [read];
     })
   );
+}
+
+/** A w:pict that is not a paragraph's lone text box: a VML picture becomes an ImageRun, a text box is
+ *  dropped, and anything else takes the slot's fallback. */
+function pictPieces(el: XmlElement, runProps: RunOptions, ctx: BodyContext, otherwise: () => Piece[]): Piece[] {
+  const image = parseVmlImage(el, ctx);
+  if (image !== null) {
+    const read = readPicture(image, runProps, ctx);
+    return read === null ? [] : inline([read]);
+  }
+  if (textBoxOf(el) !== null) {
+    ctx.report({ kind: "dropped", element: el.name, detail: "text box sharing a paragraph with other content" });
+    return [];
+  }
+  return otherwise();
 }
 
 function fallbackPieces(el: XmlElement, ctx: BodyContext): Piece[] {
@@ -662,15 +783,19 @@ function atomPieces(run: XmlElement, el: XmlElement, scope: InlineScope): Piece[
   const { ctx } = scope;
   const content = (value: AuthorNode | string): Piece[] => [{ kind: "run", run, value }];
   if (Object.prototype.hasOwnProperty.call(RUN_KINDS, el.name)) return content(node(RUN_KINDS[el.name]));
-  if (Object.prototype.hasOwnProperty.call(LATER_IN_RUN, el.name)) {
-    ctx.report({ kind: "dropped", element: el.name, detail: LATER_IN_RUN[el.name] });
-    return [];
-  }
   if (Object.prototype.hasOwnProperty.call(DROPPED_IN_RUN, el.name)) {
     ctx.report({ kind: "dropped", element: el.name, detail: DROPPED_IN_RUN[el.name] });
     return [];
   }
   switch (el.name) {
+    case "w:drawing": {
+      const image = readDrawing(el, scope.runProps(run), ctx);
+      return image === null ? [] : inline([image]);
+    }
+    case "w:pict":
+      return pictPieces(el, scope.runProps(run), ctx, () => runFallbackPieces(run, el, scope));
+    case "mc:AlternateContent":
+      return alternateElements(el, "run", ctx).flatMap((child) => atomPieces(run, child, scope));
     case "w:footnoteReference":
       return footnotePieces(run, el, ctx);
     case "w:commentReference": {

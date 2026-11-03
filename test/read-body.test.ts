@@ -151,7 +151,7 @@ describe("fields", () => {
     });
 
     test("inline mc:AlternateContent in the result: its fallback's runs are read", () => {
-      const alternate = `<mc:AlternateContent><mc:Choice Requires="w14">${run("new")}</mc:Choice><mc:Fallback>${run("old")}</mc:Fallback></mc:AlternateContent>`;
+      const alternate = `<mc:AlternateContent><mc:Choice Requires="w14"><w:r><w14:checkbox/></w:r></mc:Choice><mc:Fallback>${run("old")}</mc:Fallback></mc:AlternateContent>`;
       const bytes = docx({ body: field(alternate) });
       expect(blocks(bytes)[0].children).toEqual([node("TextRun", {}, ["old"])]);
       expect(diagnosticsOf(bytes)).toContainEqual(fieldCodeDropped("mc:AlternateContent"));
