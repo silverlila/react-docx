@@ -9,7 +9,7 @@ import {
   type Kind,
 } from "../schema/elements";
 import { TreeError, isRecord, type AuthorNode, type IndexedChild, type PropBag } from "./author";
-import { LIST_NUMBERING, listEntries, listLevels, type ListEntry, type ListLevels } from "./lists";
+import { LIST_NUMBERING, listEntries, listLevels, numberingConfig, type ListEntry, type ListLevels } from "./lists";
 import { xmlRoots } from "./xml-roots";
 
 /** A canonical node before its props are trusted as `Props<K>`: they are not validated, TSX type-checked them. */
@@ -105,10 +105,11 @@ export function canonicalize(root: AuthorNode): DocumentNode {
   if (root.type !== "Document") {
     throw new TreeError([root.type], `The root must be <Document>, got <${root.type}>`);
   }
+  const numbering = numberingConfig(root.props.numbering, ["Document"]);
   const state: DocumentState = {
     nextListInstance: 0,
     listDefinitions: new Map(),
-    listLevels: listLevels(root.props.numbering),
+    listLevels: listLevels(numbering),
     commentIds: new Set(),
     commentMarks: [],
   };
@@ -117,7 +118,8 @@ export function canonicalize(root: AuthorNode): DocumentNode {
     outsideBody: false,
   });
   assertCommentIdsResolve(state);
-  const props = state.listDefinitions.size > 0 ? withListNumbering(document.props, state.listDefinitions) : document.props;
+  const props =
+    state.listDefinitions.size > 0 ? withListNumbering(document.props, numbering, state.listDefinitions) : document.props;
   // The placement checks enforce the child structure DocumentNode describes; props are trusted as authored.
   return { ...document, props } as DocumentNode;
 }
@@ -680,10 +682,13 @@ function listParagraphs(list: AuthorNode, path: readonly string[], context: Cont
 
 /** Adds both LIST_NUMBERING configs, then each other definition the Lists used, unless the document
  *  already configures that reference. */
-function withListNumbering(props: PropBag, used: ReadonlyMap<string, ListEntry["definition"]>): PropBag {
+function withListNumbering(
+  props: PropBag,
+  config: readonly ListEntry["definition"][],
+  used: ReadonlyMap<string, ListEntry["definition"]>
+): PropBag {
   const numbering = isRecord(props.numbering) ? props.numbering : {};
-  const config: unknown[] = Array.isArray(numbering.config) ? numbering.config : [];
-  const configured = new Set(config.map((entry) => (isRecord(entry) ? entry.reference : undefined)));
+  const configured = new Set(config.map((entry) => entry.reference));
   const base = new Set(LIST_NUMBERING.config.map((entry) => entry.reference));
   const wanted = [...LIST_NUMBERING.config, ...[...used.values()].filter((entry) => !base.has(entry.reference))];
   const missing = wanted.filter((entry) => !configured.has(entry.reference));

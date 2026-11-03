@@ -1028,6 +1028,18 @@ describe("lists", () => {
     }
   });
 
+  test.each([
+    ["oops", "Document: numbering must be an object with a config array, docx.js's INumberingOptions"],
+    [{ config: { reference: "NumberedList" } }, "Document: numbering.config must be an array"],
+    [{ config: [{ reference: 1, levels: [] }] }, "Document: numbering.config[0] must have a string reference and a levels array"],
+    [{ config: [{ reference: "NumberedList", levels: [null] }] }, "Document: numbering.config[0].levels[0] must be an object with a whole-number level"],
+    [{ config: [{ reference: "NumberedList", levels: [{ level: "1" }] }] }, "Document: numbering.config[0].levels[0] must be an object with a whole-number level"],
+  ])("a malformed numbering %j throws, with or without Lists", (numbering, message) => {
+    for (const body of [n("Paragraph"), n("List", {}, n("ListItem", {}, "a"))]) {
+      expect(() => canon(n("Document", { numbering }, n("Section", {}, body)))).toThrow(message);
+    }
+  });
+
   describe("a document's own NumberedList or BulletList levels", () => {
     const indent = (left: number) => ({ paragraph: { indent: { left, hanging: 360 } } });
     const roman = { level: 0, format: "upperRoman", text: "%1)", alignment: "left", style: indent(720) };

@@ -34,16 +34,33 @@ export const LIST_NUMBERING: { readonly config: readonly NumberingConfig[] } = {
 /** The levels of each list definition the document's `numbering` configures, by reference. */
 export type ListLevels = ReadonlyMap<string, readonly Level[]>;
 
-/** Props are trusted as authored: a configured `levels` is docx.js's type. */
-export function listLevels(numbering: unknown): ListLevels {
-  const config: readonly unknown[] = isRecord(numbering) && Array.isArray(numbering.config) ? numbering.config : [];
-  const levels = new Map<string, readonly Level[]>();
-  for (const entry of config) {
-    if (isRecord(entry) && typeof entry.reference === "string" && Array.isArray(entry.levels)) {
-      levels.set(entry.reference, entry.levels as readonly Level[]);
-    }
+/** A Document's `numbering.config`, checked once: Lists and numbered paragraphs both name its entries, so
+ *  a malformed one throws here instead of being ignored or failing inside docx.js. Each entry must have a
+ *  string `reference` and a `levels` array of objects with a whole-number `level`; the rest of each level is
+ *  docx.js's options, passed on as authored. */
+export function numberingConfig(numbering: unknown, path: readonly string[]): readonly NumberingConfig[] {
+  if (numbering === undefined) return [];
+  if (!isRecord(numbering)) {
+    throw new TreeError(path, "numbering must be an object with a config array, docx.js's INumberingOptions");
   }
-  return levels;
+  if (!Array.isArray(numbering.config)) throw new TreeError(path, "numbering.config must be an array");
+  const config: readonly unknown[] = numbering.config;
+  config.forEach((entry, i) => {
+    if (!isRecord(entry) || typeof entry.reference !== "string" || !Array.isArray(entry.levels)) {
+      throw new TreeError(path, `numbering.config[${i}] must have a string reference and a levels array`);
+    }
+    const levels: readonly unknown[] = entry.levels;
+    levels.forEach((level, j) => {
+      if (!isRecord(level) || !Number.isInteger(level.level)) {
+        throw new TreeError(path, `numbering.config[${i}].levels[${j}] must be an object with a whole-number level`);
+      }
+    });
+  });
+  return config as readonly NumberingConfig[];
+}
+
+export function listLevels(config: readonly NumberingConfig[]): ListLevels {
+  return new Map(config.map((entry) => [entry.reference, entry.levels]));
 }
 
 /** A list paragraph's numbering: which list definition, how deep in it, and which instance of it. */
