@@ -3,16 +3,20 @@
  *  Reads each file and writes it back, into .roundtrip/<name>/:
  *  - roundtrip.docx: the file read with readDocx and written with renderToBuffer;
  *  - diagnostics.json: everything kept raw, resolved or dropped;
+ *  - <Name>.tsx: the tree printed as a React component (PascalCase of the file name), plus assets/ when
+ *    the document has images;
  *  - original.pdf and roundtrip.pdf, rendered by LibreOffice when `soffice` is on PATH.
  *  It prints a summary of the diagnostics per file, and exits 1 if any file failed to read or write. */
 
 import { execFileSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, extname, join } from "node:path";
+import { basename, dirname, extname, join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { printJsx } from "../src/codegen/index";
 import { renderToBuffer } from "../src/index";
 import { readDocx, type Diagnostic } from "../src/read/index";
+import type { DocumentNode } from "../src/schema/elements";
 
 const OUT = ".roundtrip";
 const TOP = 10;
@@ -40,6 +44,26 @@ function summary(name: string, dir: string, diagnostics: readonly Diagnostic[]):
     lines.push(`  top ${kind}:`, ...top.map(([element, n]) => `    ${String(n).padStart(5)}  ${element}`));
   }
   return lines.join("\n");
+}
+
+/** `my-resume` → `MyResume`; prefixed with `Doc` when it would start with a digit or be empty. */
+function componentName(name: string): string {
+  const pascal = name
+    .split(/[^A-Za-z0-9]+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join("");
+  return /^[A-Za-z]/.test(pascal) ? pascal : `Doc${pascal}`;
+}
+
+/** Writes the tree as <componentName>.tsx and its assets into `dir`. */
+function writeComponent(document: DocumentNode, name: string, dir: string): void {
+  const component = componentName(name);
+  const { source, assets } = printJsx(document, { componentName: component });
+  writeFileSync(join(dir, `${component}.tsx`), source);
+  for (const asset of assets) {
+    mkdirSync(dirname(join(dir, asset.path)), { recursive: true });
+    writeFileSync(join(dir, asset.path), asset.bytes);
+  }
 }
 
 /** Whether `soffice` runs; asked once. */
@@ -72,6 +96,7 @@ async function roundtrip(file: string, profile: string | null): Promise<boolean>
     const { document, diagnostics } = readDocx(new Uint8Array(readFileSync(file)));
     writeFileSync(join(dir, "roundtrip.docx"), await renderToBuffer(document));
     writeFileSync(join(dir, "diagnostics.json"), `${JSON.stringify(diagnostics, null, 2)}\n`);
+    writeComponent(document, name, dir);
     console.log(summary(name, dir, diagnostics));
   } catch (error) {
     console.error(`${file}: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}`);

@@ -1,7 +1,7 @@
 import { defineConfig } from "tsup";
 
 export default defineConfig({
-  entry: { index: "src/index.ts", reader: "src/read/index.ts" },
+  entry: { index: "src/index.ts", reader: "src/read/index.ts", codegen: "src/codegen/index.ts" },
   format: ["cjs", "esm"],
   dts: true,
   sourcemap: true,

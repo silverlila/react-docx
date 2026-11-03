@@ -15,6 +15,11 @@
       "types": "./dist/reader.d.ts",
       "import": "./dist/reader.mjs",
       "require": "./dist/reader.js"
+    },
+    "./codegen": {
+      "types": "./dist/codegen.d.ts",
+      "import": "./dist/codegen.mjs",
+      "require": "./dist/codegen.js"
     }
   },
   "sideEffects": false,

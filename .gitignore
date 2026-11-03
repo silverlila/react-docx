@@ -59,3 +59,6 @@ specs/
 # Round-trip script output and private real-file fixtures (unit 07)
 .roundtrip/
 test/fixtures/real/
+
+# Modules printed by test/codegen.test.ts (unit 08)
+test/.generated/
