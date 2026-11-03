@@ -1,6 +1,7 @@
 // Renders a hook- and context-using document through the built ESM output and checks the text
-// reached word/document.xml, that an error boundary's fallback renders, and that a thrown
-// `undefined` still fails the render. Usage: node [--import <hook>] render.mjs <expected React version>
+// reached word/document.xml, that an error boundary's fallback renders, that a thrown
+// `undefined` still fails the render, and that reordered keyed children come out in order.
+// Usage: node [--import <hook>] render.mjs <expected React version>
 import React from "react";
 import { strFromU8, unzipSync } from "fflate";
 import { Document, Paragraph, Section, TextRun, renderToBuffer } from "../../dist/index.mjs";
@@ -31,6 +32,13 @@ class Boundary extends React.Component {
 
 function Throws({ value }) {
   throw value;
+}
+
+/** Reorders its keyed paragraphs in a layout effect, so React moves host children it already placed. */
+function Reordered() {
+  const [order, setOrder] = React.useState(["a", "b", "c", "d"]);
+  React.useLayoutEffect(() => setOrder(["d", "c", "x", "a"]), []);
+  return h(React.Fragment, null, ...order.map((key) => h(Paragraph, { key }, h(TextRun, { text: `item-${key}` }))));
 }
 
 /** React logs every render error it reports; the checks below expect those errors. */
@@ -68,6 +76,9 @@ try {
   if (outcome !== undefined) {
     throw new Error(`a component throwing undefined should reject with undefined, got ${String(outcome)}`);
   }
+  const reordered = await documentXml(h(Document, null, h(Section, null, h(Reordered))));
+  const items = [...reordered.matchAll(/item-(\w)/g)].map((match) => match[1]).join(",");
+  if (items !== "d,c,x,a") throw new Error(`keyed paragraphs reordered in a layout effect came out as ${items}`);
   console.log(`ok ${React.version} esm`);
 } catch (error) {
   console.error(`FAIL ${React.version} esm`, error);

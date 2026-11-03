@@ -1,5 +1,6 @@
+import { useLayoutEffect, useState } from "react";
 import { describe, expect, test } from "vitest";
-import { TreeError, renderToBase64, renderToBuffer, renderToTree } from "../src/index";
+import { Document, Paragraph, Section, TreeError, renderToBase64, renderToBuffer, renderToTree } from "../src/index";
 import { CASES } from "./support/cases";
 import { docxXml } from "./support/docx-xml";
 
@@ -37,4 +38,27 @@ test("renderToTree throws a TreeError when nothing rendered", () => {
   expect(() => renderToTree(<Empty />)).toThrow(TreeError);
   expect(() => renderToTree(<Empty />)).toThrow("Nothing rendered; the root must be <Document>");
   expect(() => renderToTree(<Empty />)).toThrow(/^Nothing rendered/);
+});
+
+test("a state update that reorders keyed children renders them in the new order, each once", () => {
+  function Reordered() {
+    const [order, setOrder] = useState(["a", "b", "c", "d"]);
+    useLayoutEffect(() => setOrder(["d", "c", "x", "a"]), []);
+    return (
+      <>
+        {order.map((key) => (
+          <Paragraph key={key}>{key}</Paragraph>
+        ))}
+      </>
+    );
+  }
+  const tree = renderToTree(
+    <Document>
+      <Section>
+        <Reordered />
+      </Section>
+    </Document>
+  );
+  const texts = tree.children[0].children.map((paragraph) => JSON.stringify(paragraph.children));
+  expect(texts).toEqual(["d", "c", "x", "a"].map((text) => JSON.stringify([{ type: "TextRun", props: {}, children: [text] }])));
 });

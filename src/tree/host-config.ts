@@ -15,6 +15,19 @@ function ownProps(props: HostProps): HostProps {
   return nodeProps;
 }
 
+/** The position of `child` in `parent`; React only names children it placed there. */
+function indexIn(parent: HostNode, child: HostChild): number {
+  const index = parent.children.indexOf(child);
+  if (index === -1) throw new Error(`react-docx host: a <${parent.type}> child React named is not in it`);
+  return index;
+}
+
+/** React moves a child it already placed by appending or inserting it again: like the DOM, take it out first. */
+function detached(parent: HostNode, child: HostChild): void {
+  const index = parent.children.indexOf(child);
+  if (index !== -1) parent.children.splice(index, 1);
+}
+
 /** Host config members shared by react-reconciler 0.29, 0.31 and 0.33. */
 const base = {
   supportsMutation: true,
@@ -37,6 +50,7 @@ const base = {
   },
 
   appendChild(parent: HostNode, child: HostChild): void {
+    detached(parent, child);
     parent.children.push(child);
   },
 
@@ -45,17 +59,12 @@ const base = {
   },
 
   insertBefore(parent: HostNode, child: HostChild, beforeChild: HostChild): void {
-    const index = parent.children.indexOf(beforeChild);
-    if (index !== -1) {
-      parent.children.splice(index, 0, child);
-    }
+    detached(parent, child);
+    parent.children.splice(indexIn(parent, beforeChild), 0, child);
   },
 
   removeChild(parent: HostNode, child: HostChild): void {
-    const index = parent.children.indexOf(child);
-    if (index !== -1) {
-      parent.children.splice(index, 1);
-    }
+    parent.children.splice(indexIn(parent, child), 1);
   },
 
   removeChildFromContainer(container: HostContainer, child: HostChild): void {
