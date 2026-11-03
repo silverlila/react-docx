@@ -30,3 +30,46 @@ export const DEFAULT_STYLE_SLOTS = {
 /** Boolean options docx.js writes identically for `true` and `false`. Found by test/presence-booleans.test.ts.
  *  Paths are dot paths relative to the kind's props. */
 export const PRESENCE_ONLY: { readonly [K in Kind]?: readonly string[] } = {};
+
+/** The OOXML elements a RawXml fragment may hold at its top level, by the slot it stands in.
+ *  `w:footnoteReference`, `w:endnoteReference` and `w:commentReference` are left out of `run`:
+ *  their ids would point at notes the tree does not contain. */
+export const RAW_XML_ROOTS = {
+  block: ["w:p", "w:tbl", "w:sdt", "w:customXml", "w:bookmarkStart", "w:bookmarkEnd"],
+  inline: [
+    "w:r",
+    "w:hyperlink",
+    "w:sdt",
+    "w:fldSimple",
+    "w:ins",
+    "w:del",
+    "w:moveFrom",
+    "w:moveTo",
+    "w:bookmarkStart",
+    "w:bookmarkEnd",
+    "w:commentRangeStart",
+    "w:commentRangeEnd",
+    "w:smartTag",
+    "w:customXml",
+    "w:proofErr",
+    "m:oMath",
+    "m:oMathPara",
+  ],
+  run: [
+    "w:t",
+    "w:delText",
+    "w:tab",
+    "w:br",
+    "w:cr",
+    "w:fldChar",
+    "w:instrText",
+    "w:sym",
+    "w:softHyphen",
+    "w:noBreakHyphen",
+    "w:ptab",
+    "w:lastRenderedPageBreak",
+    "w:separator",
+    "w:continuationSeparator",
+  ],
+  style: ["w:style"],
+} as const;

@@ -3,6 +3,7 @@ import { DEFAULT_NUMBERING } from "../src/constants";
 import type { DocumentNode } from "../src/schema/elements";
 import { canonicalize, TreeError, type AuthorNode } from "../src/tree/canonical";
 import { LIST_NUMBERING } from "../src/tree/lists";
+import { xmlRoots } from "../src/tree/xml-roots";
 import { n } from "./support/nodes";
 
 /** canonicalize, asserting on every input that it is left untouched and that a second pass changes nothing. */
@@ -426,6 +427,214 @@ describe("12. style folding", () => {
       },
     };
     expect(styled(styles).props.styles).toEqual(styles);
+  });
+});
+
+describe("xmlRoots", () => {
+  test("names each top-level element of a fragment, in order", () => {
+    expect(xmlRoots('<w:fldChar w:fldCharType="begin"/><w:instrText> DATE </w:instrText><w:fldChar/>')).toEqual({
+      kind: "roots",
+      roots: ["w:fldChar", "w:instrText", "w:fldChar"],
+    });
+  });
+
+  test("does not name nested elements, even one with the same name as its parent", () => {
+    expect(xmlRoots("<w:sdt><w:sdtContent><w:sdt><w:p/></w:sdt></w:sdtContent></w:sdt>")).toEqual({
+      kind: "roots",
+      roots: ["w:sdt"],
+    });
+  });
+
+  test("a > inside a quoted attribute value does not end the tag", () => {
+    expect(xmlRoots(`<w:r w:a="x>y" w:b='/>'><w:t>a</w:t></w:r><w:r/>`)).toEqual({ kind: "roots", roots: ["w:r", "w:r"] });
+  });
+
+  test("skips whitespace, comments, processing instructions and CDATA inside an element", () => {
+    const xml = ' <!-- <w:p> --> <?mso-application x?>\n<w:r><w:t><![CDATA[</w:t>]]></w:t></w:r> ';
+    expect(xmlRoots(xml)).toEqual({ kind: "roots", roots: ["w:r"] });
+  });
+
+  test("an empty or comment-only fragment has no roots", () => {
+    expect(xmlRoots("")).toEqual({ kind: "roots", roots: [] });
+    expect(xmlRoots(" <!-- nothing --> ")).toEqual({ kind: "roots", roots: [] });
+  });
+
+  test.each([
+    ["<w:r>", "<w:r> is never closed"],
+    ["<w:r></w:t>", "</w:t> closes <w:r>"],
+    ["</w:r>", "</w:r> closes nothing"],
+    ["<w:r", 'the tag at offset 0 is never closed with ">"'],
+    ['<w:r w:a="x>', 'the tag at offset 0 is never closed with ">"'],
+    ["<!-- open", "<!-- is never closed"],
+    ["text<w:r/>", 'text "text" stands outside an element'],
+    ["<w:r/>tail", 'text "tail" stands outside an element'],
+    ["<![CDATA[x]]>", "<![CDATA[ stands outside an element"],
+    ["<!DOCTYPE x>", "declarations (<!…>) are not allowed"],
+    ["< >", "the tag at offset 0 has no name"],
+  ])("%j is malformed: %s", (xml, reason) => {
+    expect(xmlRoots(xml)).toEqual({ kind: "malformed", reason });
+  });
+});
+
+describe("13. RawXml fragment roots", () => {
+  const raw = (xml: unknown) => n("RawXml", { xml });
+  const rawPath = ["Document", "Section[0]", "Paragraph[0]", "RawXml[0]"];
+
+  test("a RawXml in each of its slots stays a RawXml node with only its xml", () => {
+    const tree = canon(
+      doc(
+        raw("<w:sdt/>"),
+        n("Paragraph", {}, raw("<w:r/>"), n("TextRun", { bold: true }, "x", raw("<w:fldChar/>"))),
+        n("Table", {}, n("TableRow", {}, n("TableCell", {}, raw("<w:tbl/>"), n("Paragraph"))))
+      )
+    );
+    const rawNode = (xml: string) => ({ type: "RawXml", props: { xml }, children: [] });
+    expect(blocks(tree)).toEqual([
+      rawNode("<w:sdt/>"),
+      paragraph({}, rawNode("<w:r/>"), run({ bold: true }, "x", rawNode("<w:fldChar/>"))),
+      {
+        type: "Table",
+        props: {},
+        children: [
+          { type: "TableRow", props: {}, children: [{ type: "TableCell", props: {}, children: [rawNode("<w:tbl/>"), paragraph({})] }] },
+        ],
+      },
+    ]);
+  });
+
+  test("a RawXml in a hyperlink, Bookmark, Header or ListItem takes that slot's roots", () => {
+    expect(() =>
+      canon(
+        n(
+          "Document",
+          {},
+          n(
+            "Section",
+            {},
+            n("Header", {}, raw("<w:p/>")),
+            n("Paragraph", {}, n("ExternalHyperlink", { link: "https://x.test" }, raw("<w:r/>")), n("Bookmark", { id: "b" }, raw("<w:r/>"))),
+            n("List", {}, n("ListItem", {}, raw("<w:r/>")))
+          )
+        )
+      )
+    ).not.toThrow();
+  });
+
+  test.each([
+    ["<w:p/>", "Paragraph", "RawXml <w:p> is not allowed in <Paragraph>"],
+    ["<w:r/><w:p/>", "Paragraph", "RawXml <w:p> is not allowed in <Paragraph>"],
+    ["<w:r/>", "Section", "RawXml <w:r> is not allowed in <Section>"],
+    ["<w:footnoteReference w:id=\"1\"/>", "TextRun", "RawXml <w:footnoteReference> is not allowed in <TextRun>"],
+  ])("%s in a %s throws", (xml, parent, message) => {
+    const input =
+      parent === "Section"
+        ? doc(raw(xml))
+        : parent === "Paragraph"
+          ? doc(n("Paragraph", {}, raw(xml)))
+          : doc(n("Paragraph", {}, n("TextRun", {}, raw(xml))));
+    expect(treeError(() => canon(input)).message).toContain(message);
+  });
+
+  test("the error names the authored parent: a ListItem, not the Paragraph it becomes", () => {
+    expect(() => canon(doc(n("List", {}, n("ListItem", {}, raw("<w:p/>")))))).toThrow(
+      "RawXml <w:p> is not allowed in <ListItem>"
+    );
+  });
+
+  test.each(["", "   ", "<!-- only a comment -->"])("the fragment %j throws: it holds no element", (xml) => {
+    const error = treeError(() => canon(doc(n("Paragraph", {}, raw(xml)))));
+    expect(error.path).toEqual(rawPath);
+    expect(error.message).toContain("RawXml must contain at least one element");
+  });
+
+  test("a fragment that is only text throws", () => {
+    expect(() => canon(doc(n("Paragraph", {}, raw("just text"))))).toThrow(
+      'RawXml is not well-formed: text "just text" stands outside an element'
+    );
+  });
+
+  test("an unbalanced fragment throws a TreeError with the RawXml's path", () => {
+    const error = treeError(() => canon(doc(n("Paragraph", {}, raw("<w:r><w:t>a</w:r>")))));
+    expect(error.path).toEqual(rawPath);
+    expect(error.message).toContain("RawXml is not well-formed: </w:r> closes <w:t>");
+  });
+
+  test("xml that is not a string throws", () => {
+    expect(() => canon(doc(n("Paragraph", {}, raw(undefined))))).toThrow("RawXml xml must be a string, got undefined");
+  });
+
+  test("a RawXml with children throws", () => {
+    expect(() => canon(doc(n("Paragraph", {}, n("RawXml", { xml: "<w:r/>" }, n("TextRun")))))).toThrow(
+      "<TextRun> is not allowed in <RawXml>"
+    );
+  });
+});
+
+describe("14. RawXml relationship references", () => {
+  test.each(['r:id="rId1"', 'r:embed="rId5"', "r:link = 'rId2'"])("an attribute %s throws", (attribute) => {
+    const xml = `<w:r><w:drawing><a:blip ${attribute}/></w:drawing></w:r>`;
+    expect(() => canon(doc(n("Paragraph", {}, n("RawXml", { xml }))))).toThrow(
+      "RawXml cannot carry relationship references (r:id, r:embed, …): docx.js cannot write their targets"
+    );
+  });
+
+  test("r: in text or in another prefix's attribute name is not a relationship reference", () => {
+    const xml = '<w:r w14:paraId="1"><w:t>for:id=1 r:id</w:t></w:r>';
+    expect(() => canon(doc(n("Paragraph", {}, n("RawXml", { xml }))))).not.toThrow();
+  });
+});
+
+describe("15. a TableCell ends with a Paragraph", () => {
+  const cell = (...children: AuthorNode[]) => doc(n("Table", {}, n("TableRow", {}, n("TableCell", {}, ...children))));
+
+  test("a TableCell whose last child is RawXml throws with the cell's path", () => {
+    const error = treeError(() => canon(cell(n("Paragraph"), n("RawXml", { xml: "<w:p/>" }))));
+    expect(error.path).toEqual(["Document", "Section[0]", "Table[0]", "TableRow[0]", "TableCell[0]"]);
+    expect(error.message).toContain("A TableCell must end with a <Paragraph>");
+  });
+
+  test("a RawXml before the last Paragraph is fine", () => {
+    expect(() => canon(cell(n("RawXml", { xml: "<w:p/>" }), n("Paragraph")))).not.toThrow();
+  });
+});
+
+describe("16. styles.importedStyles", () => {
+  const imported = (importedStyles: unknown, more: Record<string, unknown> = {}) =>
+    canon(n("Document", { styles: { importedStyles, ...more } }, n("Section")));
+  const style = (id: string) => `<w:style w:type="paragraph" w:styleId="${id}"><w:name w:val="${id}"/></w:style>`;
+
+  test("XML strings with fresh style ids pass through unchanged", () => {
+    const styles = [style("TableGrid"), `${style("Quote")}\n${style("Aside")}`];
+    expect(imported(styles).props.styles).toEqual({ importedStyles: styles });
+  });
+
+  test.each([[[{ type: "component" }]], ["<w:style/>"]])("%j throws: it takes XML strings", (entries) => {
+    expect(() => imported(entries)).toThrow("Document: styles.importedStyles takes XML strings");
+  });
+
+  test("a root other than w:style throws", () => {
+    expect(() => imported([`${style("A")}<w:p/>`])).toThrow("styles.importedStyles[0] <w:p> is not allowed in styles.xml");
+  });
+
+  test("a relationship reference throws", () => {
+    expect(() => imported(['<w:style w:styleId="A" r:id="rId1"/>'])).toThrow(
+      "styles.importedStyles[0] cannot carry relationship references"
+    );
+  });
+
+  test.each(["Heading1", "Title", "Hyperlink", "FootnoteTextChar"])("the id of docx.js's built-in %s throws", (id) => {
+    expect(() => imported([style(id)])).toThrow(`styles.importedStyles[0] defines style "${id}", which is already defined`);
+  });
+
+  test("an id a paragraph or character style defines throws", () => {
+    expect(() => imported([style("Quote")], { paragraphStyles: [{ id: "Quote" }] })).toThrow('defines style "Quote"');
+    expect(() => imported([style("Mark")], { characterStyles: [{ id: "Mark" }] })).toThrow('defines style "Mark"');
+  });
+
+  test("an id an earlier imported style defines throws", () => {
+    expect(() => imported([style("A"), style("B"), style("A")])).toThrow(
+      'styles.importedStyles[2] defines style "A", which is already defined'
+    );
   });
 });
 

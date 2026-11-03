@@ -27,6 +27,7 @@ export {
   Break,
   List,
   ListItem,
+  RawXml,
 } from "./components";
 
 export type {
@@ -51,6 +52,7 @@ export type {
   BreakProps,
   ListProps,
   ListItemProps,
+  RawXmlProps,
 } from "./types";
 
 export { DEFAULT_NUMBERING } from "./constants";

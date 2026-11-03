@@ -14,6 +14,7 @@ import type {
   MathRunProps,
   PageBreakProps,
   ParagraphProps,
+  RawXmlProps,
   SectionProps,
   SymbolRunProps,
   TabProps,
@@ -52,3 +53,4 @@ export const MathRun = element<MathRunProps>("MathRun");
 export const Break = element<BreakProps>("Break");
 export const List = element<ListProps>("List");
 export const ListItem = element<ListItemProps>("ListItem");
+export const RawXml = element<RawXmlProps>("RawXml");

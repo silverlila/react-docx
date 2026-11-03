@@ -1,6 +1,7 @@
-import { DEFAULT_STYLE_SLOTS, PAGE_NUMBER_VALUES, PRESENCE_ONLY } from "../schema/docx-facts";
+import { DEFAULT_STYLE_SLOTS, PAGE_NUMBER_VALUES, PRESENCE_ONLY, RAW_XML_ROOTS } from "../schema/docx-facts";
 import { ELEMENTS, isKind, type DocumentNode, type Kind } from "../schema/elements";
 import { LIST_NUMBERING, listEntries, listReference } from "./lists";
+import { xmlRoots } from "./xml-roots";
 
 /** The unnormalized `{ type, props, children }` the reconciler builds from JSX. */
 export type AuthorNode = {
@@ -29,6 +30,23 @@ const SUGAR: readonly string[] = ["List", "ListItem", "Break"];
 const PAGE_NUMBERS: readonly string[] = PAGE_NUMBER_VALUES;
 const STYLE_SLOTS = new Map(Object.entries(DEFAULT_STYLE_SLOTS));
 const DATA_URL_PREFIX = /^data:[^,]*;base64,/;
+/** Only relationship attributes live in the `r:` namespace, so a regex needs no parser and has no false positives. */
+const RELATIONSHIP_ATTRIBUTE = /\sr:[A-Za-z]+\s*=/;
+const STYLE_ID = /w:styleId="([^"]+)"/g;
+
+/** The kinds a RawXml may stand in, and which RAW_XML_ROOTS list its fragment's roots come from there. */
+type RawXmlParent = { [K in Kind]: "RawXml" extends (typeof ELEMENTS)[K]["children"][number] ? K : never }[Kind];
+const RAW_XML_SLOT: { readonly [K in RawXmlParent]: Exclude<keyof typeof RAW_XML_ROOTS, "style"> } = {
+  Section: "block",
+  Header: "block",
+  Footer: "block",
+  TableCell: "block",
+  Paragraph: "inline",
+  ExternalHyperlink: "inline",
+  InternalHyperlink: "inline",
+  Bookmark: "inline",
+  TextRun: "run",
+};
 
 /** The child a non-empty `text` prop becomes, inserted first. TextRun's `text` is handled in `textRuns`. */
 const TEXT_PROP_CHILD: { readonly [K in Kind]?: (text: string) => Built } = {
@@ -38,7 +56,7 @@ const TEXT_PROP_CHILD: { readonly [K in Kind]?: (text: string) => Built } = {
 
 /** Per-kind prop rules. `children` is dropped from every kind before these run. */
 const PROP_RULES: { readonly [K in Kind]?: (props: PropBag, path: readonly string[]) => PropBag } = {
-  Document: foldDefaultStyles,
+  Document: (props, path) => assertImportedStyles(foldDefaultStyles(props, path), path),
   Header: defaultHeaderFooterType,
   Footer: defaultHeaderFooterType,
   Paragraph: (props, path) => headingToStyle(omit(props, "text"), path),
@@ -81,16 +99,16 @@ function canonicalNode(
 ): Built {
   if (kind === "Section") assertOneHeaderFooterPerType(content, path);
   const parent: Parent = { kind, name: node.type, path };
-  return {
-    type: kind,
-    props: canonicalProps(kind, node.props, path),
-    children: [...textPropChild(kind, node.props, path), ...canonicalChildren(parent, content, context)],
-  };
+  const children = [...textPropChild(kind, node.props, path), ...canonicalChildren(parent, content, context)];
+  if (kind === "TableCell") assertCellEndsWithParagraph(children, path);
+  return { type: kind, props: canonicalProps(kind, node.props, path), children };
 }
 
-/** A placed author node as canonical nodes: a TextRun may split into several at its Breaks. */
-function nodesFor(kind: Kind, node: AuthorNode, path: readonly string[], context: Context): Built[] {
+/** A placed author node as canonical nodes: a TextRun may split into several at its Breaks,
+ *  and a RawXml is checked against the slot its parent gives it. */
+function nodesFor(parent: Parent, kind: Kind, node: AuthorNode, path: readonly string[], context: Context): Built[] {
   if (kind === "TextRun") return textRuns(node, path, context);
+  if (kind === "RawXml") assertRawXmlFits(parent, node, path);
   return [canonicalNode(kind, node, indexed(node.children), path, context)];
 }
 
@@ -129,7 +147,7 @@ function blockChildren(parent: Parent, content: readonly IndexedChild[], context
     const path = childPath(parent.path, child, index);
     if (child.type === "List") return listParagraphs(child, path, context);
     if (child.type === "ListItem") return [canonicalNode("Paragraph", child, indexed(child.children), path, context)];
-    return nodesFor(placedKind(parent, child, path), child, path, context);
+    return nodesFor(parent, placedKind(parent, child, path), child, path, context);
   });
 }
 
@@ -145,9 +163,9 @@ function inlineChildren(parent: Parent, content: readonly IndexedChild[], contex
         const { node, index } = group;
         const path = childPath(parent.path, node, index);
         if (!isLegalIn(parent.kind, node.type) && isLegalIn("TextRun", node.type)) {
-          return [textRun({}, nodesFor(node.type, node, path, context))];
+          return [textRun({}, [canonicalNode(node.type, node, indexed(node.children), path, context)])];
         }
-        return nodesFor(placedKind(parent, node, path), node, path, context);
+        return nodesFor(parent, placedKind(parent, node, path), node, path, context);
       }
     }
   });
@@ -163,7 +181,7 @@ function mathChildren(parent: Parent, content: readonly IndexedChild[], context:
       case "node": {
         const { node, index } = group;
         const path = childPath(parent.path, node, index);
-        return nodesFor(placedKind(parent, node, path), node, path, context);
+        return nodesFor(parent, placedKind(parent, node, path), node, path, context);
       }
     }
   });
@@ -174,7 +192,7 @@ function literalChildren(parent: Parent, content: readonly IndexedChild[], conte
   const items = content.flatMap(({ child, index }): (Built | string)[] => {
     if (typeof child === "string") return child === "" ? [] : [child];
     const path = childPath(parent.path, child, index);
-    return nodesFor(placedKind(parent, child, path), child, path, context);
+    return nodesFor(parent, placedKind(parent, child, path), child, path, context);
   });
   return mergeStrings(items);
 }
@@ -184,7 +202,7 @@ function plainChildren(parent: Parent, content: readonly IndexedChild[], context
   return content.flatMap(({ child, index }) => {
     if (typeof child === "string") throw textNotAllowed(parent);
     const path = childPath(parent.path, child, index);
-    return nodesFor(placedKind(parent, child, path), child, path, context);
+    return nodesFor(parent, placedKind(parent, child, path), child, path, context);
   });
 }
 
@@ -257,7 +275,7 @@ function textRuns(node: AuthorNode, path: readonly string[], context: Context): 
       items.push(BREAK);
     } else {
       const childAt = childPath(path, child, index);
-      items.push(...nodesFor(placedKind(parent, child, childAt), child, childAt, context));
+      items.push(...nodesFor(parent, placedKind(parent, child, childAt), child, childAt, context));
     }
   }
   return segmentsAtBreaks(items).flatMap((segment, i) => segmentRuns(segmentProps(props, segment, i === 0), segment));
@@ -310,6 +328,54 @@ function segmentProps(props: PropBag, segment: Segment, first: boolean): PropBag
   if (segment.breaks === 0) return props;
   const leading = typeof props.break === "number" ? props.break : 0;
   return { ...props, break: leading + segment.breaks };
+}
+
+// ─── RawXml ────────────────────────────────────────────────────────────────────
+
+type Fragment = {
+  readonly xml: string;
+  /** Names the fragment in messages: `RawXml`, `styles.importedStyles[0]`. */
+  readonly label: string;
+  readonly allowedRoots: readonly string[];
+  /** Where the fragment stands, for messages: `<Paragraph>`, `styles.xml`. */
+  readonly where: string;
+};
+
+/** Rules 13 and 14: a well-formed fragment of at least one element, each root allowed where it stands,
+ *  and no relationship references, whose targets docx.js cannot write. */
+function assertFragment({ xml, label, allowedRoots, where }: Fragment, path: readonly string[]): void {
+  const scanned = xmlRoots(xml);
+  if (scanned.kind === "malformed") throw new TreeError(path, `${label} is not well-formed: ${scanned.reason}`);
+  if (scanned.roots.length === 0) throw new TreeError(path, `${label} must contain at least one element`);
+  const stray = scanned.roots.find((root) => !allowedRoots.includes(root));
+  if (stray !== undefined) throw new TreeError(path, `${label} <${stray}> is not allowed in ${where}`);
+  if (RELATIONSHIP_ATTRIBUTE.test(xml)) {
+    throw new TreeError(
+      path,
+      `${label} cannot carry relationship references (r:id, r:embed, …): docx.js cannot write their targets`
+    );
+  }
+}
+
+function isRawXmlParent(kind: Kind): kind is RawXmlParent {
+  return Object.prototype.hasOwnProperty.call(RAW_XML_SLOT, kind);
+}
+
+function assertRawXmlFits(parent: Parent, node: AuthorNode, path: readonly string[]): void {
+  const { xml } = node.props;
+  if (typeof xml !== "string") throw new TreeError(path, `RawXml xml must be a string, got ${typeof xml}`);
+  if (!isRawXmlParent(parent.kind)) throw new TreeError(path, `<RawXml> is not allowed in <${parent.name}>`);
+  const allowedRoots = RAW_XML_ROOTS[RAW_XML_SLOT[parent.kind]];
+  assertFragment({ xml, label: "RawXml", allowedRoots, where: `<${parent.name}>` }, path);
+}
+
+/** Rule 15. docx.js appends an empty `<w:p/>` after any trailing child that is not its own Paragraph,
+ *  a raw `<w:p>` included, which would change the cell. */
+function assertCellEndsWithParagraph(children: readonly (Built | string)[], path: readonly string[]): void {
+  const last = children[children.length - 1];
+  if (typeof last === "object" && last.type === "RawXml") {
+    throw new TreeError(path, "A TableCell must end with a <Paragraph>");
+  }
 }
 
 // ─── Props ─────────────────────────────────────────────────────────────────────
@@ -422,6 +488,32 @@ function foldDefaultStyles(props: PropBag, path: readonly string[]): PropBag {
       ...(characters.custom.length > 0 ? { characterStyles: characters.custom } : {}),
     },
   };
+}
+
+/** Rule 16. Raw styles are written after docx.js's own and the style lists', so a `w:styleId` one of
+ *  those already defines, or an earlier raw style defines, would be defined twice. */
+function assertImportedStyles(props: PropBag, path: readonly string[]): PropBag {
+  if (!isRecord(props.styles) || props.styles.importedStyles === undefined) return props;
+  const { importedStyles, paragraphStyles, characterStyles } = props.styles;
+  if (!Array.isArray(importedStyles)) throw new TreeError(path, "styles.importedStyles takes XML strings");
+  const entries: readonly unknown[] = importedStyles;
+  const defined = new Set([...STYLE_SLOTS.keys(), ...styleIds(paragraphStyles), ...styleIds(characterStyles)]);
+  entries.forEach((xml, i) => {
+    if (typeof xml !== "string") throw new TreeError(path, "styles.importedStyles takes XML strings");
+    const label = `styles.importedStyles[${i}]`;
+    assertFragment({ xml, label, allowedRoots: RAW_XML_ROOTS.style, where: "styles.xml" }, path);
+    for (const [, id] of xml.matchAll(STYLE_ID)) {
+      if (defined.has(id)) throw new TreeError(path, `${label} defines style "${id}", which is already defined`);
+      defined.add(id);
+    }
+  });
+  return props;
+}
+
+function styleIds(entries: unknown): string[] {
+  if (!Array.isArray(entries)) return [];
+  const styles: readonly unknown[] = entries;
+  return styles.flatMap((entry) => (isRecord(entry) && typeof entry.id === "string" ? [entry.id] : []));
 }
 
 function partitionStyles(

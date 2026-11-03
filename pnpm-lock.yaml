@@ -17,6 +17,9 @@ importers:
       react-reconciler-33:
         specifier: npm:react-reconciler@0.33.0
         version: react-reconciler@0.33.0(react@18.3.1)
+      xml-js:
+        specifier: ^1.6.8
+        version: 1.6.11
     devDependencies:
       '@types/node':
         specifier: ^24.3.1

@@ -1,13 +1,17 @@
 import type { ReactNode } from "react";
 import type * as docx from "docx";
+import type { StylesProps } from "./schema/elements";
 
 /** Authoring props: docx.js option types verbatim, with element children in place of option-bag children. */
 type Kids = { children?: ReactNode };
 type NoKids = { children?: never };
 type HeaderFooterType = { type?: "default" | "first" | "even" };
 
-export type DocumentProps = Omit<docx.IPropertiesOptions, "sections" | "footnotes" | "comments" | "externalStyles"> &
-  Kids;
+/** `styles.importedStyles` takes raw `<w:style>` XML strings. */
+export type DocumentProps = Omit<
+  docx.IPropertiesOptions,
+  "sections" | "footnotes" | "comments" | "externalStyles" | "styles"
+> & { styles?: StylesProps } & Kids;
 export type SectionProps = Omit<docx.ISectionOptions, "children" | "headers" | "footers"> & Kids;
 export type HeaderProps = HeaderFooterType & Kids;
 export type FooterProps = HeaderFooterType & Kids;
@@ -30,3 +34,5 @@ export type BreakProps = NoKids;
 /** Nesting a List inside a List or ListItem sets the level. */
 export type ListProps = { type?: "bullet" | "numbered" } & Kids;
 export type ListItemProps = Omit<docx.IParagraphOptions, "children" | "numbering"> & Kids;
+/** One or more sibling OOXML elements, written verbatim. Legal where a block, an inline or run content stands. */
+export type RawXmlProps = { xml: string } & NoKids;

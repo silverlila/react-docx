@@ -22,6 +22,7 @@ import {
   Math,
   PageBreak,
   Paragraph,
+  RawXml,
   Section,
   SymbolRun,
   Tab,
@@ -368,6 +369,27 @@ export const CASES: readonly CharacterizationCase[] = [
         <Section>
           <Paragraph heading={HeadingLevel.HEADING_1}>
             <TextRun text="red heading" />
+          </Paragraph>
+        </Section>
+      </Document>
+    ),
+  },
+  {
+    name: "raw-xml",
+    element: (
+      <Document
+        styles={{
+          importedStyles: ['<w:style w:type="table" w:styleId="TableGrid"><w:name w:val="Table Grid"/></w:style>'],
+        }}
+      >
+        <Section>
+          <RawXml xml="<w:sdt><w:sdtContent><w:p><w:r><w:t>in sdt</w:t></w:r></w:p></w:sdtContent></w:sdt>" />
+          <Paragraph>
+            <RawXml xml='<w:r><w:t xml:space="preserve"> sp a </w:t></w:r>' />
+            <TextRun>
+              date:
+              <RawXml xml='<w:fldChar w:fldCharType="begin"/><w:instrText xml:space="preserve"> DATE </w:instrText><w:fldChar w:fldCharType="end"/>' />
+            </TextRun>
           </Paragraph>
         </Section>
       </Document>

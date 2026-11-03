@@ -54,7 +54,8 @@
   "dependencies": {
     "react-reconciler-29": "npm:react-reconciler@0.29.0",
     "react-reconciler-31": "npm:react-reconciler@0.31.0",
-    "react-reconciler-33": "npm:react-reconciler@0.33.0"
+    "react-reconciler-33": "npm:react-reconciler@0.33.0",
+    "xml-js": "^1.6.8"
   },
   "devDependencies": {
     "@types/node": "^24.3.1",

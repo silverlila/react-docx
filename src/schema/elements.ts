@@ -22,7 +22,7 @@ const spec =
   <const S extends Omit<Spec<P>, "props">>(row: S): S & { readonly props?: P } =>
     row;
 
-const BLOCK = ["Paragraph", "Table"] as const;
+const BLOCK = ["Paragraph", "Table", "RawXml"] as const;
 const INLINE = [
   "TextRun",
   "ImageRun",
@@ -32,10 +32,14 @@ const INLINE = [
   "Bookmark",
   "PageBreak",
   "Math",
+  "RawXml",
 ] as const;
-const RUN_CONTENT = ["Tab", "PageNumber"] as const;
+const RUN_CONTENT = ["Tab", "PageNumber", "RawXml"] as const;
 
-export type StylesProps = Omit<docx.IStylesOptions, "importedStyles" | "initialStyles">;
+export type StylesProps = Omit<docx.IStylesOptions, "importedStyles" | "initialStyles"> & {
+  /** Raw <w:style> elements, as XML strings, written after docx.js's own styles. */
+  readonly importedStyles?: readonly string[];
+};
 export type DocumentProps = Omit<
   docx.IPropertiesOptions,
   "sections" | "footnotes" | "comments" | "externalStyles" | "styles"
@@ -122,6 +126,8 @@ export const ELEMENTS = {
   PageBreak: spec<{}>()({ docx: "PageBreak", children: [], text: false, ooxml: ["w:br"] }),
   Math: spec<{}>()({ docx: "Math", children: ["MathRun"], text: false, ooxml: ["m:oMath"] }),
   MathRun: spec<{}>()({ docx: "MathRun", children: [], text: true, ooxml: ["m:r"] }),
+  /** One or more sibling OOXML elements docx.js cannot express, written verbatim. */
+  RawXml: spec<{ readonly xml: string }>()({ docx: "ImportedXmlComponent", children: [], text: false, ooxml: [] }),
 } as const satisfies Record<string, Spec<unknown>>;
 
 export type Kind = keyof typeof ELEMENTS;
