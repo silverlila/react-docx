@@ -10,10 +10,15 @@ import {
 import {
   Bookmark,
   Break,
+  Comment,
+  CommentRangeEnd,
+  CommentRangeStart,
+  CommentReference,
   DEFAULT_NUMBERING,
   Document,
   ExternalHyperlink,
   Footer,
+  Footnote,
   Header,
   ImageRun,
   InternalHyperlink,
@@ -28,7 +33,9 @@ import {
   Tab,
   Table,
   TableCell,
+  TableOfContents,
   TableRow,
+  Textbox,
   TextRun,
 } from "../../src/index";
 
@@ -391,6 +398,29 @@ export const CASES: readonly CharacterizationCase[] = [
               <RawXml xml='<w:fldChar w:fldCharType="begin"/><w:instrText xml:space="preserve"> DATE </w:instrText><w:fldChar w:fldCharType="end"/>' />
             </TextRun>
           </Paragraph>
+        </Section>
+      </Document>
+    ),
+  },
+  {
+    name: "notes-and-blocks",
+    element: (
+      <Document features={{ updateFields: true }}>
+        <Comment id={0} author="Ada" initials="AL" date={new Date("2026-01-01T00:00:00Z")}>
+          Check this claim
+        </Comment>
+        <Section>
+          <TableOfContents alias="Contents" headingStyleRange="1-3" hyperlink />
+          <Paragraph>
+            <CommentRangeStart id={0} />
+            <TextRun>Claim</TextRun>
+            <CommentRangeEnd id={0} />
+            <CommentReference id={0} />
+            <Footnote>Source: 2026 report</Footnote>
+          </Paragraph>
+          <Textbox style={{ width: "200pt", height: "50pt" }}>
+            <Paragraph>in box</Paragraph>
+          </Textbox>
         </Section>
       </Document>
     ),

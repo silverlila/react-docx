@@ -638,6 +638,150 @@ describe("16. styles.importedStyles", () => {
   });
 });
 
+describe("17. loose content in Footnote, Comment and Textbox", () => {
+  /** Each host where it may stand, and how to find its canonical children again. */
+  const hosts = {
+    Footnote: {
+      tree: (...children: (AuthorNode | string)[]) => doc(n("Paragraph", {}, n("Footnote", {}, ...children))),
+      children: (tree: DocumentNode) => (inline(tree) as { children: unknown }[])[0].children,
+    },
+    Comment: {
+      tree: (...children: (AuthorNode | string)[]) =>
+        n("Document", {}, n("Section"), n("Comment", { id: 0 }, ...children)),
+      children: (tree: DocumentNode) => tree.children[1].children,
+    },
+    Textbox: {
+      tree: (...children: (AuthorNode | string)[]) => doc(n("Textbox", { style: { width: "1in" } }, ...children)),
+      children: (tree: DocumentNode) => (blocks(tree)[0] as { children: unknown }).children,
+    },
+  };
+
+  test("<Footnote>text</Footnote> becomes Footnote > Paragraph > TextRun > text", () => {
+    const tree = canon(doc(n("Paragraph", {}, "Claim", n("Footnote", {}, "Source: 2026 report"))));
+    expect(inline(tree)).toEqual([
+      run({}, "Claim"),
+      { type: "Footnote", props: {}, children: [paragraph({}, run({}, "Source: 2026 report"))] },
+    ]);
+  });
+
+  test.each(Object.keys(hosts) as (keyof typeof hosts)[])(
+    "in a %s, each run of strings and inline content between blocks becomes one Paragraph",
+    (host) => {
+      const { tree, children } = hosts[host];
+      const canonical = canon(tree("a", n("TextRun", { bold: true }, "b"), n("Paragraph", {}, "c"), n("Tab")));
+      expect(children(canonical)).toEqual([
+        paragraph({}, run({}, "a"), run({ bold: true }, "b")),
+        paragraph({}, run({}, "c")),
+        paragraph({}, run({}, tab)),
+      ]);
+    }
+  );
+
+  test("an error in wrapped content names its authored path, with no Paragraph in it", () => {
+    const error = treeError(() => canon(hosts.Comment.tree("a", n("TextRun", {}, n("Section")))));
+    expect(error.path).toEqual(["Document", "Comment[1]", "TextRun[1]", "Section[0]"]);
+    expect(error.message).toContain("<Section> is not allowed in <TextRun>");
+  });
+
+  test("a block kind the host does not hold still throws", () => {
+    expect(() => canon(hosts.Textbox.tree(n("Table")))).toThrow("<Table> is not allowed in <Textbox>");
+  });
+
+  test("a Footnote must start with a Paragraph: docx.js puts the footnote's number there", () => {
+    const table = n("Table", {}, n("TableRow", {}, n("TableCell", {}, n("Paragraph"))));
+    const error = treeError(() => canon(hosts.Footnote.tree(table)));
+    expect(error.path).toEqual(["Document", "Section[0]", "Paragraph[0]", "Footnote[0]"]);
+    expect(error.message).toContain("A Footnote must start with a <Paragraph>");
+    expect(() => canon(hosts.Footnote.tree())).toThrow("A Footnote must start with a <Paragraph>");
+    expect(() => canon(hosts.Footnote.tree("note", table))).not.toThrow();
+  });
+});
+
+describe("18. Footnote placement", () => {
+  const footnote = () => n("Footnote", {}, "note");
+
+  test.each(["Header", "Footer"])("a Footnote in a %s throws", (part) => {
+    const error = treeError(() => canon(doc(n(part, {}, n("Paragraph", {}, footnote())))));
+    expect(error.path).toEqual(["Document", "Section[0]", `${part}[0]`, "Paragraph[0]", "Footnote[0]"]);
+    expect(error.message).toContain("Footnote is only allowed in the document body");
+  });
+
+  test("a Footnote in a Comment throws", () => {
+    const tree = () => n("Document", {}, n("Section"), n("Comment", { id: 0 }, n("Paragraph", {}, footnote())));
+    expect(() => canon(tree())).toThrow("Document > Comment[1] > Paragraph[0] > Footnote[0]: Footnote is only allowed");
+  });
+
+  test("a Footnote in a Footnote throws", () => {
+    expect(() => canon(doc(n("Paragraph", {}, n("Footnote", {}, "a", footnote()))))).toThrow(
+      "Footnote is only allowed in the document body"
+    );
+  });
+
+  test.each([
+    ["a hyperlink", n("Paragraph", {}, n("ExternalHyperlink", { link: "https://x.test" }, footnote()))],
+    ["a Bookmark", n("Paragraph", {}, n("Bookmark", { id: "b" }, footnote()))],
+    ["a TableCell paragraph", n("Table", {}, n("TableRow", {}, n("TableCell", {}, n("Paragraph", {}, footnote()))))],
+    ["a Textbox paragraph", n("Textbox", { style: { width: "1in" } }, n("Paragraph", {}, footnote()))],
+  ])("a Footnote in %s of the body is fine", (_where, block) => {
+    expect(() => canon(doc(block))).not.toThrow();
+  });
+});
+
+describe("19. comment ids", () => {
+  const withComments = (body: AuthorNode[], ...comments: AuthorNode[]) =>
+    n("Document", {}, n("Section", {}, ...body), ...comments);
+  const comment = (id: number) => n("Comment", { id, author: "Ada" }, "c");
+
+  test("ranges and a reference resolve to a Comment that comes after them", () => {
+    const marked = n(
+      "Paragraph",
+      {},
+      n("CommentRangeStart", { id: 0 }),
+      "x",
+      n("CommentRangeEnd", { id: 0 }),
+      n("CommentReference", { id: 0 })
+    );
+    const tree = canon(withComments([marked], comment(0)));
+    expect(inline(tree)).toEqual([
+      { type: "CommentRangeStart", props: { id: 0 }, children: [] },
+      run({}, "x"),
+      { type: "CommentRangeEnd", props: { id: 0 }, children: [] },
+      run({}, { type: "CommentReference", props: { id: 0 }, children: [] }),
+    ]);
+  });
+
+  test("a second Comment with the same id throws with its path", () => {
+    const error = treeError(() => canon(withComments([], comment(0), comment(1), comment(0))));
+    expect(error.path).toEqual(["Document", "Comment[3]"]);
+    expect(error.message).toContain("A second <Comment id={0}>");
+  });
+
+  test.each(["CommentRangeStart", "CommentRangeEnd", "CommentReference"])("a %s with no matching Comment throws", (kind) => {
+    const error = treeError(() => canon(withComments([n("Paragraph", {}, n(kind, { id: 1 }))], comment(0))));
+    expect(error.path).toEqual(["Document", "Section[0]", "Paragraph[0]", `${kind}[0]`]);
+    expect(error.message).toContain("No <Comment id={1}>");
+  });
+
+  test("a Comment no range or reference names is fine", () => {
+    expect(() => canon(withComments([n("Paragraph", {}, "x")], comment(0)))).not.toThrow();
+  });
+
+  test("a Comment belongs to the Document, not a Section", () => {
+    expect(() => canon(doc(comment(0)))).toThrow("<Comment> is not allowed in <Section>");
+  });
+});
+
+describe("TableOfContents and Textbox are Section-body blocks", () => {
+  test.each([
+    ["TableOfContents", {}],
+    ["Textbox", { style: { width: "1in" } }],
+  ])("a %s in a Header or a TableCell throws", (kind, props) => {
+    expect(() => canon(doc(n("Header", {}, n(kind, props))))).toThrow(`<${kind}> is not allowed in <Header>`);
+    const cell = n("Table", {}, n("TableRow", {}, n("TableCell", {}, n(kind, props), n("Paragraph"))));
+    expect(() => canon(doc(cell))).toThrow(`<${kind}> is not allowed in <TableCell>`);
+  });
+});
+
 describe("lists", () => {
   const numbering = (reference: string, level: number, instance: number) => ({ numbering: { reference, level, instance } });
 

@@ -6,6 +6,8 @@ export type DocxXml = Readonly<Record<string, string>>;
 /** External hyperlink relationship ids are `rId` + docx.js's `uniqueId()`, a lowercased 21-char nanoid,
  *  so random per render. docx.js's own sequential ids (`rId1`…) are short and untouched. */
 const RANDOM_REL_ID = /rId[a-z0-9_-]{20,}/g;
+/** Each text box's VML shape id is a fresh docx.js `uniqueId()`. Matches the id value alone. */
+const VML_SHAPE_ID = /(?<=<v:shape id=")[^"]+/g;
 
 function isComparedPart(name: string): boolean {
   return (
@@ -21,11 +23,12 @@ function scanOrder(names: string[]): string[] {
   return names.includes("word/document.xml") ? ["word/document.xml", ...rest] : rest;
 }
 
-function stableRelIds(parts: Record<string, string>): Map<string, string> {
+/** Each distinct match of `pattern` → `<prefix>1`, `<prefix>2`, … in order of first appearance. */
+function stableIds(parts: Record<string, string>, pattern: RegExp, prefix: string): Map<string, string> {
   const ids = new Map<string, string>();
   for (const name of scanOrder(Object.keys(parts))) {
-    for (const [id] of parts[name].matchAll(RANDOM_REL_ID)) {
-      if (!ids.has(id)) ids.set(id, `rIdLink${ids.size + 1}`);
+    for (const [id] of parts[name].matchAll(pattern)) {
+      if (!ids.has(id)) ids.set(id, `${prefix}${ids.size + 1}`);
     }
   }
   return ids;
@@ -41,11 +44,13 @@ export function docxXml(bytes: Uint8Array | ArrayBuffer): DocxXml {
     if (isComparedPart(name)) parts[name] = strFromU8(content);
   }
 
-  const ids = stableRelIds(parts);
+  const relIds = stableIds(parts, RANDOM_REL_ID, "rIdLink");
+  const shapeIds = stableIds(parts, VML_SHAPE_ID, "vShape");
   const result: Record<string, string> = {};
   for (const [name, xml] of Object.entries(parts)) {
     result[name] = xml
-      .replace(RANDOM_REL_ID, (id) => ids.get(id) ?? id)
+      .replace(RANDOM_REL_ID, (id) => relIds.get(id) ?? id)
+      .replace(VML_SHAPE_ID, (id) => shapeIds.get(id) ?? id)
       .replaceAll("><", ">\n<");
   }
   return result;

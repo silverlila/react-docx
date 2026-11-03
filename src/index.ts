@@ -28,6 +28,13 @@ export {
   List,
   ListItem,
   RawXml,
+  Footnote,
+  Comment,
+  CommentRangeStart,
+  CommentRangeEnd,
+  CommentReference,
+  TableOfContents,
+  Textbox,
 } from "./components";
 
 export type {
@@ -53,6 +60,13 @@ export type {
   ListProps,
   ListItemProps,
   RawXmlProps,
+  FootnoteProps,
+  CommentProps,
+  CommentRangeStartProps,
+  CommentRangeEndProps,
+  CommentReferenceProps,
+  TableOfContentsProps,
+  TextboxProps,
 } from "./types";
 
 export { DEFAULT_NUMBERING } from "./constants";

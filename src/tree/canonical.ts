@@ -23,7 +23,19 @@ export class TreeError extends Error {
 type PropBag = Readonly<Record<string, unknown>>;
 /** A canonical node before its props are trusted as `Props<K>`: they are not validated, TSX type-checked them. */
 type Built = { readonly type: Kind; readonly props: PropBag; readonly children: readonly (Built | string)[] };
-type Context = { nextListInstance: number; listsExpanded: boolean };
+/** One canonicalize call's document-wide state, shared by every node. */
+type DocumentState = {
+  nextListInstance: number;
+  listsExpanded: boolean;
+  /** Rule 19: every Comment id, and each id a comment range or reference names, with that node's path. */
+  readonly commentIds: Set<unknown>;
+  readonly commentMarks: { readonly id: unknown; readonly path: readonly string[] }[];
+};
+type Context = {
+  readonly document: DocumentState;
+  /** Rule 18: inside a Header, Footer, Comment or Footnote, whose content docx.js reads no footnote references from. */
+  readonly outsideBody: boolean;
+};
 type Parent = { readonly kind: Kind; readonly name: string; readonly path: readonly string[] };
 
 const SUGAR: readonly string[] = ["List", "ListItem", "Break"];
@@ -33,6 +45,12 @@ const DATA_URL_PREFIX = /^data:[^,]*;base64,/;
 /** Only relationship attributes live in the `r:` namespace, so a regex needs no parser and has no false positives. */
 const RELATIONSHIP_ATTRIBUTE = /\sr:[A-Za-z]+\s*=/;
 const STYLE_ID = /w:styleId="([^"]+)"/g;
+const OUTSIDE_BODY: readonly Kind[] = ["Header", "Footer", "Comment", "Footnote"];
+/** Rule 17: the kinds whose loose strings and inline content are wrapped into Paragraphs. */
+const WRAPS_LOOSE_CONTENT: readonly Kind[] = ["Footnote", "Comment", "Textbox"];
+const COMMENT_MARKS: readonly Kind[] = ["CommentRangeStart", "CommentRangeEnd", "CommentReference"];
+/** The author node a rule-17 Paragraph is built from: its children are the loose content, given separately. */
+const LOOSE_PARAGRAPH: AuthorNode = { type: "Paragraph", props: {}, children: [] };
 
 /** The kinds a RawXml may stand in, and which RAW_XML_ROOTS list its fragment's roots come from there. */
 type RawXmlParent = { [K in Kind]: "RawXml" extends (typeof ELEMENTS)[K]["children"][number] ? K : never }[Kind];
@@ -75,9 +93,13 @@ export function canonicalize(root: AuthorNode): DocumentNode {
   if (root.type !== "Document") {
     throw new TreeError([root.type], `The root must be <Document>, got <${root.type}>`);
   }
-  const context: Context = { nextListInstance: 0, listsExpanded: false };
-  const document = canonicalNode("Document", root, indexed(root.children), ["Document"], context);
-  const props = context.listsExpanded ? withListNumbering(document.props) : document.props;
+  const state: DocumentState = { nextListInstance: 0, listsExpanded: false, commentIds: new Set(), commentMarks: [] };
+  const document = canonicalNode("Document", root, indexed(root.children), ["Document"], {
+    document: state,
+    outsideBody: false,
+  });
+  assertCommentIdsResolve(state);
+  const props = state.listsExpanded ? withListNumbering(document.props) : document.props;
   // The placement checks enforce the child structure DocumentNode describes; props are trusted as authored.
   return { ...document, props } as DocumentNode;
 }
@@ -98,9 +120,15 @@ function canonicalNode(
   context: Context
 ): Built {
   if (kind === "Section") assertOneHeaderFooterPerType(content, path);
+  if (kind === "Footnote" && context.outsideBody) {
+    throw new TreeError(path, "Footnote is only allowed in the document body");
+  }
+  recordCommentId(kind, node.props, path, context.document);
   const parent: Parent = { kind, name: node.type, path };
-  const children = [...textPropChild(kind, node.props, path), ...canonicalChildren(parent, content, context)];
+  const inner = OUTSIDE_BODY.includes(kind) ? { ...context, outsideBody: true } : context;
+  const children = [...textPropChild(kind, node.props, path), ...canonicalChildren(parent, content, inner)];
   if (kind === "TableCell") assertCellEndsWithParagraph(children, path);
+  if (kind === "Footnote") assertFootnoteStartsWithParagraph(children, path);
   return { type: kind, props: canonicalProps(kind, node.props, path), children };
 }
 
@@ -134,6 +162,7 @@ function textNotAllowed(parent: Parent): TreeError {
 
 function canonicalChildren(parent: Parent, content: readonly IndexedChild[], context: Context): (Built | string)[] {
   if (ELEMENTS[parent.kind].text) return literalChildren(parent, content, context);
+  if (WRAPS_LOOSE_CONTENT.includes(parent.kind)) return wrappedBlockChildren(parent, content, context);
   if (isLegalIn(parent.kind, "Paragraph")) return blockChildren(parent, content, context);
   if (isLegalIn(parent.kind, "TextRun")) return inlineChildren(parent, content, context);
   if (isLegalIn(parent.kind, "MathRun")) return mathChildren(parent, content, context);
@@ -149,6 +178,35 @@ function blockChildren(parent: Parent, content: readonly IndexedChild[], context
     if (child.type === "ListItem") return [canonicalNode("Paragraph", child, indexed(child.children), path, context)];
     return nodesFor(parent, placedKind(parent, child, path), child, path, context);
   });
+}
+
+/** Rule 17. Footnote, Comment, Textbox: each run of consecutive strings and inline content becomes one Paragraph,
+ *  whose children keep their authored paths. The rest are block children. */
+function wrappedBlockChildren(parent: Parent, content: readonly IndexedChild[], context: Context): Built[] {
+  return looseRuns(parent.kind, content).flatMap((group) =>
+    group.loose
+      ? [canonicalNode("Paragraph", LOOSE_PARAGRAPH, group.content, parent.path, context)]
+      : blockChildren(parent, group.content, context)
+  );
+}
+
+/** Consecutive children grouped by whether they are loose content `parent` cannot hold directly. */
+function looseRuns(parent: Kind, content: readonly IndexedChild[]): { loose: boolean; content: IndexedChild[] }[] {
+  const groups: { loose: boolean; content: IndexedChild[] }[] = [];
+  for (const item of content) {
+    const loose = isLoose(parent, item.child);
+    const last = groups[groups.length - 1];
+    if (last?.loose === loose) last.content.push(item);
+    else groups.push({ loose, content: [item] });
+  }
+  return groups;
+}
+
+/** A string, or a node a Paragraph holds (directly, or wrapped in a TextRun) that `parent` does not. */
+function isLoose(parent: Kind, child: AuthorNode | string): boolean {
+  if (typeof child === "string") return true;
+  if (isLegalIn(parent, child.type)) return false;
+  return child.type === "Break" || isLegalIn("Paragraph", child.type) || isLegalIn("TextRun", child.type);
 }
 
 /** Paragraph, hyperlinks, Bookmark: text, Breaks and run content standing here are wrapped in TextRuns. */
@@ -378,6 +436,33 @@ function assertCellEndsWithParagraph(children: readonly (Built | string)[], path
   }
 }
 
+// ─── Footnotes and comments ────────────────────────────────────────────────────
+
+/** docx.js puts the footnote's own number mark at the front of its first child, which must be a Paragraph:
+ *  a leading Table crashes it, and an empty Footnote would show no number. */
+function assertFootnoteStartsWithParagraph(children: readonly (Built | string)[], path: readonly string[]): void {
+  const first = children[0];
+  if (typeof first !== "object" || first.type !== "Paragraph") {
+    throw new TreeError(path, "A Footnote must start with a <Paragraph>");
+  }
+}
+
+/** Rule 19, as nodes are reached: a Comment id is taken once; a range or reference id is kept to resolve later. */
+function recordCommentId(kind: Kind, props: PropBag, path: readonly string[], state: DocumentState): void {
+  if (kind === "Comment") {
+    if (state.commentIds.has(props.id)) throw new TreeError(path, `A second <Comment id={${String(props.id)}}>`);
+    state.commentIds.add(props.id);
+  } else if (COMMENT_MARKS.includes(kind)) {
+    state.commentMarks.push({ id: props.id, path });
+  }
+}
+
+/** Rule 19, once the whole document is read: Comments may follow the ranges that name them. */
+function assertCommentIdsResolve(state: DocumentState): void {
+  const dangling = state.commentMarks.find(({ id }) => !state.commentIds.has(id));
+  if (dangling !== undefined) throw new TreeError(dangling.path, `No <Comment id={${String(dangling.id)}}>`);
+}
+
 // ─── Props ─────────────────────────────────────────────────────────────────────
 
 function canonicalProps(kind: Kind, props: PropBag, path: readonly string[]): PropBag {
@@ -543,8 +628,8 @@ function partitionStyles(
 
 function listParagraphs(list: AuthorNode, path: readonly string[], context: Context): Built[] {
   const reference = listReference(list);
-  const instance = context.nextListInstance++;
-  context.listsExpanded = true;
+  const instance = context.document.nextListInstance++;
+  context.document.listsExpanded = true;
   return listEntries(list, path).map((entry) => {
     const paragraph = canonicalNode("Paragraph", entry.item, entry.content, entry.path, context);
     return { ...paragraph, props: { ...paragraph.props, numbering: { reference, level: entry.level, instance } } };

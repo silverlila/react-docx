@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type * as docx from "docx";
-import type { StylesProps } from "./schema/elements";
+import type { StylesProps, TextboxProps as TextboxOptions } from "./schema/elements";
 
 /** Authoring props: docx.js option types verbatim, with element children in place of option-bag children. */
 type Kids = { children?: ReactNode };
@@ -36,3 +36,13 @@ export type ListProps = { type?: "bullet" | "numbered" } & Kids;
 export type ListItemProps = Omit<docx.IParagraphOptions, "children" | "numbering"> & Kids;
 /** One or more sibling OOXML elements, written verbatim. Legal where a block, an inline or run content stands. */
 export type RawXmlProps = { xml: string } & NoKids;
+/** Stands where it is referenced, holding the footnote's content. Loose text becomes a Paragraph. */
+export type FootnoteProps = Kids;
+/** A Document child. Loose text becomes a Paragraph. */
+export type CommentProps = Omit<docx.ICommentOptions, "children"> & Kids;
+export type CommentRangeStartProps = { id: number } & NoKids;
+export type CommentRangeEndProps = { id: number } & NoKids;
+export type CommentReferenceProps = { id: number } & NoKids;
+export type TableOfContentsProps = { alias?: string } & docx.ITableOfContentsOptions & NoKids;
+/** Holds Paragraphs; loose text becomes one. `style` is the VML shape style, such as `{ width: "200pt" }`. */
+export type TextboxProps = TextboxOptions & Kids;

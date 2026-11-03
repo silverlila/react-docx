@@ -25,20 +25,38 @@ type Built = {
   MathRun: docx.MathRun;
   /** One component per top-level element of the fragment, written in the RawXml's place. */
   RawXml: docx.XmlComponent[];
+  Footnote: docx.FootnoteReferenceRun;
+  /** Not built in place: the Document collects it into its `comments` option. */
+  Comment: docx.ICommentOptions;
+  CommentRangeStart: docx.CommentRangeStart;
+  CommentRangeEnd: docx.CommentRangeEnd;
+  /** Spliced into its run like a RawXml's components: docx.js writes it inside `<w:r>`,
+   *  but its run child union leaves it out. */
+  CommentReference: docx.XmlComponent[];
+  TableOfContents: docx.TableOfContents;
+  Textbox: docx.Textbox;
 };
+
+/** What building a node needs beyond the node: per-build, so two documents rendered in one process both start at 1. */
+type BuildCtx = { readonly footnoteIds: ReadonlyMap<Node<"Footnote">, number> };
 
 type HeaderFooterSlots<T> = { default?: T; first?: T; even?: T };
 
 /** Builds one canonical node of any kind. */
-function build<N extends Node>(node: N): Built[N["type"]] {
+function build<N extends Node>(node: N, ctx: BuildCtx): Built[N["type"]] {
   // The one cast: TypeScript cannot correlate BUILD[node.type] with node, though BUILD's type pairs each kind's
   // builder with that kind's node.
-  const builder = BUILD[node.type] as unknown as (node: N) => Built[N["type"]];
-  return builder(node);
+  const builder = BUILD[node.type] as unknown as (node: N, ctx: BuildCtx) => Built[N["type"]];
+  return builder(node, ctx);
 }
 
-/** docx.js's child unions are closed and its FileChild type is branded, so no raw component types as a child.
- *  At runtime docx.js pushes any XmlComponent child into its parent as-is, which is all RawXml needs. */
+function buildAll<N extends Node>(nodes: readonly N[], ctx: BuildCtx): Built[N["type"]][] {
+  return nodes.map((node) => build(node, ctx));
+}
+
+/** docx.js's child unions are closed and its FileChild type is branded, so they admit no raw component, and
+ *  some leave out content docx.js writes correctly. At runtime docx.js pushes any XmlComponent child into its
+ *  parent as-is. */
 function asChildren<T>(components: docx.XmlComponent[]): T[] {
   return components as unknown as T[];
 }
@@ -48,15 +66,59 @@ function inPlace<T>(built: readonly (T | docx.XmlComponent[])[]): T[] {
   return built.flatMap((item) => (Array.isArray(item) ? asChildren<T>(item) : [item]));
 }
 
-/** Raw styles are appended after docx.js has built its own. Passing them as docx.js's `importedStyles`
+/** Footnotes in body order: depth first through the Sections, never into a Header, Footer or Comment,
+ *  which canonical rule 18 keeps footnotes out of. */
+function bodyFootnotes(document: DocumentNode): Node<"Footnote">[] {
+  const found: Node<"Footnote">[] = [];
+  const visit = (node: Node): void => {
+    if (node.type === "Footnote") found.push(node);
+    else if (node.type !== "Header" && node.type !== "Footer" && node.type !== "Comment") {
+      for (const child of node.children) if (typeof child !== "string") visit(child);
+    }
+  };
+  visit(document);
+  return found;
+}
+
+function footnoteId(node: Node<"Footnote">, ctx: BuildCtx): number {
+  const id = ctx.footnoteIds.get(node);
+  if (id === undefined) throw new Error("A Footnote outside the document body: the tree must come from canonicalize");
+  return id;
+}
+
+/** docx.js's `footnotes` option: each footnote's content under its number. docx.js types that content as
+ *  Paragraphs; it writes a Table after the first Paragraph just as well. */
+function footnoteBodies(footnotes: readonly Node<"Footnote">[], ctx: BuildCtx) {
+  return Object.fromEntries(
+    footnotes.map((footnote) => [
+      footnoteId(footnote, ctx),
+      { children: asChildren<docx.Paragraph>(buildAll(footnote.children, ctx)) },
+    ])
+  );
+}
+
+/** Footnotes are numbered 1..n in body order; docx.js reserves −1 and 0 for its separators.
+ *
+ *  Raw styles are appended after docx.js has built its own. Passing them as docx.js's `importedStyles`
  *  would replace its whole default style list, since it spreads `styles` over its defaults. */
-function buildDocumentNode({ props, children }: Node<"Document">): docx.Document {
-  const { styles, ...rest } = props;
+function buildDocumentNode(node: Node<"Document">): docx.Document {
+  const { styles, ...rest } = node.props;
   const { importedStyles = [], ...docxStyles } = styles ?? {};
+  const footnotes = bodyFootnotes(node);
+  const ctx: BuildCtx = { footnoteIds: new Map(footnotes.map((footnote, i) => [footnote, i + 1])) };
+  const sections: docx.ISectionOptions[] = [];
+  const comments: docx.ICommentOptions[] = [];
+  for (const child of node.children) {
+    if (child.type === "Section") sections.push(build(child, ctx));
+    else comments.push(build(child, ctx));
+  }
+  // footnotes and comments are only given when there are some, so documents without notes are written as before.
   const document = new docx.Document({
     ...rest,
     ...(styles === undefined ? {} : { styles: docxStyles }),
-    sections: children.map(build),
+    sections,
+    ...(footnotes.length > 0 ? { footnotes: footnoteBodies(footnotes, ctx) } : {}),
+    ...(comments.length > 0 ? { comments: { children: comments } } : {}),
   });
   for (const xml of importedStyles) {
     for (const style of rawXmlComponents(xml)) document.Styles.addChildElement(style);
@@ -64,53 +126,66 @@ function buildDocumentNode({ props, children }: Node<"Document">): docx.Document
   return document;
 }
 
-function buildSection(node: Node<"Section">): docx.ISectionOptions {
+function buildSection(node: Node<"Section">, ctx: BuildCtx): docx.ISectionOptions {
   const headers: HeaderFooterSlots<docx.Header> = {};
   const footers: HeaderFooterSlots<docx.Footer> = {};
-  const children: (docx.Paragraph | docx.Table)[] = [];
+  const children: docx.FileChild[] = [];
   for (const child of node.children) {
-    if (child.type === "Header") headers[child.props.type] = build(child);
-    else if (child.type === "Footer") footers[child.props.type] = build(child);
-    else children.push(...inPlace([build(child)]));
+    if (child.type === "Header") headers[child.props.type] = build(child, ctx);
+    else if (child.type === "Footer") footers[child.props.type] = build(child, ctx);
+    else children.push(...inPlace([build(child, ctx)]));
   }
   return { ...node.props, headers, footers, children };
 }
 
 /** A canonical TextRun holds either string and run-content children or, alone, a `text` literal.
  *  docx.js ignores `text` whenever `children` is present, even empty, so children go through only when there are some. */
-function buildTextRun({ props, children }: Node<"TextRun">): docx.TextRun {
+function buildTextRun({ props, children }: Node<"TextRun">, ctx: BuildCtx): docx.TextRun {
   if (children.length === 0) return new docx.TextRun(props);
-  const built = children.map((child) => (typeof child === "string" ? child : build(child)));
+  const built = children.map((child) => (typeof child === "string" ? child : build(child, ctx)));
   return new docx.TextRun({ ...props, children: inPlace(built) });
 }
 
-const BUILD: { readonly [K in Kind]: (node: Node<K>) => Built[K] } = {
+const BUILD: { readonly [K in Kind]: (node: Node<K>, ctx: BuildCtx) => Built[K] } = {
   Document: buildDocumentNode,
   Section: buildSection,
-  Header: ({ children }) => new docx.Header({ children: inPlace(children.map(build)) }),
-  Footer: ({ children }) => new docx.Footer({ children: inPlace(children.map(build)) }),
-  Paragraph: ({ props, children }) => new docx.Paragraph({ ...props, children: inPlace(children.map(build)) }),
+  Header: ({ children }, ctx) => new docx.Header({ children: inPlace(buildAll(children, ctx)) }),
+  Footer: ({ children }, ctx) => new docx.Footer({ children: inPlace(buildAll(children, ctx)) }),
+  Paragraph: ({ props, children }, ctx) => new docx.Paragraph({ ...props, children: inPlace(buildAll(children, ctx)) }),
   TextRun: buildTextRun,
-  Table: ({ props, children }) => new docx.Table({ ...props, rows: children.map(build) }),
-  TableRow: ({ props, children }) => new docx.TableRow({ ...props, children: children.map(build) }),
-  TableCell: ({ props, children }) => new docx.TableCell({ ...props, children: inPlace(children.map(build)) }),
+  Table: ({ props, children }, ctx) => new docx.Table({ ...props, rows: buildAll(children, ctx) }),
+  TableRow: ({ props, children }, ctx) => new docx.TableRow({ ...props, children: buildAll(children, ctx) }),
+  TableCell: ({ props, children }, ctx) =>
+    new docx.TableCell({ ...props, children: inPlace(buildAll(children, ctx)) }),
   Tab: () => new docx.Tab(),
   // The docx.js field sentinel: a run child string equal to a PageNumber value is written as that field.
   PageNumber: ({ props }) => props.field,
   ImageRun: ({ props }) => new docx.ImageRun(props),
   SymbolRun: ({ props }) => new docx.SymbolRun(props),
-  ExternalHyperlink: ({ props, children }) =>
-    new docx.ExternalHyperlink({ link: props.link, children: inPlace(children.map(build)) }),
-  InternalHyperlink: ({ props, children }) =>
-    new docx.InternalHyperlink({ anchor: props.anchor, children: inPlace(children.map(build)) }),
-  Bookmark: ({ props, children }) => new docx.Bookmark({ id: props.id, children: inPlace(children.map(build)) }),
+  ExternalHyperlink: ({ props, children }, ctx) =>
+    new docx.ExternalHyperlink({ link: props.link, children: inPlace(buildAll(children, ctx)) }),
+  InternalHyperlink: ({ props, children }, ctx) =>
+    new docx.InternalHyperlink({ anchor: props.anchor, children: inPlace(buildAll(children, ctx)) }),
+  Bookmark: ({ props, children }, ctx) =>
+    new docx.Bookmark({ id: props.id, children: inPlace(buildAll(children, ctx)) }),
   PageBreak: () => new docx.PageBreak(),
-  Math: ({ children }) => new docx.Math({ children: children.map(build) }),
+  Math: ({ children }, ctx) => new docx.Math({ children: buildAll(children, ctx) }),
   MathRun: ({ children }) => new docx.MathRun(children.join("")),
   RawXml: ({ props }) => rawXmlComponents(props.xml),
+  // The footnote's content is built once, by the Document, into its `footnotes` option.
+  Footnote: (node, ctx) => new docx.FootnoteReferenceRun(footnoteId(node, ctx)),
+  Comment: ({ props, children }, ctx) => ({ ...props, children: buildAll(children, ctx) }),
+  CommentRangeStart: ({ props }) => new docx.CommentRangeStart(props.id),
+  CommentRangeEnd: ({ props }) => new docx.CommentRangeEnd(props.id),
+  CommentReference: ({ props }) => [new docx.CommentReference(props.id)],
+  TableOfContents: ({ props: { alias, ...options } }) => new docx.TableOfContents(alias, options),
+  // docx.js types a Textbox's children as inline content but writes them into <w:txbxContent>, which holds
+  // paragraphs: the element table gives it Paragraph children.
+  Textbox: ({ props, children }, ctx) =>
+    new docx.Textbox({ ...props, children: asChildren<docx.ParagraphChild>(buildAll(children, ctx)) }),
 };
 
 /** Canonical tree → docx.js Document. The tree must come from `canonicalize`. */
 export function buildDocument(tree: DocumentNode): docx.Document {
-  return build(tree);
+  return buildDocumentNode(tree);
 }
