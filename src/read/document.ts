@@ -10,14 +10,19 @@
  *    Word inherits the previous section's, and docx.js writing none keeps that.
  *  - Settings are editor state and docx.js writes its own, so only the four it has options for are read,
  *    and only when on, since off is their default. The rest are counted ignored.
- *  - Custom properties are kept only as vt:lpwstr, the one value type docx.js writes. */
+ *  - Custom properties are kept only as vt:lpwstr, the one value type docx.js writes.
+ *  - Numbering, footnotes and comments are opened before the body, which reads them as it meets their
+ *    references. Comments become Document children after the Sections. Styles are read after the body, so
+ *    the lists only a style uses come after the body's (decision 5). */
 
 import type * as docx from "docx";
 import { colorOf, wholeNumberAt, type Note } from "../ooxml/codec";
 import { readSectionProperties } from "../ooxml/section";
 import type { AuthorNode } from "../tree/author";
-import { readBlocks, withoutGoBack } from "./body";
+import { bodyContext, readBlocks, withoutGoBack, type BodyContext } from "./body";
 import { partOfType, type ReadContext } from "./context";
+import { commentNode, readNotesParts } from "./notes";
+import { readNumberingPart } from "./numbering";
 import { NotADocxError } from "./package";
 import { readStylesPart } from "./styles";
 import { attrOf, childNamed, elementsOf, isOn, textOf, type XmlElement } from "./xml";
@@ -40,8 +45,13 @@ const DEFAULT_THEME = "word/theme/theme1.xml";
 /** Not parts a reader consumes: package plumbing, and app.xml's statistics docx.js recomputes. */
 const PLUMBING = ["[Content_Types].xml", "docProps/app.xml"];
 const IGNORED_PARTS = ["word/fontTable.xml", "word/webSettings.xml"];
-/** Unit 05 reads these and removes this list. */
-const LATER_PARTS = ["word/numbering.xml", "word/footnotes.xml", "word/comments.xml"];
+/** Parts docx.js cannot write, and why. */
+const DROPPED_PARTS: Readonly<Record<string, string>> = {
+  "word/commentsExtended.xml": "comment resolved state: docx.js cannot write it",
+  "word/commentsIds.xml": "comment threading ids: docx.js cannot write them",
+  "word/commentsExtensible.xml": "comment threading dates: docx.js cannot write them",
+  "word/endnotes.xml": "docx.js cannot write endnotes",
+};
 
 const node = (type: string, props: Readonly<Record<string, unknown>>, children: readonly AuthorNode[]): AuthorNode => ({
   type,
@@ -80,7 +90,7 @@ const HEADER_FOOTER = {
   footer: { kind: "Footer", root: "w:ftr", reference: "w:footerReference" },
 } as const;
 
-function readSection(section: SectionXml, index: number, ctx: ReadContext): AuthorNode {
+function readSection(section: SectionXml, index: number, ctx: BodyContext): AuthorNode {
   const here = ctx.within(ctx.pkg.mainPart, [index]);
   const read = readSectionProperties(section.sectPr, ctx.env);
   here.notes(read.notes);
@@ -168,10 +178,19 @@ function readDocumentElement(document: XmlElement, ctx: ReadContext, props: Docu
 
 function reportUnreadParts(ctx: ReadContext, consumed: ReadonlySet<string>): void {
   for (const path of ctx.pkg.paths) {
-    if (consumed.has(path) || path.endsWith(".rels") || PLUMBING.includes(path) || LATER_PARTS.includes(path)) continue;
+    if (consumed.has(path) || path.endsWith(".rels") || PLUMBING.includes(path)) continue;
     if (IGNORED_PARTS.includes(path)) ctx.ignore(path);
-    else ctx.within(path, []).report({ kind: "dropped", element: path, detail: "no reader reads this part" });
+    else ctx.within(path, []).report({ kind: "dropped", element: path, detail: DROPPED_PARTS[path] ?? "no reader reads this part" });
   }
+}
+
+/** Every comment as a Comment, at the Document child index after the `start` Sections. */
+function readComments(ctx: BodyContext, start: number): AuthorNode[] {
+  const { notes } = ctx.parts;
+  return notes.comments().map((read, i) => {
+    const here = ctx.within(notes.commentsPart, [start + i]);
+    return commentNode(read, readBlocks(read.content, here, { rawBlocks: false }), here);
+  });
 }
 
 /** The Document author node of the package `ctx` reads, before canonicalize. `consumed` is the set
@@ -181,15 +200,22 @@ export function readDocumentNode(ctx: ReadContext, consumed: ReadonlySet<string>
   if (root?.name !== "w:document") throw new NotADocxError(`${ctx.pkg.mainPart} is not a w:document.`);
   const props: DocumentProps = { ...ctx.pkg.core };
   const body = readDocumentElement(root, ctx, props);
-  const sections = splitSections(withoutGoBack(body, ctx)).map((section, index) => readSection(section, index, ctx));
+  const numbering = readNumberingPart(ctx);
+  const bodyCtx = bodyContext(ctx, { numbering, notes: readNotesParts(ctx) });
+  const sections = splitSections(withoutGoBack(body, ctx)).map((section, index) => readSection(section, index, bodyCtx));
+  const comments = readComments(bodyCtx, sections.length);
+  bodyCtx.parts.notes.reportUnreferenced();
 
   const customProperties = readCustomProperties(ctx);
   if (customProperties !== undefined) props.customProperties = customProperties;
   readSettings(ctx, props);
-  const styles = readStylesPart(ctx);
+  const styles = readStylesPart(ctx, numbering);
   if (styles !== undefined) props.styles = styles;
+  const config = numbering.config();
+  if (config.length > 0) props.numbering = { config };
+  numbering.reportUnused();
   ctx.readPart(CORE_PART);
   ctx.readPart(partOfType(ctx.pkg, "/theme", DEFAULT_THEME));
   reportUnreadParts(ctx, consumed);
-  return node("Document", props, sections);
+  return node("Document", props, [...sections, ...comments]);
 }
