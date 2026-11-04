@@ -3,7 +3,8 @@
  *  Each printed module is written to its own folder under test/.generated/ (gitignored, cleared once per
  *  run, because vitest caches modules by URL), imported, and rendered with renderToTree. The vitest
  *  alias makes its "@react-docx/core" import the source. Real files in test/fixtures/real/ (gitignored,
- *  private) get the same identity check when present; their output stays in test/.generated/. */
+ *  private) get the same identity check when present; their output stays in test/.generated/. A real
+ *  file may be long (a thesis takes seconds), so each gets REAL_FILE_TIMEOUT_MS. */
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -63,12 +64,13 @@ describe("a printed module renders the tree it was printed from", () => {
 });
 
 const REAL_FILES = realFiles();
+const REAL_FILE_TIMEOUT_MS = 30_000;
 
 /** Skipped, not empty, when there are no real files: vitest fails a suite with no tests. */
 describe.skipIf(REAL_FILES.length === 0)("a printed real file renders the tree it was printed from", () => {
   test.each(REAL_FILES.map((f, i) => [f.name, i, f] as const))("%s", async (_name, i, { bytes }) => {
     await roundTrips(`real-${i}`, readDocx(bytes).document);
-  });
+  }, REAL_FILE_TIMEOUT_MS);
 });
 
 describe("printing rules", () => {

@@ -3,7 +3,8 @@
  *  - react-docx output is an exact fixed point: read, write, read gives the same tree and the same XML.
  *  - Word-shaped input is stable after one write, and its first read reports exactly what it loses.
  *  - Real files in test/fixtures/real/ (gitignored, private) get the same stability check; their
- *    diagnostics are printed, not pinned. */
+ *    diagnostics are printed, not pinned. A real file may be long (a thesis takes seconds), so each gets
+ *    REAL_FILE_TIMEOUT_MS. */
 
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
@@ -193,6 +194,7 @@ describe("what the round trip found in the reader", () => {
 });
 
 const REAL_FILES = realFiles();
+const REAL_FILE_TIMEOUT_MS = 30_000;
 
 /** Skipped, not empty, when there are no real files: vitest fails a suite with no tests. */
 describe.skipIf(REAL_FILES.length === 0)("real files are stable after one write", () => {
@@ -200,7 +202,7 @@ describe.skipIf(REAL_FILES.length === 0)("real files are stable after one write"
     console.info(name, JSON.stringify(pairs(readDocx(bytes).diagnostics)));
     const { t2, t3 } = await twoWrites(bytes);
     expect(t3).toEqual(t2);
-  });
+  }, REAL_FILE_TIMEOUT_MS);
 });
 
 describe("writing what the reader read never fails", () => {
