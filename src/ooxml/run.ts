@@ -8,8 +8,8 @@
  *    (dropped: the explicit off). A main with no twin is read alone, so docx.js writes the twin beside it,
  *    which changes only complex-script text.
  *  - docx.js writes w:caps only when smallCaps is unset, so with both present w:caps is dropped.
- *  - Off values docx.js cannot write: options in PRESENCE_ONLY.TextRun, which it writes the same for true and
- *    false, and vanish, specVanish and math, which it writes only when on. These are dropped.
+ *  - Off values docx.js cannot write: vanish, specVanish and math, which it writes only when on. These are
+ *    dropped.
  *  - w:position: a universal measure ("6pt") is kept verbatim, as docx.js writes it; Word's half-points
  *    ("6") become points ("3pt"), because docx.js types position as a universal measure.
  *  - Fonts: theme font attributes resolve against the file's theme and win over the literal beside them.
@@ -19,7 +19,6 @@
 import type * as docx from "docx";
 import { attrOf, childNamed, type XmlElement } from "../read/xml";
 import type { ThemeFonts, ThemeFontSet } from "../read/package";
-import { PRESENCE_ONLY } from "../schema/docx-facts";
 import {
   applyFates,
   colorOf,
@@ -153,8 +152,7 @@ const THEME_FONTS = new Map<string, readonly [keyof ThemeFonts, keyof ThemeFontS
 const to = <K extends keyof RunOptions>(key: K, read: ValueReader<NonNullable<Draft<RunOptions>[K]>>) =>
   mapTo<RunOptions, K>(key, read);
 
-const offIsWritable = (key: RunFlag): boolean =>
-  !(PRESENCE_ONLY.TextRun ?? []).includes(key) && !WRITTEN_ONLY_WHEN_ON.includes(key);
+const offIsWritable = (key: RunFlag): boolean => !WRITTEN_ONLY_WHEN_ON.includes(key);
 
 const flag = (key: RunFlag) => to(key, onOff(offIsWritable(key)));
 

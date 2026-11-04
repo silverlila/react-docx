@@ -15,7 +15,7 @@
  *  - docx.js writes raw styles after its own, so a raw w:styleId that is already defined, or defined by
  *    an earlier raw style, is rejected: it would be defined twice. */
 
-import { DEFAULT_STYLE_SLOTS, PAGE_NUMBER_VALUES, PRESENCE_ONLY, RAW_XML_ROOTS } from "../schema/docx-facts";
+import { DEFAULT_STYLE_SLOTS, PAGE_NUMBER_VALUES, RAW_XML_ROOTS } from "../schema/docx-facts";
 import {
   ELEMENTS,
   OUTSIDE_BODY,
@@ -467,7 +467,7 @@ function canonicalProps(kind: Kind, props: PropBag, path: readonly string[]): Pr
   assertNoRemovedProps(kind, props, path);
   const own = omit(props, "children");
   const rule = PROP_RULES[kind];
-  return withoutPresenceOnlyFalse(kind, rule ? rule(own, path) : own);
+  return rule ? rule(own, path) : own;
 }
 
 function omit(props: PropBag, ...keys: string[]): PropBag {
@@ -512,16 +512,6 @@ function assertOneHeaderFooterPerType(content: readonly IndexedChild[], path: re
     }
     seen.add(key);
   }
-}
-
-function withoutPresenceOnlyFalse(kind: Kind, props: PropBag): PropBag {
-  return (PRESENCE_ONLY[kind] ?? []).reduce((current, path) => withoutFalseAt(current, path.split(".")), props);
-}
-
-function withoutFalseAt(props: PropBag, [key, ...rest]: readonly string[]): PropBag {
-  const value = props[key];
-  if (rest.length === 0) return value === false ? omit(props, key) : props;
-  return isRecord(value) ? { ...props, [key]: withoutFalseAt(value, rest) } : props;
 }
 
 function imageBytes(props: PropBag, path: readonly string[]): PropBag {

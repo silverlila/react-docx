@@ -1,6 +1,6 @@
 import * as docx from "docx";
 import { describe, expect, test } from "vitest";
-import { DEFAULT_STYLE_SLOTS, PAGE_NUMBER_VALUES, PRESENCE_ONLY } from "../src/schema/docx-facts";
+import { DEFAULT_STYLE_SLOTS, PAGE_NUMBER_VALUES } from "../src/schema/docx-facts";
 import { docxXml } from "./support/docx-xml";
 
 type ProbedKind = "Paragraph" | "TextRun" | "Table" | "TableRow" | "TableCell" | "Section";
@@ -86,9 +86,9 @@ async function probePresenceOnly(): Promise<Record<string, string[]>> {
 }
 
 describe("docx.js presence-only booleans", () => {
-  test("PRESENCE_ONLY lists exactly the boolean options docx.js writes the same for true and false", async () => {
+  test("docx.js writes no boolean option the same for true and false", async () => {
     const probed = await probePresenceOnly();
-    expect(probed).toEqual(PRESENCE_ONLY);
+    expect(probed).toEqual({});
   });
 
   test("the probe reaches the option, including a nested section property", async () => {

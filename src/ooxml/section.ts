@@ -9,7 +9,6 @@
 
 import type * as docx from "docx";
 import { attrOf, elementsOf, type XmlElement } from "../read/xml";
-import { PRESENCE_ONLY } from "../schema/docx-facts";
 import {
   applyFates,
   dropped,
@@ -269,8 +268,6 @@ const readColumns: ValueReader<docx.IColumnsAttributes> = (el, _env, notes) => {
   return column;
 };
 
-const titlePageIsWritableOff = !(PRESENCE_ONLY.Section ?? []).includes("properties.titlePage");
-
 /** Read beside the options, into SectionRead.references. */
 const RETURNED_BESIDE: Fate<SectionProperties> = { fate: "mapped", read: () => undefined };
 
@@ -290,7 +287,7 @@ export const SECTPR_FATES: FateTable<SectionProperties> = {
   "w:formProt": noOption("docx.js has no form protection option"),
   "w:vAlign": to("verticalAlign", oneOfVal(VERTICAL_ALIGNS)),
   "w:noEndnote": noOption("docx.js cannot write endnotes"),
-  "w:titlePg": to("titlePage", onOff(titlePageIsWritableOff)),
+  "w:titlePg": to("titlePage", onOff(true)),
   "w:textDirection": pageTo("textDirection", oneOfVal(TEXT_DIRECTIONS)),
   "w:bidi": noOption("docx.js has no right-to-left section option"),
   "w:rtlGutter": noOption("docx.js has no rtlGutter option"),

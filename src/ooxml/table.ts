@@ -17,7 +17,6 @@
 
 import type * as docx from "docx";
 import { attrOf, childNamed, elementsOf, type XmlElement } from "../read/xml";
-import { PRESENCE_ONLY } from "../schema/docx-facts";
 import {
   applyFates,
   dropped,
@@ -238,8 +237,6 @@ function readOverlap(el: XmlElement | null, notes: Note[]): ValueOf<typeof docx.
 const to = <K extends keyof TableOptions>(key: K, read: ValueReader<NonNullable<Draft<TableOptions>[K]>>) =>
   mapTo<TableOptions, K>(key, read);
 
-const tableFlag = (key: "visuallyRightToLeft") => to(key, onOff(!(PRESENCE_ONLY.Table ?? []).includes(key)));
-
 /** Read after the other children, from w:tblPr, because it belongs to w:tblpPr's float. */
 const READ_AFTER: Fate<TableOptions> = { fate: "mapped", read: () => undefined };
 
@@ -247,7 +244,7 @@ export const TBLPR_FATES: FateTable<TableOptions> = {
   "w:tblStyle": to("style", stringVal),
   "w:tblpPr": to("float", readFloat),
   "w:tblOverlap": READ_AFTER,
-  "w:bidiVisual": tableFlag("visuallyRightToLeft"),
+  "w:bidiVisual": to("visuallyRightToLeft", onOff(true)),
   "w:tblStyleRowBandSize": noOption("docx.js has no table-style band size option"),
   "w:tblStyleColBandSize": noOption("docx.js has no table-style band size option"),
   "w:tblW": to("width", readWidth),
@@ -308,8 +305,6 @@ export function readTableProperties(tbl: XmlElement, env: CodecEnv): CodecResult
 const toRow = <K extends keyof RowOptions>(key: K, read: ValueReader<NonNullable<Draft<RowOptions>[K]>>) =>
   mapTo<RowOptions, K>(key, read);
 
-const rowFlag = (key: "cantSplit" | "tableHeader") => toRow(key, onOff(!(PRESENCE_ONLY.TableRow ?? []).includes(key)));
-
 const readHeight: ValueReader<NonNullable<RowOptions["height"]>> = (el, _env, notes) => {
   if (requiredAttribute(el, "w:val", notes) === null) return null;
   const value = twipsAt(el, "w:val", notes);
@@ -325,9 +320,9 @@ export const TRPR_FATES: FateTable<RowOptions> = {
   "w:gridAfter": noOption("docx.js has no gridAfter option"),
   "w:wBefore": noOption("docx.js has no wBefore option"),
   "w:wAfter": noOption("docx.js has no wAfter option"),
-  "w:cantSplit": rowFlag("cantSplit"),
+  "w:cantSplit": toRow("cantSplit", onOff(true)),
   "w:trHeight": toRow("height", readHeight),
-  "w:tblHeader": rowFlag("tableHeader"),
+  "w:tblHeader": toRow("tableHeader", onOff(true)),
   "w:tblCellSpacing": toRow("cellSpacing", readCellSpacing),
   "w:jc": noOption("docx.js has no row alignment option"),
   "w:hidden": noOption("docx.js has no hidden row option"),

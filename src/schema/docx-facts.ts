@@ -4,12 +4,9 @@
  *    run children.
  *  - DEFAULT_STYLE_SLOTS: each of docx.js's built-in style ids, with the IDefaultStylesOptions key that
  *    sets it and whether that key takes paragraph or character options.
- *  - PRESENCE_ONLY: by kind, the dot paths of boolean options docx.js writes the same for true and false,
- *    as probed by test/presence-booleans.test.ts. In 9.5.1 there are none.
  *  - RAW_XML_ROOTS: the top-level OOXML elements a RawXml fragment may hold, by slot. */
 
 import type * as docx from "docx";
-import type { Kind } from "./elements";
 
 export const PAGE_NUMBER_VALUES = ["CURRENT", "TOTAL_PAGES", "TOTAL_PAGES_IN_SECTION", "SECTION"] as const;
 
@@ -31,8 +28,6 @@ export const DEFAULT_STYLE_SLOTS = {
   FootnoteText: { key: "footnoteText", kind: "paragraph" },
   FootnoteTextChar: { key: "footnoteTextChar", kind: "character" },
 } as const satisfies Record<string, DefaultStyleSlot>;
-
-export const PRESENCE_ONLY: { readonly [K in Kind]?: readonly string[] } = {};
 
 export const RAW_XML_ROOTS = {
   block: ["w:p", "w:tbl", "w:sdt", "w:customXml", "w:bookmarkStart", "w:bookmarkEnd"],

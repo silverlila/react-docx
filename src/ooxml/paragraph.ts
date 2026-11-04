@@ -2,8 +2,8 @@
  *  unit 05) and w:sectPr (for the section split, unit 04).
  *
  *  - The writer-inverse test defines correctness, as for runs.
- *  - Off values docx.js cannot write: options in PRESENCE_ONLY.Paragraph, and pageBreakBefore and
- *    overflowPunctuation, which it writes only when on. These are dropped.
+ *  - Off values docx.js cannot write: pageBreakBefore and overflowPunctuation, which it writes only
+ *    when on. These are dropped.
  *  - docx.js's wordWrap: true writes <w:wordWrap w:val="0"/> and false writes nothing, so an off
  *    w:wordWrap reads as wordWrap: true and an on one is dropped.
  *  - autoSpaceEastAsianText writes only w:autoSpaceDN, so that is what it reads; w:autoSpaceDE is dropped.
@@ -13,7 +13,6 @@
 
 import type * as docx from "docx";
 import { attrOf, childNamed, childrenNamed, isOn, type XmlElement } from "../read/xml";
-import { PRESENCE_ONLY } from "../schema/docx-facts";
 import {
   applyFates,
   dropped,
@@ -100,8 +99,7 @@ const VERTICAL_ALIGNS: readonly ValueOf<typeof docx.VerticalPositionAlign>[] = [
 const to = <K extends keyof ParagraphOptions>(key: K, read: ValueReader<NonNullable<Draft<ParagraphOptions>[K]>>) =>
   mapTo<ParagraphOptions, K>(key, read);
 
-const offIsWritable = (key: ParagraphFlag): boolean =>
-  !(PRESENCE_ONLY.Paragraph ?? []).includes(key) && !WRITTEN_ONLY_WHEN_ON.includes(key);
+const offIsWritable = (key: ParagraphFlag): boolean => !WRITTEN_ONLY_WHEN_ON.includes(key);
 
 const flag = (key: ParagraphFlag) => to(key, onOff(offIsWritable(key)));
 
