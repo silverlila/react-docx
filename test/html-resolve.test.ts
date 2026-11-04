@@ -5,6 +5,7 @@ import {
   ColumnBreak,
   Document,
   Footnote,
+  Footer,
   Header,
   ImageRun,
   InternalHyperlink,
@@ -192,6 +193,101 @@ describe("the style cascade", () => {
       { top: solid, bottom: solid, left: solid, right: solid },
     ]);
   });
+
+  describe("order, lowest first: each layer overrides every layer below it", () => {
+    type Layer = "defaults" | "table" | "style" | "numbering" | "character" | "direct";
+    const tableStyle =
+      '<w:style w:type="table" w:styleId="Grid"><w:name w:val="Grid"/>' +
+      '<w:pPr><w:jc w:val="center"/></w:pPr><w:rPr><w:color w:val="000002"/></w:rPr></w:style>';
+    const inCell = (layers: readonly Layer[]) => {
+      const has = (layer: Layer) => layers.includes(layer);
+      const styles = {
+        ...(has("defaults")
+          ? { default: { document: { paragraph: { alignment: "right" }, run: { color: "000001" } } } }
+          : {}),
+        importedStyles: [tableStyle],
+        paragraphStyles: [{ id: "P", paragraph: { alignment: "both" }, run: { color: "000003" } }],
+        characterStyles: [{ id: "C", run: { color: "000004" } }],
+      };
+      const numbering = {
+        config: [
+          {
+            reference: "n",
+            levels: [{ level: 0, format: "decimal", text: "%1.", style: { paragraph: { alignment: "end" } } }],
+          },
+        ],
+      };
+      const paragraph = h(
+        Paragraph,
+        {
+          ...(has("style") ? { style: "P" } : {}),
+          ...(has("numbering") ? { numbering: { reference: "n", level: 0 } } : {}),
+          ...(has("direct") ? { alignment: "start" } : {}),
+        },
+        h(TextRun, { ...(has("character") ? { style: "C" } : {}), ...(has("direct") ? { color: "000005" } : {}) }, "x"),
+      );
+      const table = tableAt(
+        body(
+          doc(
+            { styles, numbering },
+            h(Table, has("table") ? { style: "Grid" } : null, h(TableRow, null, h(TableCell, null, paragraph))),
+          ),
+        ),
+        0,
+      );
+      return paragraphAt(table.rows[0].cells[0].blocks, 0);
+    };
+
+    test.each([
+      [["defaults"], "right"],
+      [["defaults", "table"], "center"],
+      [["defaults", "table", "style"], "justify"],
+      [["defaults", "table", "style", "numbering"], "end"],
+      [["defaults", "table", "style", "numbering", "direct"], "start"],
+    ] as const)("paragraph: %j aligns %s", (layers, align) => {
+      expect(inCell(layers).format.align).toBe(align);
+    });
+
+    test.each([
+      [["defaults"], "000001"],
+      [["defaults", "table"], "000002"],
+      [["defaults", "table", "style"], "000003"],
+      [["defaults", "table", "style", "character"], "000004"],
+      [["defaults", "table", "style", "character", "direct"], "000005"],
+    ] as const)("run: %j colours %s", (layers, color) => {
+      expect(textAt(inCell(layers).inlines, 0).run.color).toBe(color);
+    });
+  });
+
+  describe("spacing, indent and font merge per key across layers; everything else overrides", () => {
+    test("spacing before from the document defaults and after from direct props both apply", () => {
+      const styles = { default: { document: { paragraph: { spacing: { before: 100 } } } } };
+      const p = paragraphAt(body(doc({ styles }, h(Paragraph, { spacing: { after: 200 } }, "x"))), 0);
+      expect(p.format).toMatchObject({ spaceBeforePt: 5, spaceAfterPt: 10 });
+    });
+
+    test("a left indent from the paragraph style and a first line from direct props both apply", () => {
+      const styles = { paragraphStyles: [{ id: "P", paragraph: { indent: { left: 720 } } }] };
+      const p = paragraphAt(body(doc({ styles }, h(Paragraph, { style: "P", indent: { firstLine: 360 } }, "x"))), 0);
+      expect(p.format).toMatchObject({ indentLeftPt: 36, firstLinePt: 18 });
+    });
+
+    test("an East Asian font from the document defaults stays under a direct Latin font", () => {
+      const styles = { default: { document: { run: { font: { eastAsia: "MS Mincho" } } } } };
+      const p = paragraphAt(
+        body(doc({ styles }, h(Paragraph, null, h(TextRun, { font: { ascii: "Georgia", hAnsi: "Georgia" } }, "x")))),
+        0,
+      );
+      expect(textAt(p.inlines, 0).run).toMatchObject({ fontFamily: "Georgia", otherFonts: ["MS Mincho"] });
+    });
+
+    test("a border from direct props replaces the paragraph style's border instead of adding sides", () => {
+      const line = { style: "single", size: 8, color: "000000" } as const;
+      const styles = { paragraphStyles: [{ id: "P", paragraph: { border: { top: line } } }] };
+      const p = paragraphAt(body(doc({ styles }, h(Paragraph, { style: "P", border: { bottom: line } }, "x"))), 0);
+      expect(Object.keys(p.format.borders)).toEqual(["bottom"]);
+    });
+  });
 });
 
 describe("styles read from a Word file", () => {
@@ -267,6 +363,34 @@ describe("list markers", () => {
   test("the marker takes the level's run over the paragraph mark and the level's suffix", () => {
     expect(markers[0]).toMatchObject({ run: { bold: true, fontFamily: "Times New Roman" }, suffix: "tab" });
     expect(markers[2]).toMatchObject({ run: { bold: false }, suffix: "space" });
+  });
+
+  test("the body counts on across sections; each header, footer and footnote counts on its own", () => {
+    const counted = { config: [{ reference: "n", levels: [{ level: 0, format: "decimal", text: "%1." }] }] } as const;
+    const listItem = (text: string, ...rest: ReactNode[]) =>
+      h(Paragraph, { numbering: { reference: "n", level: 0 } }, text, ...rest);
+    const pages = resolveDocument(
+      renderToTree(
+        h(
+          Document,
+          { numbering: counted },
+          h(
+            Section,
+            null,
+            h(Header, null, listItem("header")),
+            h(Footer, null, listItem("footer")),
+            listItem("one"),
+            listItem("two", h(Footnote, null, listItem("note"))),
+          ),
+          h(Section, null, listItem("three")),
+        ),
+      ),
+    );
+    const markerOf = (b: ResolvedBlock) => (b.kind === "paragraph" ? b.marker?.text : undefined);
+    expect(body(pages).map(markerOf)).toEqual(["1.", "2.", "3."]);
+    expect(pages[0].header.map(markerOf)).toEqual(["1."]);
+    expect(pages[0].footer.map(markerOf)).toEqual(["1."]);
+    expect(pages[0].footnotes[0].blocks.map(markerOf)).toEqual(["1."]);
   });
 });
 
@@ -1044,6 +1168,14 @@ describe("measured breaks", () => {
     const children = [h(Paragraph, null, "a"), h(Paragraph, null, "b"), h(Paragraph, null, "c")];
     expect(pagesOf(new Set(), ...children)[0].parts[0].keys).toEqual(["b0.0", "b1.0", "b2.0"]);
     expect(texts(pagesOf(new Set(["b2.0"]), ...children))).toEqual([["a", "b"], ["c"]]);
+  });
+
+  test("a page break cuts a paragraph into pieces b<block>.<piece>; a measured split continues one as b<block>.<piece>@<text>:<offset>", () => {
+    const broken = pagesOf(new Set(), h(Paragraph, null, "ab", h(PageBreak), "cd"));
+    expect(broken.map((page) => page.parts[0].keys)).toEqual([["b0.0"], ["b0.1"]]);
+    const split = pagesOf(new Set(["s0.0@0:3"]), h(Paragraph, null, "abcdef"));
+    expect(texts(split)).toEqual([["abc"], ["def"]]);
+    expect(split.map((page) => page.parts[0].keys)).toEqual([["b0.0"], ["b0.0@0:3"]]);
   });
 
   test("a measured row key breaks a table there and repeats its header rows; the piece's key names its first row", () => {

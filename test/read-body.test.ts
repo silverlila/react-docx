@@ -82,6 +82,12 @@ describe("runs and text", () => {
     const p = firstParagraph(`<w:p>${run("CURRENT")}</w:p>`);
     expect(p.children).toEqual([node("TextRun", { text: "CURRENT" })]);
   });
+
+  test("text equal to a PageNumber value is written back as text, not as a PAGE field", async () => {
+    const read = readDocx(docx({ body: `<w:p>${run("Page ")}${run("CURRENT")}</w:p>` })).document;
+    const reread = sections(await renderToBuffer(read))[0].children as TreeNode[];
+    expect(reread[0].children).toEqual([node("TextRun", {}, ["Page "]), node("TextRun", { text: "CURRENT" })]);
+  });
 });
 
 describe("fields", () => {
@@ -148,6 +154,32 @@ describe("fields", () => {
 
   test("a PAGEREF with a cached page number stays RawXml", () => {
     const field = `${fldChar("begin")}${instr(" PAGEREF b1 \\h ")}${fldChar("separate")}${run("3")}${fldChar("end")}`;
+    expect(firstParagraph(`<w:p>${field}</w:p>`).children).toEqual([node("RawXml", { xml: field })]);
+  });
+
+  const bold = (inside: string) => `<w:r><w:rPr><w:b/></w:rPr>${inside}</w:r>`;
+  test.each([
+    [
+      "a PAGE field with a switch other than \\* MERGEFORMAT",
+      `${fldChar("begin")}${instr(" PAGE \\* roman ")}${fldChar("separate")}${run("iv")}${fldChar("end")}`,
+    ],
+    [
+      "a SEQ field with a cached result",
+      `${fldChar("begin")}${instr("SEQ Figure")}${fldChar("separate")}${run("1")}${fldChar("end")}`,
+    ],
+    [
+      "a PAGEREF whose runs have run properties",
+      `${bold('<w:fldChar w:fldCharType="begin"/>')}${bold('<w:instrText xml:space="preserve">PAGEREF b1 \\h</w:instrText>')}${bold('<w:fldChar w:fldCharType="end"/>')}`,
+    ],
+    [
+      "a w:fldSimple whose run has run properties",
+      `<w:fldSimple w:instr="AUTHOR">${bold("<w:t>Ada</w:t>")}</w:fldSimple>`,
+    ],
+    [
+      "a w:fldSimple with an attribute docx.js does not write",
+      '<w:fldSimple w:instr="AUTHOR" w:dirty="true"><w:r><w:t>Ada</w:t></w:r></w:fldSimple>',
+    ],
+  ])("Word's shape of a field docx.js writes stays RawXml: %s", (_name, field) => {
     expect(firstParagraph(`<w:p>${field}</w:p>`).children).toEqual([node("RawXml", { xml: field })]);
   });
 
@@ -273,6 +305,22 @@ describe("bookmarks", () => {
     expect(p.children).toEqual([
       node("RawXml", { xml: '<w:bookmarkStart w:id="100001" w:name="bm"/>' }),
       node("RawXml", { xml: `${fieldTail}<w:bookmarkEnd w:id="100001"/>${fldChar("end")}` }),
+    ]);
+  });
+
+  test("of two crossing bookmarks, the first stays a Bookmark and the one crossing it is RawXml under 100001", () => {
+    const p = firstParagraph(
+      `<w:p><w:bookmarkStart w:id="1" w:name="a"/>${run("x")}<w:bookmarkStart w:id="2" w:name="b"/>${run("y")}` +
+        `<w:bookmarkEnd w:id="1"/>${run("z")}<w:bookmarkEnd w:id="2"/></w:p>`,
+    );
+    expect(p.children).toEqual([
+      node("Bookmark", { id: "a" }, [
+        node("TextRun", {}, ["x"]),
+        node("RawXml", { xml: '<w:bookmarkStart w:id="100001" w:name="b"/>' }),
+        node("TextRun", {}, ["y"]),
+      ]),
+      node("TextRun", {}, ["z"]),
+      node("RawXml", { xml: '<w:bookmarkEnd w:id="100001"/>' }),
     ]);
   });
 

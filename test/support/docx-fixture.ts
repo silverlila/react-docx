@@ -65,6 +65,11 @@ function contentTypes(overrides: readonly string[]): string {
 }
 
 export function docx(parts: FixtureParts): Uint8Array {
+  if (parts.rels !== undefined && /\bId="rIdFixture/.test(parts.rels)) {
+    throw new Error(
+      'Fixture rels must not use ids starting "rIdFixture": the fixture uses that prefix for its own parts.',
+    );
+  }
   const files: Record<string, Uint8Array> = {};
   const overrides = [override("word/document.xml", `${WORD_TYPES}.document.main+xml`)];
   const packageRels = [relationship("rIdFixture-document", `${OFFICE_RELS}/officeDocument`, "word/document.xml")];
