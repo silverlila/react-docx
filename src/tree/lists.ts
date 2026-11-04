@@ -84,8 +84,12 @@ type Nesting = {
   readonly numbering: ListNumbering;
 };
 
-function listType(list: AuthorNode): ListType {
-  return list.props.type === "numbered" ? "NumberedList" : "BulletList";
+function listType(list: AuthorNode, path: readonly string[]): ListType {
+  const { type } = list.props;
+  if (type === undefined || type === "bullet") return "BulletList";
+  if (type === "numbered") return "NumberedList";
+  const got = typeof type === "string" ? `"${type}"` : type === null ? "null" : typeof type;
+  throw new TreeError(path, `List type must be "bullet" or "numbered", got ${got}`);
 }
 
 function definitionAt(type: ListType, start: number, configured: ListLevels): Definition {
@@ -114,8 +118,8 @@ function definitionAt(type: ListType, start: number, configured: ListLevels): De
   };
 }
 
-function nestingOf(list: AuthorNode, parent: Nesting | undefined, context: ListContext): Nesting {
-  const type = listType(list);
+function nestingOf(list: AuthorNode, path: readonly string[], parent: Nesting | undefined, context: ListContext): Nesting {
+  const type = listType(list, path);
   const depth = parent === undefined ? 0 : parent.depth + 1;
   if (parent !== undefined && type === parent.type) {
     const { reference, level, instance } = parent.numbering;
@@ -137,7 +141,7 @@ export function listEntries(list: AuthorNode, path: readonly string[], context: 
   if (typeof first === "object" && first.type === "List") {
     throw new TreeError([...path, "List[0]"], "A <List> must start with a <ListItem>, the item its numbering restarts at");
   }
-  const nesting = nestingOf(list, parent, context);
+  const nesting = nestingOf(list, path, parent, context);
   const entries: ListEntry[] = [];
   list.children.forEach((child, index) => {
     if (typeof child === "string") throw new TreeError(path, "Text is not allowed directly in <List>");

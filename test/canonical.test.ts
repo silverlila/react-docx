@@ -1143,6 +1143,12 @@ describe("lists", () => {
     );
   });
 
+  test("a List type other than bullet or numbered throws, at that List", () => {
+    const error = treeError(() => canon(doc(n("List", {}, n("ListItem", {}, "a", n("List", { type: "number" }, n("ListItem", {}, "b")))))));
+    expect(error.path).toEqual(["Document", "Section[0]", "List[0]", "ListItem[0]", "List[1]"]);
+    expect(error.message).toContain('List type must be "bullet" or "numbered", got "number"');
+  });
+
   test("a ListItem outside a List is a plain Paragraph", () => {
     expect(blocks(canon(doc(n("ListItem", { alignment: "center" }, "a"))))).toEqual([
       paragraph({ alignment: "center" }, run({}, "a")),
