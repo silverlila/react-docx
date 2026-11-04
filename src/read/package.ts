@@ -35,7 +35,9 @@ export type OpcPackage = {
   media(path: string): Uint8Array | null;
   readonly paths: readonly string[];
   readonly theme: Theme;
+  readonly themePart: string;
   readonly core: CoreProperties;
+  readonly corePart: string;
 };
 
 const CONTENT_TYPES = "[Content_Types].xml";
@@ -150,7 +152,8 @@ export function openPackage(bytes: Uint8Array): OpcPackage {
   const mainPart = targetOfType(readRels(part(PACKAGE_RELS), ""), "/officeDocument") ?? DEFAULT_MAIN_PART;
   if (fileAt(mainPart) === null) throw new NotADocxError(`The package has no main document part (${mainPart}).`);
 
-  const themeElements = childNamed(part(targetOfType(relsOf(mainPart), "/theme") ?? DEFAULT_THEME), "a:themeElements");
+  const themePart = targetOfType(relsOf(mainPart), "/theme") ?? DEFAULT_THEME;
+  const themeElements = childNamed(part(themePart), "a:themeElements");
 
   return {
     mainPart,
@@ -159,6 +162,8 @@ export function openPackage(bytes: Uint8Array): OpcPackage {
     media: fileAt,
     paths: Object.keys(files).filter((path) => !path.endsWith("/")),
     theme: { fonts: readThemeFonts(themeElements), colors: readThemeColors(themeElements) },
+    themePart,
     core: readCore(part(CORE)),
+    corePart: CORE,
   };
 }

@@ -41,9 +41,7 @@ type SectionXml = {
   readonly markProperties: readonly XmlElement[];
 };
 
-const CORE_PART = "docProps/core.xml";
 const CUSTOM_PART = "docProps/custom.xml";
-const DEFAULT_THEME = "word/theme/theme1.xml";
 const PLUMBING = ["[Content_Types].xml", "docProps/app.xml"];
 const IGNORED_PARTS = ["word/fontTable.xml", "word/webSettings.xml"];
 const DROPPED_PARTS: Readonly<Record<string, string>> = {
@@ -205,8 +203,8 @@ export function readDocumentNode(ctx: ReadContext, consumed: ReadonlySet<string>
   const config = numbering.config();
   if (config.length > 0) props.numbering = { config };
   numbering.reportUnused();
-  ctx.readPart(CORE_PART);
-  ctx.readPart(partOfType(ctx.pkg, "/theme", DEFAULT_THEME));
+  ctx.consume(ctx.pkg.corePart);
+  ctx.consume(ctx.pkg.themePart);
   reportUnreadParts(ctx, consumed);
   return node("Document", props, [...sections, ...comments]);
 }
