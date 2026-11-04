@@ -10,7 +10,7 @@
  *  - docx.js needs an align or an offset on wp:positionH/V, and writes an image's run without properties. */
 
 import type * as docx from "docx";
-import { dropped, isOneOf, isOnValue, resolved, type Note } from "../ooxml/codec";
+import { DECIMAL, INTEGER, NO_OPTION, dropped, isOneOf, isOnValue, resolved, type Note } from "../ooxml/codec";
 import type { RunOptions } from "../ooxml/run";
 import type { ImageProps } from "../schema/elements";
 import { isOwnKey } from "../schema/own";
@@ -36,10 +36,7 @@ const PICTURE_URI = "http://schemas.openxmlformats.org/drawingml/2006/picture";
 const EMU_PER_PX = 9525;
 const ROTATION_UNIT = 60000;
 const DEFAULT_OUTLINE_WIDTH = 9525;
-const NO_OPTION = "docx.js has no option for it";
 const CROP = "crop is not expressible; image kept uncropped";
-const WHOLE = /^-?[0-9]+$/;
-const DECIMAL = /^-?[0-9]+(?:\.[0-9]+)?$/;
 const VML_LENGTH = /^(-?[0-9]+(?:\.[0-9]+)?)(pt|in|cm|mm|pc|px)?$/;
 
 const RASTER_TYPES: Readonly<Record<string, Raster["type"]>> = { png: "png", jpg: "jpg", jpeg: "jpg", gif: "gif", bmp: "bmp" };
@@ -84,7 +81,7 @@ const refused = (notes: readonly Note[], note: Note): DrawingRead => ({ kind: "r
 
 function wholeAt(el: XmlElement | null, name: string): number | null {
   const value = attrOf(el, name);
-  return value !== null && WHOLE.test(value) ? Number(value) : null;
+  return value !== null && INTEGER.test(value) ? Number(value) : null;
 }
 
 function mediaOf(relId: string | null, element: string, ctx: ReadContext, notes: Note[], media: string[]): { path: string; data: Uint8Array } | null {
@@ -152,7 +149,7 @@ function outlineOf(ln: XmlElement, notes: Note[]): Outline | null {
   }
   for (const child of elementsOf(ln)) if (child !== fill) notes.push(dropped(child.name, NO_OPTION));
   for (const [name, attribute] of Object.entries(ln.attributes)) {
-    if (name !== "w" || !WHOLE.test(attribute)) notes.push(dropped(ln.name, `${name}="${attribute}": ${NO_OPTION}`));
+    if (name !== "w" || !INTEGER.test(attribute)) notes.push(dropped(ln.name, `${name}="${attribute}": ${NO_OPTION}`));
   }
   const width = wholeAt(ln, "w");
   return { ...(width === null ? {} : { width }), type: "solidFill", solidFillType: "rgb", value };
@@ -232,7 +229,7 @@ function positionOf<R extends string, A extends string>(
   const alignText = align === null ? null : textOf(align);
   if (alignText !== null && isOneOf(aligns, alignText)) return { ...at, align: alignText };
   const offsetText = offset === null ? null : textOf(offset);
-  if (offsetText !== null && WHOLE.test(offsetText)) return { ...at, offset: Number(offsetText) };
+  if (offsetText !== null && INTEGER.test(offsetText)) return { ...at, offset: Number(offsetText) };
   notes.push(dropped(name, "no align or offset docx.js accepts; written at offset 0"));
   return { ...at, offset: 0 };
 }

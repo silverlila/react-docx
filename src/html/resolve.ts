@@ -21,6 +21,7 @@
  *    marks are not drawn. */
 
 import type * as docx from "docx";
+import { HEX } from "../ooxml/codec";
 import { levelOf, markerText, type Counters } from "../ooxml/markers";
 import type { RunOptions } from "../ooxml/run";
 import type { TreePath } from "../read/diagnostics";
@@ -105,7 +106,6 @@ const BASE64_CHUNK = 0x8000;
 const FONT_SLOTS: readonly FontSlot[] = ["ascii", "hAnsi", "eastAsia", "cs"];
 const POINTS_PER_UNIT: Readonly<Record<string, number>> = { pt: 1, pc: 12, pi: 12, in: 72, cm: 72 / 2.54, mm: 72 / 25.4 };
 const UNIVERSAL_MEASURE = /^(-?[0-9]+(?:\.[0-9]+)?)(mm|cm|in|pt|pc|pi)$/;
-const HEX = /^[0-9A-Fa-f]{6}$/;
 
 const ALIGNMENTS: Readonly<Record<string, ComputedParagraph["align"]>> = {
   left: "left",

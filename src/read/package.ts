@@ -8,7 +8,7 @@
  *  `revision` back as a whole number. */
 
 import { strFromU8, unzipSync } from "fflate";
-import type { Theme, ThemeColors, ThemeFonts, ThemeFontSet } from "../ooxml/codec";
+import { WHOLE_NUMBER, type Theme, type ThemeColors, type ThemeFonts, type ThemeFontSet } from "../ooxml/codec";
 import { isOwnKey, own } from "../schema/own";
 import { attrOf, childNamed, elementsOf, parseXml, textOf, type XmlElement } from "../ooxml/xml";
 
@@ -52,8 +52,6 @@ const CORE_TEXT = [
   ["description", "dc:description"],
   ["lastModifiedBy", "cp:lastModifiedBy"],
 ] as const;
-
-const WHOLE_NUMBER = /^[0-9]+$/;
 
 function folderOf(path: string): string {
   return path.slice(0, path.lastIndexOf("/") + 1);

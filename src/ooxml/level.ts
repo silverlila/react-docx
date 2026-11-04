@@ -30,7 +30,7 @@ import { dropNumbering, readStyleParagraph } from "./style";
 
 type LevelOptions = Omit<docx.ILevelsOptions, "level">;
 
-const MAX_LEVEL = 9;
+export const MAX_LEVEL = 9;
 
 const LEVEL_FORMATS: readonly ValueOf<typeof docx.LevelFormat>[] = [...NUMBER_FORMATS, "custom"];
 const SUFFIXES: readonly ValueOf<typeof docx.LevelSuffix>[] = ["nothing", "space", "tab"];

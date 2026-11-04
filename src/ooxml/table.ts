@@ -27,6 +27,7 @@ import {
   wholeNumberVal,
   HANDLED_BESIDE,
   HEIGHT_RULES,
+  INTEGER,
   isUniversalMeasure,
   noOption,
   type CodecEnv,
@@ -73,7 +74,6 @@ const VERTICAL_MERGES: readonly ValueOf<typeof docx.VerticalMergeType>[] = ["con
 const CELL_VERTICAL_ALIGNS: readonly NonNullable<CellOptions["verticalAlign"]>[] = ["top", "center", "bottom"];
 const TEXT_DIRECTIONS: readonly ValueOf<typeof docx.TextDirection>[] = ["btLr", "lrTb", "tbRl"];
 
-const WHOLE_NUMBER = /^-?[0-9]+$/;
 const PERCENT = /^-?[0-9]+(\.[0-9]+)?%$/;
 const FIFTIETHS_PER_PERCENT = 50;
 
@@ -82,7 +82,7 @@ function measureAt(el: XmlElement, type: WidthType, notes: Note[]): Measure | nu
   const value = requiredAttr(el, "w:w", notes);
   if (value === null) return null;
   if (PERCENT.test(value)) return `${Number(value.slice(0, -1))}%`;
-  if (WHOLE_NUMBER.test(value)) return type === "pct" ? `${Number(value) / FIFTIETHS_PER_PERCENT}%` : Number(value);
+  if (INTEGER.test(value)) return type === "pct" ? `${Number(value) / FIFTIETHS_PER_PERCENT}%` : Number(value);
   if (isUniversalMeasure(value)) return value;
   notes.push(dropped(el.name, `w:w="${value}" is not a measure docx.js writes`));
   return null;

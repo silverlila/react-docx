@@ -24,7 +24,7 @@ import React, { useContext, type CSSProperties, type ReactNode } from "react";
 import type { TreePath } from "../read/diagnostics";
 import type { DocumentNode } from "../schema/elements";
 import { NO_BREAKS, measureBreaks, type MeasuredBreaks } from "./breaks";
-import { borderCss, paragraphStyle, runStyle } from "./css";
+import { borderCss, paragraphStyle, pt, runStyle } from "./css";
 import type {
   ComputedParagraph,
   FieldKind,
@@ -48,7 +48,6 @@ const FOOTNOTE_RULE_WIDTH = "144pt";
 
 const SAFE_LINK_SCHEMES: ReadonlySet<string> = new Set(["http:", "https:", "mailto:"]);
 
-const pt = (n: number): string => `${n}pt`;
 const pathAttr = (path: TreePath): string => path.join(".");
 
 /** A page is a column of its header, body, footnotes and footer. */

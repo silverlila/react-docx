@@ -4,7 +4,7 @@
  *  v:shape is dropped. */
 
 import type * as docx from "docx";
-import { dropped, type Note } from "../ooxml/codec";
+import { DECIMAL, INTEGER, NO_OPTION, dropped, type Note } from "../ooxml/codec";
 import { VML_MEASURE, VML_POSITION, VML_POSITIONS, VML_RELATIVE_TO } from "../schema/docx-facts";
 import { own } from "../schema/own";
 import { attrOf, childNamed, childrenNamed, elementsOf, type XmlElement } from "../ooxml/xml";
@@ -22,10 +22,6 @@ export type TextBox = {
 
 type Alternate = { readonly used: "Choice" | "Fallback"; readonly elements: readonly XmlElement[] };
 
-const NO_OPTION = "docx.js has no option for it";
-const NUMBER = /^-?[0-9]+(\.[0-9]+)?$/;
-const INTEGER = /^-?[0-9]+$/;
-
 const DOCX_SHAPE_TYPE = "#_x0000_t202";
 const DOCX_TEXTBOX_ATTRIBUTES: Readonly<Record<string, string>> = {
   style: "mso-fit-shape-to-text:t;",
@@ -34,8 +30,8 @@ const DOCX_TEXTBOX_ATTRIBUTES: Readonly<Record<string, string>> = {
 
 const isMeasure = (value: string): value is Exclude<Length, "auto" | number> => VML_MEASURE.test(value);
 const length = (value: string): Length | null =>
-  value === "auto" || isMeasure(value) ? value : NUMBER.test(value) ? Number(value) : null;
-const number = (value: string): number | null => (NUMBER.test(value) ? Number(value) : null);
+  value === "auto" || isMeasure(value) ? value : DECIMAL.test(value) ? Number(value) : null;
+const number = (value: string): number | null => (DECIMAL.test(value) ? Number(value) : null);
 const oneOf =
   <const V extends string>(values: readonly V[]) =>
   (value: string): V | null =>

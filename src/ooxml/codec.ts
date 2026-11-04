@@ -62,11 +62,13 @@ export type ValueOf<T> = T[keyof T];
 type BorderStyle = ValueOf<typeof docx.BorderStyle>;
 type ShadingType = ValueOf<typeof docx.ShadingType>;
 
-const NO_OPTION = "docx.js has no option for it";
+export const NO_OPTION = "docx.js has no option for it";
 const OFF_VALUES = ["0", "false", "off"];
-const HEX = /^[0-9A-Fa-f]{6}$/;
+export const HEX = /^[0-9A-Fa-f]{6}$/;
 const HEX_BYTE = /^[0-9A-Fa-f]{2}$/;
-const WHOLE_NUMBER = /^-?[0-9]+$/;
+export const INTEGER = /^-?[0-9]+$/;
+export const WHOLE_NUMBER = /^[0-9]+$/;
+export const DECIMAL = /^-?[0-9]+(\.[0-9]+)?$/;
 
 export const dropped = (element: string, detail: string): Note => ({ fate: "dropped", element, detail });
 
@@ -220,7 +222,7 @@ export const onOff =
 export function wholeNumberAt(el: XmlElement, attribute: string, notes: Note[]): number | null {
   const value = attrOf(el, attribute);
   if (value === null) return null;
-  if (WHOLE_NUMBER.test(value)) return Number(value);
+  if (INTEGER.test(value)) return Number(value);
   notes.push(dropped(el.name, `${attribute}="${value}" is not a whole number`));
   return null;
 }

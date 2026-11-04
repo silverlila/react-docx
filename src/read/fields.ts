@@ -15,7 +15,7 @@
  *    docx.js's defaults (2612 / 2610 in MS Gothic) are left out, as an author would. */
 
 import type * as docx from "docx";
-import { dropped, isOnValue, type Mutable, type Note } from "../ooxml/codec";
+import { WHOLE_NUMBER, dropped, isOnValue, type Mutable, type Note } from "../ooxml/codec";
 import { PAGE_NUMBER_VALUES, SYMBOL_CHAR } from "../schema/docx-facts";
 import { isOwnKey } from "../schema/own";
 import { node, type AuthorNode } from "../tree/author";
@@ -53,7 +53,6 @@ const SEQ = /^SEQ (\S+)$/;
 const PAGEREF = /^PAGEREF (\S+)( \\h)?( \\p)?$/;
 const MERGEFIELD = /^ MERGEFIELD (\S+) $/;
 const TOC_SWITCH = / \\([a-z])(?: "([^"]*)")?/y;
-const WHOLE_NUMBER = /^[0-9]+$/;
 
 export function pageFieldOf(instruction: string): PageField | null {
   const [first = "", ...switches] = instruction.trim().split(/\s+/);

@@ -8,7 +8,7 @@
 
 import type * as docx from "docx";
 import { applyFates, type FateTable, type Note } from "../ooxml/codec";
-import { readLevel } from "../ooxml/level";
+import { MAX_LEVEL, readLevel } from "../ooxml/level";
 import { decimalFormats, levelOf, markerText, type Counters } from "../ooxml/markers";
 import { own } from "../schema/own";
 import { partOfType, type ReadContext } from "./context";
@@ -56,8 +56,6 @@ const OTHER_CHILDREN: Readonly<Record<string, Note["fate"]>> = {
 type NumberingOption =
   | { readonly reference: string; readonly level: number; readonly instance: number; readonly custom?: true }
   | false;
-
-const MAX_LEVEL = 9;
 
 export const unknownNumId = (numId: string): string => `numId ${numId} is not defined in numbering.xml`;
 

@@ -30,7 +30,7 @@ const UNDERLINE_STYLES: Readonly<Record<string, CSSProperties["textDecorationSty
   wavyHeavy: "wavy",
 };
 
-const pt = (n: number): string => `${n}pt`;
+export const pt = (n: number): string => `${n}pt`;
 
 /** Word sets superscript and subscript at about two thirds of the run's size, and they do not make
  *  their line taller. */
