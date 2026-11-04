@@ -100,8 +100,13 @@ type PageFacts = {
 
 const PageContext = React.createContext<PageFacts | null>(null);
 
-function fieldText(field: FieldKind, placeholder: string, page: PageFacts | null): string {
-  if (page === null) return placeholder;
+function usePage(): PageFacts {
+  const page = useContext(PageContext);
+  if (page === null) throw new Error("DocxPreview: a page's content drew outside <Page>");
+  return page;
+}
+
+function fieldText(field: FieldKind, placeholder: string, page: PageFacts): string {
   switch (field) {
     case "page":
       return page.number;
@@ -117,7 +122,7 @@ function fieldText(field: FieldKind, placeholder: string, page: PageFacts | null
 }
 
 function Field({ inline }: { readonly inline: Extract<ResolvedInline, { kind: "field" }> }): ReactNode {
-  const page = useContext(PageContext);
+  const page = usePage();
   return (
     <span data-docx-field="" style={runStyle(inline.run)}>
       {fieldText(inline.field, inline.placeholder, page)}
@@ -173,12 +178,10 @@ function placement(float: ResolvedFloat, widthPt: number, heightPt: number, geom
 }
 
 function FloatingImage({ image, float }: { readonly image: Extract<ResolvedInline, { kind: "image" }>; readonly float: ResolvedFloat }): ReactNode {
-  const page = useContext(PageContext);
-  const img = <img src={image.src} width={image.widthPx} height={image.heightPx} alt={image.alt} style={{ display: "block" }} />;
-  if (page === null) return img;
+  const page = usePage();
   return (
     <span data-docx-floating="" style={placement(float, image.widthPx * PT_PER_PX, image.heightPx * PT_PER_PX, page.geometry)}>
-      {img}
+      <img src={image.src} width={image.widthPx} height={image.heightPx} alt={image.alt} style={{ display: "block" }} />
     </span>
   );
 }
@@ -186,8 +189,8 @@ function FloatingImage({ image, float }: { readonly image: Extract<ResolvedInlin
 /** A text box in the flow is drawn as docx.js writes one, with Word's default line and white fill. A placed
  *  one is drawn without: Word's anchored text boxes mostly have neither, and the tree keeps neither. */
 function TextboxBlock({ block, breakKey }: { readonly block: Extract<ResolvedBlock, { kind: "textbox" }> } & Keyed): ReactNode {
-  const page = useContext(PageContext);
-  const placed = block.float !== null && page !== null;
+  const page = usePage();
+  const placed = block.float !== null;
   const place = placed ? placement(block.float, block.widthPt ?? 0, block.heightPt ?? 0, page.geometry) : {};
   return (
     <div
