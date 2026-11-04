@@ -19,7 +19,7 @@
  *  - It writes a run child string equal to a PageNumber value as that field. */
 
 import * as docx from "docx";
-import { OUTSIDE_BODY, type DocumentNode, type Kind, type Node } from "../schema/elements";
+import type { DocumentNode, Kind, Node } from "../schema/elements";
 import { rawXmlComponents } from "./raw-xml";
 
 type Built = {
@@ -70,7 +70,7 @@ type Built = {
   YearLong: docx.YearLong;
 };
 
-type BuildCtx = { readonly footnoteIds: ReadonlyMap<Node<"Footnote">, number> };
+type BuildCtx = { readonly footnotes: Node<"Footnote">[] };
 
 type HeaderFooterSlots<T> = { default?: T; first?: T; even?: T };
 
@@ -91,28 +91,15 @@ function inPlace<T>(built: readonly (T | docx.XmlComponent[])[]): T[] {
   return built.flatMap((item) => (Array.isArray(item) ? asChildren<T>(item) : [item]));
 }
 
-function bodyFootnotes(document: DocumentNode): Node<"Footnote">[] {
-  const found: Node<"Footnote">[] = [];
-  const visit = (node: Node): void => {
-    if (node.type === "Footnote") found.push(node);
-    else if (!OUTSIDE_BODY.includes(node.type)) {
-      for (const child of node.children) if (typeof child !== "string") visit(child);
-    }
-  };
-  visit(document);
-  return found;
+function buildFootnoteReference(node: Node<"Footnote">, ctx: BuildCtx): docx.FootnoteReferenceRun {
+  ctx.footnotes.push(node);
+  return new docx.FootnoteReferenceRun(ctx.footnotes.length);
 }
 
-function footnoteId(node: Node<"Footnote">, ctx: BuildCtx): number {
-  const id = ctx.footnoteIds.get(node);
-  if (id === undefined) throw new Error("A Footnote outside the document body: the tree must come from canonicalize");
-  return id;
-}
-
-function footnoteBodies(footnotes: readonly Node<"Footnote">[], ctx: BuildCtx) {
+function footnoteBodies(ctx: BuildCtx) {
   return Object.fromEntries(
-    footnotes.map((footnote) => [
-      footnoteId(footnote, ctx),
+    ctx.footnotes.map((footnote, i) => [
+      i + 1,
       { children: asChildren<docx.Paragraph>(buildAll(footnote.children, ctx)) },
     ])
   );
@@ -121,8 +108,7 @@ function footnoteBodies(footnotes: readonly Node<"Footnote">[], ctx: BuildCtx) {
 export function buildDocument(node: DocumentNode): docx.Document {
   const { styles, ...rest } = node.props;
   const { importedStyles = [], ...docxStyles } = styles ?? {};
-  const footnotes = bodyFootnotes(node);
-  const ctx: BuildCtx = { footnoteIds: new Map(footnotes.map((footnote, i) => [footnote, i + 1])) };
+  const ctx: BuildCtx = { footnotes: [] };
   const sections: docx.ISectionOptions[] = [];
   const comments: docx.ICommentOptions[] = [];
   for (const child of node.children) {
@@ -133,7 +119,7 @@ export function buildDocument(node: DocumentNode): docx.Document {
     ...rest,
     ...(styles === undefined ? {} : { styles: docxStyles }),
     sections,
-    ...(footnotes.length > 0 ? { footnotes: footnoteBodies(footnotes, ctx) } : {}),
+    ...(ctx.footnotes.length > 0 ? { footnotes: footnoteBodies(ctx) } : {}),
     ...(comments.length > 0 ? { comments: { children: comments } } : {}),
   });
   for (const xml of importedStyles) {
@@ -212,7 +198,7 @@ const BUILD: { readonly [K in Kind]: (node: Node<K>, ctx: BuildCtx) => Built[K] 
   Math: ({ children }, ctx) => new docx.Math({ children: buildAll(children, ctx) }),
   MathRun: ({ children }) => new docx.MathRun(children.join("")),
   RawXml: ({ props }) => rawXmlComponents(props.xml),
-  Footnote: (node, ctx) => new docx.FootnoteReferenceRun(footnoteId(node, ctx)),
+  Footnote: buildFootnoteReference,
   Comment: ({ props, children }, ctx) => ({ ...props, date: props.date ?? UNDATED, children: buildAll(children, ctx) }),
   CommentRangeStart: ({ props }) => new docx.CommentRangeStart(props.id),
   CommentRangeEnd: ({ props }) => new docx.CommentRangeEnd(props.id),
