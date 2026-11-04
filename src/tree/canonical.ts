@@ -137,6 +137,22 @@ const PROP_RULES: { readonly [K in Kind]?: (props: PropBag, path: readonly strin
   Textbox: assertTextboxStyle,
 };
 
+type Children = readonly (Built | string)[];
+type ChildRule = {
+  readonly beforeChildren?: (content: readonly IndexedChild[], path: readonly string[], context: Context) => void;
+  readonly afterChildren?: (children: Children, path: readonly string[]) => Children;
+};
+
+const CHILD_RULES: { readonly [K in UnsplitKind]?: ChildRule } = {
+  Section: { beforeChildren: assertOneHeaderFooterPerType },
+  Footnote: {
+    beforeChildren: (_content, path, context) => assertFootnoteInBody(path, context),
+    afterChildren: assertFootnoteStartsWithParagraph,
+  },
+  Textbox: { afterChildren: (children) => (children.length === 0 ? [emptyParagraph()] : children) },
+  TableCell: { afterChildren: assertCellEndsWithParagraph },
+};
+
 export function canonicalize(root: AuthorNode): DocumentNode {
   if (root.type !== "Document") {
     throw new TreeError([root.type], `The root must be <Document>, got <${root.type}>`);
@@ -178,17 +194,13 @@ function canonicalNode(
   path: readonly string[],
   context: Context
 ): Built {
-  if (kind === "Section") assertOneHeaderFooterPerType(content, path);
-  if (kind === "Footnote" && context.outsideBody) {
-    throw new TreeError(path, "Footnote is only allowed in the document body");
-  }
+  const rule = CHILD_RULES[kind];
+  rule?.beforeChildren?.(content, path, context);
   recordCommentId(kind, node.props, path, context.document);
   const parent: Parent<UnsplitKind> = { kind, name: node.type, path };
   const inner = OUTSIDE_BODY.includes(kind) ? { ...context, outsideBody: true } : context;
   const authored = [...textPropChild(kind, node.props, path), ...canonicalChildren(parent, content, inner)];
-  const children = kind === "Textbox" && authored.length === 0 ? [emptyParagraph()] : authored;
-  if (kind === "TableCell") assertCellEndsWithParagraph(children, path);
-  if (kind === "Footnote") assertFootnoteStartsWithParagraph(children, path);
+  const children = rule?.afterChildren ? rule.afterChildren(authored, path) : authored;
   return { type: kind, props: canonicalProps(kind, node.props, path), children };
 }
 
@@ -476,18 +488,24 @@ function assertRawXmlFits(parent: Parent, node: AuthorNode, path: readonly strin
   assertFragment({ xml, label: "RawXml", allowedRoots, where: `<${parent.name}>` }, path);
 }
 
-function assertCellEndsWithParagraph(children: readonly (Built | string)[], path: readonly string[]): void {
+function assertCellEndsWithParagraph(children: Children, path: readonly string[]): Children {
   const last = children[children.length - 1];
   if (typeof last === "object" && last.type === "RawXml") {
     throw new TreeError(path, "A TableCell must end with a <Paragraph>");
   }
+  return children;
 }
 
-function assertFootnoteStartsWithParagraph(children: readonly (Built | string)[], path: readonly string[]): void {
+function assertFootnoteInBody(path: readonly string[], context: Context): void {
+  if (context.outsideBody) throw new TreeError(path, "Footnote is only allowed in the document body");
+}
+
+function assertFootnoteStartsWithParagraph(children: Children, path: readonly string[]): Children {
   const first = children[0];
   if (typeof first !== "object" || first.type !== "Paragraph") {
     throw new TreeError(path, "A Footnote must start with a <Paragraph>");
   }
+  return children;
 }
 
 function recordCommentId(kind: Kind, props: PropBag, path: readonly string[], state: DocumentState): void {
