@@ -1230,6 +1230,15 @@ describe("LIST_NUMBERING", () => {
   });
 });
 
+describe("SymbolRun char", () => {
+  test("a SymbolRun char that is not four hex digits throws, at that SymbolRun", () => {
+    const error = treeError(() => canon(doc(n("Paragraph", {}, n("SymbolRun", { char: "★" })))));
+    expect(error.path).toEqual(["Document", "Section[0]", "Paragraph[0]", "SymbolRun[0]"]);
+    expect(error.message).toContain('SymbolRun char must be four hex digits, as in "F071", got "★"');
+    expect(inline(canon(doc(n("Paragraph", {}, n("SymbolRun", { char: "f071" })))))).toEqual([runOf("SymbolRun", { char: "f071" })]);
+  });
+});
+
 describe("canonicalize as a whole", () => {
   const everything = () =>
     n(

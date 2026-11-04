@@ -16,7 +16,7 @@
 
 import type * as docx from "docx";
 import { dropped, isOnValue, type Mutable, type Note } from "../ooxml/codec";
-import { PAGE_NUMBER_VALUES } from "../schema/docx-facts";
+import { PAGE_NUMBER_VALUES, SYMBOL_CHAR } from "../schema/docx-facts";
 import { isOwnKey } from "../schema/own";
 import type { AuthorNode } from "../tree/author";
 import type { ReadContext } from "./context";
@@ -26,7 +26,7 @@ export type Item =
   | { readonly kind: "atom"; readonly run: XmlElement; readonly el: XmlElement }
   | { readonly kind: "element"; readonly el: XmlElement };
 
-type PageField = (typeof PAGE_NUMBER_VALUES)[number];
+export type PageField = (typeof PAGE_NUMBER_VALUES)[number];
 
 type ComplexField =
   | { readonly kind: "page"; readonly field: PageField; readonly run: XmlElement; readonly cached: boolean }
@@ -54,11 +54,10 @@ const PAGEREF = /^PAGEREF (\S+)( \\h)?( \\p)?$/;
 const MERGEFIELD = /^ MERGEFIELD (\S+) $/;
 const TOC_SWITCH = / \\([a-z])(?: "([^"]*)")?/y;
 const WHOLE_NUMBER = /^[0-9]+$/;
-const SYMBOL_HEX = /^[0-9A-Fa-f]{4}$/;
 
 const node = (type: string, props: Readonly<Record<string, unknown>> = {}): AuthorNode => ({ type, props, children: [] });
 
-function pageFieldOf(instruction: string): PageField | null {
+export function pageFieldOf(instruction: string): PageField | null {
   const [first = "", ...switches] = instruction.trim().split(/\s+/);
   const key = first.toUpperCase();
   if (!isOwnKey(PAGE_FIELDS, key)) return null;
@@ -199,7 +198,7 @@ function symbolState(el: XmlElement, defaults: typeof DEFAULT_CHECKED, notes: No
   const state: Mutable<docx.ICheckboxSymbolProperties> = {};
   const value = attrOf(el, "w14:val");
   const font = attrOf(el, "w14:font");
-  if (value !== null && !SYMBOL_HEX.test(value)) notes.push(dropped(el.name, `w14:val="${value}" is not a 4-digit hex symbol`));
+  if (value !== null && !SYMBOL_CHAR.test(value)) notes.push(dropped(el.name, `w14:val="${value}" is not a 4-digit hex symbol`));
   else if (value !== null && value.toUpperCase() !== defaults.value) state.value = value;
   if (font !== null && font !== defaults.font) state.font = font;
   return Object.keys(state).length === 0 ? null : state;

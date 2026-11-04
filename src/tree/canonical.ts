@@ -13,9 +13,11 @@
  *  - docx.js writes its built-in style ids itself, so an authored style with one of those ids folds into
  *    `styles.default.<key>`. Otherwise styles.xml would define it twice.
  *  - docx.js writes raw styles after its own, so a raw w:styleId that is already defined, or defined by
- *    an earlier raw style, is rejected: it would be defined twice. */
+ *    an earlier raw style, is rejected: it would be defined twice.
+ *  - docx.js writes SymbolRun's char into w:char unchecked, and OOXML takes four hex digits there, so any
+ *    other char is rejected. */
 
-import { DEFAULT_STYLE_SLOTS, PAGE_NUMBER_VALUES, RAW_XML_ROOTS } from "../schema/docx-facts";
+import { DEFAULT_STYLE_SLOTS, PAGE_NUMBER_VALUES, RAW_XML_ROOTS, SYMBOL_CHAR } from "../schema/docx-facts";
 import {
   ELEMENTS,
   OUTSIDE_BODY,
@@ -87,6 +89,7 @@ const PROP_RULES: { readonly [K in Kind]?: (props: PropBag, path: readonly strin
   DeletedTextRun: (props) => omit(props, "text"),
   Math: (props) => omit(props, "text"),
   ImageRun: imageBytes,
+  SymbolRun: assertSymbolChar,
 };
 
 export function canonicalize(root: AuthorNode): DocumentNode {
@@ -505,6 +508,13 @@ function assertOneHeaderFooterPerType(content: readonly IndexedChild[], path: re
     }
     seen.add(key);
   }
+}
+
+function assertSymbolChar(props: PropBag, path: readonly string[]): PropBag {
+  const { char } = props;
+  if (typeof char === "string" && SYMBOL_CHAR.test(char)) return props;
+  const got = typeof char === "string" ? `"${char}"` : char === null ? "null" : typeof char;
+  throw new TreeError(path, `SymbolRun char must be four hex digits, as in "F071", got ${got}`);
 }
 
 function imageBytes(props: PropBag, path: readonly string[]): PropBag {

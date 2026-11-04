@@ -40,14 +40,15 @@ function elementOf(name: string, attributes: Record<string, string>, children: r
   return { name, attributes: { ...attributes }, children: contentOf(children) };
 }
 
-function topLevelElements(text: string): XmlElement[] {
+/** Every top-level element of `text`, which may hold several. */
+export function parseXmlRoots(text: string): XmlElement[] {
   return contentOf(parseDocument(text, { xmlMode: true }).children).filter(
     (node): node is XmlElement => typeof node !== "string"
   );
 }
 
 export function parseXml(text: string): XmlElement {
-  const [root] = topLevelElements(text);
+  const [root] = parseXmlRoots(text);
   if (root === undefined) throw new Error(`parseXml: no element in ${JSON.stringify(text.slice(0, 80))}`);
   return root;
 }

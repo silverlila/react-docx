@@ -102,8 +102,8 @@ function rawBecause(style: XmlElement, type: string): RawBecause | null {
   return isDefault !== null && isOnValue(isDefault) ? "default" : null;
 }
 
-function rawStyle(style: XmlElement, because: RawBecause): StyleRead | StyleDropped {
-  const xml = serializeXml(style);
+function rawStyle(style: XmlElement, because: RawBecause, env: CodecEnv): StyleRead | StyleDropped {
+  const xml = serializeXml(withRenamedStyles(style, env.styleIds));
   const roots = xmlRoots(xml);
   if (roots.kind === "relationship") {
     return { kind: "dropped", because: "it carries an r: relationship reference, which raw XML cannot keep" };
@@ -131,7 +131,7 @@ export function clashingStyleIds(styles: XmlElement | null): ReadonlyMap<string,
   return renames;
 }
 
-const STYLE_REFERENCES = new Set(["w:rStyle", "w:pStyle", "w:tblStyle"]);
+const STYLE_REFERENCES = new Set(["w:rStyle", "w:pStyle", "w:tblStyle", "w:basedOn", "w:link", "w:next"]);
 
 /** `el` with its style references following `clashingStyleIds`' renames, for XML kept verbatim. */
 export function withRenamedStyles(el: XmlElement, renames: ReadonlyMap<string, string> | undefined): XmlElement {
@@ -156,7 +156,7 @@ export function readStyle(original: XmlElement, env: CodecEnv): StyleRead | Styl
     return { kind: "dropped", because: `w:type="${type}" is not a style type` };
   }
   const because = rawBecause(style, type);
-  if (because !== null) return rawStyle(style, because);
+  if (because !== null) return rawStyle(style, because, env);
 
   const id = attrOf(style, "w:styleId");
   if (id === null) return { kind: "dropped", because: "it has no w:styleId" };

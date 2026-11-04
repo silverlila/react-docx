@@ -14,7 +14,8 @@
  *    split across parents, is kept as RawXml with its id moved to 100000 + an ordinal.
  *  - Word's _GoBack bookmark (the last edit position) is removed up front with `withoutGoBack`.
  *  - The generic fallback keeps an element as RawXml when its slot allows its name and
- *    `rawXmlOf` accepts it, else unwraps a wrapper's content, else drops it.
+ *    `rawXmlOf` accepts it, else unwraps a wrapper's content, else drops it. Every RawXml names a renamed
+ *    style (`clashingStyleIds`) by its fresh id.
  *  - OOXML requires a table cell to end with a paragraph; Word always complies, so a cell whose last
  *    block would be RawXml or a Table gets an empty Paragraph without a diagnostic.
  *  - The walk reads the body, headers and footers, footnotes and comments, told apart by the context's
@@ -35,7 +36,7 @@ import { readParagraphProperties, type ParagraphOptions, type ParagraphRead } fr
 import { readRunProperties, type RunOptions } from "../ooxml/run";
 import { withRenamedStyles } from "../ooxml/style";
 import { readCellProperties, readRowProperties, readTableProperties } from "../ooxml/table";
-import { PAGE_NUMBER_VALUES, RAW_XML_ROOTS } from "../schema/docx-facts";
+import { PAGE_NUMBER_VALUES, RAW_XML_ROOTS, SYMBOL_CHAR } from "../schema/docx-facts";
 import { isOwnKey, own } from "../schema/own";
 import type { AuthorNode } from "../tree/author";
 import { mergeStrings } from "../tree/canonical";
@@ -135,8 +136,8 @@ const node = (type: string, props: Readonly<Record<string, unknown>> = {}, child
 
 const rawXml = (xml: string): AuthorNode => node("RawXml", { xml });
 
-function rawXmlOf(elements: readonly XmlElement[], slot: Slot): RawXmlCheck {
-  const xml = elements.map(serializeXml).join("");
+function rawXmlOf(elements: readonly XmlElement[], slot: Slot, ctx: ReadContext): RawXmlCheck {
+  const xml = elements.map((el) => serializeXml(withRenamedStyles(el, ctx.env.styleIds))).join("");
   const roots = xmlRoots(xml);
   if (roots.kind === "relationship") {
     return { kind: "refused", reason: "it carries an r: relationship reference, which docx.js cannot write" };
@@ -154,7 +155,7 @@ type Fallback =
 
 function fallback(el: XmlElement, slot: Slot, ctx: ReadContext, rawAllowed = true): Fallback {
   const roots: readonly string[] = RAW_XML_ROOTS[slot];
-  const check = rawAllowed && roots.includes(el.name) ? rawXmlOf([withRenamedStyles(el, ctx.env.styleIds)], slot) : null;
+  const check = rawAllowed && roots.includes(el.name) ? rawXmlOf([el], slot, ctx) : null;
   if (check?.kind === "raw") {
     ctx.report({ kind: "raw", element: el.name, detail: "no tree kind maps it, so it is kept verbatim" });
     return { kind: "raw", node: rawXml(check.xml) };
@@ -223,7 +224,7 @@ function renumberedBookmark(el: XmlElement, ctx: ReadContext): XmlElement {
 }
 
 function rawBookmark(el: XmlElement, slot: Slot, ctx: ReadContext): AuthorNode | null {
-  const check = rawXmlOf([renumberedBookmark(el, ctx)], slot);
+  const check = rawXmlOf([renumberedBookmark(el, ctx)], slot, ctx);
   if (check.kind === "refused") {
     ctx.report({ kind: "dropped", element: el.name, detail: check.reason });
     return null;
@@ -591,7 +592,7 @@ function fieldPieces(span: readonly Item[], scope: InlineScope): Piece[] {
       return inline([field.node]);
     case "other": {
       const raw = field.raw.map((el) => (BOOKMARKS.has(el.name) ? renumberedBookmark(el, scope.ctx) : el));
-      const check = rawXmlOf(raw, "inline");
+      const check = rawXmlOf(raw, "inline", scope.ctx);
       if (check.kind === "raw") {
         scope.ctx.report({ kind: "raw", element: "w:fldChar", detail: "a field no tree kind maps, kept verbatim with its result" });
         return inline([rawXml(check.xml)]);
@@ -738,7 +739,7 @@ function simpleFieldPieces(el: XmlElement, ctx: BodyContext): Piece[] {
     case "node":
       return inline([read.node]);
     case "other": {
-      const check = rawXmlOf([el], "inline");
+      const check = rawXmlOf([el], "inline", ctx);
       if (check.kind === "raw") {
         ctx.report({ kind: "raw", element: el.name, detail: "a field no tree kind maps, kept verbatim with its result" });
         return inline([rawXml(check.xml)]);
@@ -814,7 +815,7 @@ function atomPieces(run: XmlElement, el: XmlElement, scope: InlineScope): Piece[
     }
     case "w:sym": {
       const char = attrOf(el, "w:char");
-      if (char === null) return runFallbackPieces(run, el, scope);
+      if (char === null || !SYMBOL_CHAR.test(char)) return runFallbackPieces(run, el, scope);
       const font = attrOf(el, "w:font");
       const props = { ...scope.runProps(run), char, ...(font === null ? {} : { symbolfont: font }) };
       return inline([node("SymbolRun", props)]);

@@ -443,6 +443,17 @@ describe("styles whose id docx.js gives a built-in style of the other type", () 
     const again = readDocx(new Uint8Array(await renderToBuffer(read.document)));
     expect(findAll(tree(again.document), "TextRun")[0].props).toMatchObject({ style: "StrongChar" });
   });
+
+  test("a style kept as raw XML names the renamed style by its fresh id", () => {
+    const raw =
+      '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:next w:val="Strong"/><w:link w:val="Strong"/></w:style>' +
+      '<w:style w:type="table" w:styleId="Grid"><w:name w:val="Grid"/><w:basedOn w:val="Strong"/>' +
+      '<w:tblStylePr w:type="firstRow"><w:pPr><w:pStyle w:val="Strong"/></w:pPr><w:rPr><w:rStyle w:val="Strong"/></w:rPr></w:tblStylePr></w:style>';
+    const styles = tree(readDocx(docx({ body, styles: STRONG + raw })).document).props.styles as { importedStyles?: string[] };
+    const imported = (styles.importedStyles ?? []).join();
+    expect(imported.match(/w:val="StrongChar"/g)).toHaveLength(5);
+    expect(imported).not.toContain('w:val="Strong"');
+  });
 });
 
 describe("a table without its own borders", () => {
@@ -472,6 +483,24 @@ describe("a table without its own borders", () => {
 });
 
 describe("review fixes: reader", () => {
+  test("a field kept verbatim names a renamed style by its fresh id", () => {
+    const styles = '<w:style w:type="character" w:styleId="Strong"><w:name w:val="Strong"/><w:rPr><w:b/></w:rPr></w:style>';
+    const strong = (inner: string) => `<w:r><w:rPr><w:rStyle w:val="Strong"/></w:rPr>${inner}</w:r>`;
+    const complex =
+      strong('<w:fldChar w:fldCharType="begin"/>') + strong('<w:instrText xml:space="preserve"> DATE </w:instrText>') +
+      strong('<w:fldChar w:fldCharType="separate"/>') + strong("<w:t>today</w:t>") + strong('<w:fldChar w:fldCharType="end"/>');
+    const simple = `<w:fldSimple w:instr=" DATE ">${strong("<w:t>today</w:t>")}</w:fldSimple>`;
+    const raw = findAll(tree(readDocx(docx({ body: `<w:p>${complex}</w:p><w:p>${simple}</w:p>`, styles })).document), "RawXml").map((n) => String(n.props.xml));
+    expect(raw).toHaveLength(2);
+    expect(raw.every((xml) => xml.includes('w:val="StrongChar"') && !xml.includes('w:val="Strong"'))).toBe(true);
+  });
+
+  test("a w:sym whose char is not four hex digits is kept as raw XML, not read as a SymbolRun", () => {
+    const body = '<w:p><w:r><w:sym w:font="Wingdings" w:char="★"/></w:r><w:r><w:sym w:font="Symbol" w:char="F071"/></w:r></w:p>';
+    const document = tree(readDocx(docx({ body })).document);
+    expect(findAll(document, "SymbolRun").map((s) => s.props.char)).toEqual(["F071"]);
+    expect(findAll(document, "RawXml").map((r) => r.props.xml)).toEqual(['<w:sym w:font="Wingdings" w:char="★"/>']);
+  });
   test("a renamed style is renamed in XML kept verbatim too", () => {
     const styles = '<w:style w:type="character" w:styleId="Strong"><w:name w:val="Strong"/><w:rPr><w:b/></w:rPr></w:style>';
     const body = '<w:p><w:sdt><w:sdtPr><w:alias w:val="x"/></w:sdtPr><w:sdtContent><w:r><w:rPr><w:rStyle w:val="Strong"/></w:rPr><w:t>b</w:t></w:r></w:sdtContent></w:sdt></w:p>';

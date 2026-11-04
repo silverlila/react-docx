@@ -6,6 +6,9 @@
  *  - docx.js writes every section but the last as its blocks plus an empty paragraph holding only the
  *    w:sectPr. A paragraph with no content is therefore read as that section mark and not as a Paragraph,
  *    or each round trip would add one; any paragraph properties it has are reported dropped.
+ *  - A section-ending paragraph with content (Word's usual shape) is read as a Paragraph, and docx.js
+ *    adds its own empty mark after it on write, so the first round trip adds one empty paragraph to each
+ *    section but the last. docx.js has no option to put a w:sectPr on an authored paragraph.
  *  - Header and Footer children come before the body blocks. A section with no references gets none:
  *    Word inherits the previous section's, and docx.js writing none keeps that.
  *  - Settings are editor state and docx.js writes its own, so only the four it has options for are read,

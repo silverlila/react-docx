@@ -4,11 +4,14 @@
  *    run children.
  *  - DEFAULT_STYLE_SLOTS: each of docx.js's built-in style ids, with the IDefaultStylesOptions key that
  *    sets it and whether that key takes paragraph or character options.
- *  - RAW_XML_ROOTS: the top-level OOXML elements a RawXml fragment may hold, by slot. */
+ *  - RAW_XML_ROOTS: the top-level OOXML elements a RawXml fragment may hold, by slot.
+ *  - SYMBOL_CHAR: a w:sym's w:char, OOXML's ST_ShortHexNumber. docx.js writes SymbolRun's char unchecked. */
 
 import type * as docx from "docx";
 
 export const PAGE_NUMBER_VALUES = ["CURRENT", "TOTAL_PAGES", "TOTAL_PAGES_IN_SECTION", "SECTION"] as const;
+
+export const SYMBOL_CHAR = /^[0-9A-Fa-f]{4}$/;
 
 type DefaultStyleKey = Exclude<keyof NonNullable<docx.IStylesOptions["default"]>, "document">;
 type DefaultStyleSlot = { readonly key: DefaultStyleKey; readonly kind: "paragraph" | "character" };

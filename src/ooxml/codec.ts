@@ -32,6 +32,11 @@ export type CodecEnv = {
   readonly tableStyleBorders?: ReadonlyMap<string, docx.ITableBordersOptions>;
 };
 
+const NO_FONTS: ThemeFontSet = { latin: null, eastAsia: null, complex: null };
+
+/** An env with no theme, for XML read without its package. */
+export const NO_THEME_ENV: CodecEnv = { theme: { fonts: { major: NO_FONTS, minor: NO_FONTS }, colors: {} } };
+
 export type Note = {
   readonly fate: "resolved" | "dropped" | "ignored";
   readonly element: string;
