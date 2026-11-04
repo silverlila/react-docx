@@ -291,10 +291,18 @@ function readBlockElements(elements: readonly XmlElement[], ctx: BodyContext, li
 function readParagraph(p: XmlElement, at: (offset: number) => BodyContext, inSection: boolean): AuthorNode[] {
   const all = elementsOf(p).filter((el) => el.name !== "w:pPr");
   const ctx = at(0);
-  if (!inSection || loneTextBox(all, ctx) !== null) return [readOneParagraph(p, all, ctx, inSection)];
-  const hoisted = hoistTextBoxes(all, ctx);
-  const boxes = hoisted.boxes.map((box, i) => hoistedTextbox(box, at(i)));
-  return [...boxes, readOneParagraph(p, hoisted.content, at(boxes.length), inSection)];
+  const lone = loneTextBox(all, ctx);
+  if (lone === null && inSection) {
+    const hoisted = hoistTextBoxes(all, ctx);
+    const boxes = hoisted.boxes.map((box, i) => hoistedTextbox(box, at(i)));
+    const paragraphCtx = at(boxes.length);
+    return [...boxes, readOneParagraph(paragraphProperties(p, paragraphCtx), hoisted.content, paragraphCtx)];
+  }
+  const read = paragraphProperties(p, ctx);
+  if (lone === null) return [readOneParagraph(read, all, ctx)];
+  if (inSection) return [textboxNode(read, lone, ctx)];
+  ctx.report({ kind: "dropped", element: "w:pict", detail: "a text box outside a Section body: Textbox stands only in a Section" });
+  return [readOneParagraph(read, all.filter((el) => el !== lone.holder), ctx)];
 }
 
 /** The text boxes in `content`'s runs, directly or as alternate content's Fallback, and `content`
@@ -303,10 +311,7 @@ function hoistTextBoxes(content: readonly XmlElement[], ctx: BodyContext): { box
   const boxes: TextBox[] = [];
   const boxIn = (el: XmlElement): TextBox | null => {
     if (el.name === "w:pict") return textBoxOf(el);
-    if (el.name !== "mc:AlternateContent") return null;
-    const chosen = alternateContent(el, (x) => mapsToKind(x, "run", ctx));
-    const [pict, ...rest] = chosen?.used === "Fallback" ? chosen.elements : [];
-    return pict?.name === "w:pict" && rest.length === 0 ? textBoxOf(pict) : null;
+    return el.name === "mc:AlternateContent" ? fallbackTextBox(el, ctx) : null;
   };
   const out = content.flatMap((el): XmlElement[] => {
     if (el.name === "w:pict") {
@@ -336,18 +341,16 @@ function hoistedTextbox(box: TextBox, ctx: BodyContext): AuthorNode {
   return node("Textbox", style === undefined ? {} : { style }, readBlocks(box.content, ctx, { rawBlocks: false, tables: false }));
 }
 
-function readOneParagraph(p: XmlElement, all: readonly XmlElement[], ctx: BodyContext, inSection: boolean): AuthorNode {
+function paragraphProperties(p: XmlElement, ctx: BodyContext): ParagraphRead {
   const read = readParagraphProperties(childNamed(p, "w:pPr"), ctx.env);
   ctx.notes(read.notes);
   if (read.sectPr !== null) {
     ctx.report({ kind: "dropped", element: "w:sectPr", detail: "only a paragraph in the document body ends a section" });
   }
-  const lone = loneTextBox(all, ctx);
-  if (lone !== null && inSection) return textboxNode(read, lone, ctx);
-  if (lone !== null) {
-    ctx.report({ kind: "dropped", element: "w:pict", detail: "a text box outside a Section body: Textbox stands only in a Section" });
-  }
-  const content = lone === null ? all : all.filter((el) => el !== lone.holder);
+  return read;
+}
+
+function readOneParagraph(read: ParagraphRead, content: readonly XmlElement[], ctx: BodyContext): AuthorNode {
   const { numPr } = read;
   if (numPr !== null && numPr.numId !== "0" && ctx.part !== ctx.pkg.mainPart) {
     return markedParagraph(read.options, numPr, content, ctx);
@@ -406,10 +409,15 @@ function loneTextBox(content: readonly XmlElement[], ctx: ReadContext): LoneText
     return box === null ? null : { box, holder, run: holder, alternate: null };
   }
   if (only.name !== "mc:AlternateContent") return null;
-  const chosen = alternateContent(only, (el) => mapsToKind(el, "run", ctx));
-  const [pict, ...rest] = chosen?.used === "Fallback" ? chosen.elements : [];
-  const box = pict?.name === "w:pict" && rest.length === 0 ? textBoxOf(pict) : null;
+  const box = fallbackTextBox(only, ctx);
   return box === null ? null : { box, holder, run: holder, alternate: only };
+}
+
+/** The text box of alternate content read as its Fallback, when that Fallback is one w:pict. */
+function fallbackTextBox(alternate: XmlElement, ctx: ReadContext): TextBox | null {
+  const chosen = alternateContent(alternate, (el) => mapsToKind(el, "run", ctx));
+  const [pict, ...rest] = chosen?.used === "Fallback" ? chosen.elements : [];
+  return pict?.name === "w:pict" && rest.length === 0 ? textBoxOf(pict) : null;
 }
 
 function textboxNode(read: ParagraphRead, lone: LoneTextBox, ctx: BodyContext): AuthorNode {
