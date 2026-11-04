@@ -11,6 +11,7 @@
 import type * as docx from "docx";
 import { attrOf, childNamed, elementsOf, type XmlElement } from "./xml";
 import {
+  isOnValue,
   applyFates,
   dropped,
   mapTo,
@@ -260,9 +261,52 @@ function readGrid(tblGrid: XmlElement | null, notes: Note[]): number[] | null {
   return null;
 }
 
+const TABLE_SIDES = ["top", "left", "bottom", "right", "insideHorizontal", "insideVertical"] as const;
+const NO_BORDER: docx.IBorderOptions = { style: "none", size: 0, color: "auto" };
+
+/** Each table style's borders with its basedOn chain's beneath them, by style id; the default table style's
+ *  (w:default="1") also under "". */
+export function tableStyleBorders(styles: XmlElement | null, env: CodecEnv): ReadonlyMap<string, docx.ITableBordersOptions> {
+  const own = new Map<string, { basedOn: string | null; borders: docx.ITableBordersOptions }>();
+  let defaultId: string | null = null;
+  for (const style of elementsOf(styles)) {
+    const id = attrOf(style, "w:styleId");
+    if (style.name !== "w:style" || attrOf(style, "w:type") !== "table" || id === null) continue;
+    const tblBorders = childNamed(childNamed(style, "w:tblPr"), "w:tblBorders");
+    const borders = tblBorders === null ? {} : applyFates(tblBorders, TABLE_BORDER_FATES, env).options;
+    own.set(id, { basedOn: attrOf(childNamed(style, "w:basedOn"), "w:val"), borders });
+    const isDefault = attrOf(style, "w:default");
+    if (isDefault !== null && isOnValue(isDefault)) defaultId = id;
+  }
+  const merged = new Map<string, docx.ITableBordersOptions>();
+  const resolve = (id: string, depth: number): docx.ITableBordersOptions => {
+    const style = own.get(id);
+    if (style === undefined || depth > 10) return {};
+    const base = style.basedOn === null ? {} : resolve(style.basedOn, depth + 1);
+    return { ...base, ...style.borders };
+  };
+  for (const id of own.keys()) merged.set(id, resolve(id, 0));
+  if (defaultId !== null) merged.set("", merged.get(defaultId) ?? {});
+  return merged;
+}
+
+/** The sides a table does not give are its style's, or none: what Word draws, which docx.js would
+ *  otherwise write as single lines. */
+function withStyleBorders(options: Draft<TableOptions>, env: CodecEnv, notes: Note[]): void {
+  if (env.tableStyleBorders === undefined) return;
+  const own = options.borders ?? {};
+  if (TABLE_SIDES.every((side) => own[side] !== undefined)) return;
+  const style = env.tableStyleBorders.get(options.style ?? "") ?? {};
+  const borders: Draft<docx.ITableBordersOptions> = {};
+  for (const side of TABLE_SIDES) borders[side] = own[side] ?? style[side] ?? NO_BORDER;
+  options.borders = borders;
+  notes.push({ fate: "resolved", element: "w:tblBorders", detail: "sides the table does not give are its table style's, or none" });
+}
+
 export function readTableProperties(tbl: XmlElement, env: CodecEnv): CodecResult<TableOptions> {
   const tblPr = childNamed(tbl, "w:tblPr");
   const { options, notes } = applyFates(tblPr, TBLPR_FATES, env);
+  withStyleBorders(options, env, notes);
   const overlapElement = childNamed(tblPr, "w:tblOverlap");
   const overlap = readOverlap(overlapElement, notes);
   if (overlap !== null && options.float === undefined) {

@@ -28,6 +28,11 @@ function readStyles(root: XmlElement, ctx: ReadContext, numbering: NumberingRead
     } else {
       const read = readStyle(el, ctx.env);
       const id = attrOf(el, "w:styleId") ?? "(no w:styleId)";
+      const renamed = ctx.env.styleIds?.get(id);
+      if (renamed !== undefined) {
+        const detail = `${id}: docx.js writes a built-in style ${id} of the other type, so this one is written as ${renamed}`;
+        ctx.report({ kind: "resolved", element: "w:style", detail });
+      }
       if (read.kind === "dropped") {
         ctx.report({ kind: "dropped", element: "w:style", detail: `${id}: ${read.because}` });
       } else if (read.kind === "raw") {

@@ -23,7 +23,14 @@ export type ThemeColors = Readonly<Record<string, string>>;
 
 export type Theme = { readonly fonts: ThemeFonts; readonly colors: ThemeColors };
 
-export type CodecEnv = { readonly theme: Theme };
+/** styleIds: the new id of each style whose own id docx.js gives a built-in style of the other type
+ *  (`clashingStyleIds`). tableStyleBorders: each table style's borders, the default table style's under ""
+ *  (`tableStyleBorders`); without it, a table reads only its own. */
+export type CodecEnv = {
+  readonly theme: Theme;
+  readonly styleIds?: ReadonlyMap<string, string>;
+  readonly tableStyleBorders?: ReadonlyMap<string, docx.ITableBordersOptions>;
+};
 
 export type Note = {
   readonly fate: "resolved" | "dropped" | "ignored";
@@ -235,6 +242,12 @@ export function requiredAttr(el: XmlElement, attribute: string, notes: Note[]): 
 }
 
 export const stringVal: ValueReader<string> = (el, _env, notes) => requiredAttr(el, "w:val", notes);
+
+/** A reference to a style, by the id the tree gives it. */
+export const styleRefVal: ValueReader<string> = (el, env, notes) => {
+  const id = requiredAttr(el, "w:val", notes);
+  return id === null ? null : env.styleIds?.get(id) ?? id;
+};
 
 export const wholeNumberVal: ValueReader<number> = (el, _env, notes) =>
   requiredAttr(el, "w:val", notes) === null ? null : wholeNumberAt(el, "w:val", notes);

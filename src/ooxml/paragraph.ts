@@ -18,7 +18,7 @@ import {
   onOff,
   readBorder,
   readShading,
-  stringVal,
+  styleRefVal,
   wholeNumberAt,
   wholeNumberVal,
   ALIGNMENTS,
@@ -233,7 +233,7 @@ const readFrame: ValueReader<docx.IFrameOptions> = (el, _env, notes) => {
 };
 
 const PPR_FATES: FateTable<ParagraphOptions> = {
-  "w:pStyle": to("style", stringVal),
+  "w:pStyle": to("style", styleRefVal),
   "w:keepNext": flag("keepNext"),
   "w:keepLines": flag("keepLines"),
   "w:pageBreakBefore": flag("pageBreakBefore"),

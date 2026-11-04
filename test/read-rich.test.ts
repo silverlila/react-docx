@@ -429,3 +429,54 @@ describe("phase-1 cases", () => {
     }
   );
 });
+
+describe("styles whose id docx.js gives a built-in style of the other type", () => {
+  const STRONG = '<w:style w:type="character" w:styleId="Strong"><w:name w:val="Strong"/><w:rPr><w:b/></w:rPr></w:style>';
+  const body = '<w:p><w:r><w:rPr><w:rStyle w:val="Strong"/></w:rPr><w:t>bold</w:t></w:r></w:p>';
+
+  test("Word's character style Strong reads under a fresh id, its references follow it, and it round-trips", async () => {
+    const read = readDocx(docx({ body, styles: STRONG }));
+    const styles = tree(read.document).props.styles as { characterStyles?: { id: string }[] };
+    expect(styles.characterStyles?.map((s) => s.id)).toEqual(["StrongChar"]);
+    expect(findAll(tree(read.document), "TextRun")[0].props).toMatchObject({ style: "StrongChar" });
+    expect(read.diagnostics).toContainEqual(expect.objectContaining({ kind: "resolved", element: "w:style" }));
+    const again = readDocx(new Uint8Array(await renderToBuffer(read.document)));
+    expect(findAll(tree(again.document), "TextRun")[0].props).toMatchObject({ style: "StrongChar" });
+  });
+});
+
+describe("a table without its own borders", () => {
+  const TABLE = (tblPr: string) =>
+    `<w:tbl><w:tblPr>${tblPr}</w:tblPr><w:tblGrid><w:gridCol w:w="2000"/></w:tblGrid><w:tr><w:tc><w:p><w:r><w:t>x</w:t></w:r></w:p></w:tc></w:tr></w:tbl><w:p/>`;
+  const STYLES =
+    '<w:style w:type="table" w:default="1" w:styleId="TableNormal"><w:name w:val="Normal Table"/></w:style>' +
+    '<w:style w:type="table" w:styleId="Lines"><w:name w:val="Lines"/><w:basedOn w:val="TableNormal"/><w:tblPr><w:tblBorders>' +
+    '<w:top w:val="single" w:sz="8" w:color="4472C4"/><w:insideH w:val="single" w:sz="4" w:color="4472C4"/></w:tblBorders></w:tblPr></w:style>';
+  const bordersOf = (tblPr: string) =>
+    findAll(tree(readDocx(docx({ body: TABLE(tblPr), styles: STYLES })).document), "Table")[0].props.borders as Record<string, { style: string }>;
+
+  test("reads its table style's borders, and none for the sides the style leaves out, as Word draws it", () => {
+    const borders = bordersOf('<w:tblStyle w:val="Lines"/>');
+    expect(borders.top).toMatchObject({ style: "single", size: 8, color: "4472C4" });
+    expect(borders.insideHorizontal).toMatchObject({ style: "single", size: 4 });
+    expect([borders.left, borders.bottom, borders.right, borders.insideVertical].map((b) => b.style)).toEqual(["none", "none", "none", "none"]);
+  });
+
+  test("without a style it has the default table style's borders: none", () => {
+    expect(Object.values(bordersOf("")).map((b) => b.style)).toEqual(["none", "none", "none", "none", "none", "none"]);
+  });
+
+  test("its own sides win over the style's", () => {
+    expect(bordersOf('<w:tblStyle w:val="Lines"/><w:tblBorders><w:top w:val="double" w:sz="4"/></w:tblBorders>').top).toMatchObject({ style: "double" });
+  });
+});
+
+describe("review fixes: reader", () => {
+  test("a renamed style is renamed in XML kept verbatim too", () => {
+    const styles = '<w:style w:type="character" w:styleId="Strong"><w:name w:val="Strong"/><w:rPr><w:b/></w:rPr></w:style>';
+    const body = '<w:p><w:sdt><w:sdtPr><w:alias w:val="x"/></w:sdtPr><w:sdtContent><w:r><w:rPr><w:rStyle w:val="Strong"/></w:rPr><w:t>b</w:t></w:r></w:sdtContent></w:sdt></w:p>';
+    const raw = findAll(tree(readDocx(docx({ body, styles })).document), "RawXml").map((n) => String(n.props.xml));
+    expect(raw.join()).toContain('w:val="StrongChar"');
+    expect(raw.join()).not.toContain('w:val="Strong"');
+  });
+});

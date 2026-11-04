@@ -20,7 +20,7 @@ import {
   readBorder,
   readShading,
   resolved,
-  stringVal,
+  styleRefVal,
   wholeNumberAt,
   wholeNumberVal,
   isUniversalMeasure,
@@ -236,7 +236,7 @@ const readRevision: ValueReader<docx.IRunPropertiesChangeOptions> = (el, env, no
 };
 
 const RPR_FATES: FateTable<RunOptions> = {
-  "w:rStyle": to("style", stringVal),
+  "w:rStyle": to("style", styleRefVal),
   "w:rFonts": to("font", readFonts),
   "w:b": flag("bold"),
   "w:bCs": flag("boldComplexScript"),

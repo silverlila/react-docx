@@ -21,7 +21,14 @@ import { DEFAULT_STYLE_SLOTS } from "../schema/docx-facts";
 import type { StylesProps } from "../schema/elements";
 import { DOCX_DEFAULT_STYLES } from "./docx-default-styles.generated";
 
-export type SheetParagraph = docx.IParagraphStylePropertiesOptions & { readonly pageBreakBefore?: boolean };
+/** A style's paragraph options as the reader reads them: docx.js's style type leaves out what the paragraph
+ *  codec also reads (and docx.js writes) for a style. */
+export type SheetParagraph = docx.IParagraphStylePropertiesOptions & {
+  readonly pageBreakBefore?: boolean;
+  readonly tabStops?: readonly docx.TabStopDefinition[];
+  readonly bidirectional?: boolean;
+  readonly widowControl?: boolean;
+};
 
 type SheetStyle = {
   readonly type: "paragraph" | "character" | "table";

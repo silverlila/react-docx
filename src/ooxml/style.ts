@@ -5,7 +5,9 @@
  *  - docx.js gives a character style uiPriority 99 and unhideWhenUsed on write when they are absent. */
 
 import type * as docx from "docx";
-import { attrOf, childNamed, serializeXml, type XmlElement } from "./xml";
+import { DEFAULT_STYLE_SLOTS } from "../schema/docx-facts";
+import { own } from "../schema/own";
+import { attrOf, childNamed, elementsOf, serializeXml, type XmlElement } from "./xml";
 import { xmlRoots } from "../tree/xml-roots";
 import {
   applyFates,
@@ -14,6 +16,7 @@ import {
   mapTo,
   onOff,
   stringVal,
+  styleRefVal,
   wholeNumberVal,
   HANDLED_BESIDE,
   noOption,
@@ -65,9 +68,9 @@ const to = <K extends keyof StyleOptions>(key: K, read: ValueReader<NonNullable<
 const COMMON_FATES: FateTable<StyleOptions> = {
   "w:name": to("name", stringVal),
   "w:aliases": noOption("docx.js has no style aliases option"),
-  "w:basedOn": to("basedOn", stringVal),
-  "w:next": to("next", stringVal),
-  "w:link": to("link", stringVal),
+  "w:basedOn": to("basedOn", styleRefVal),
+  "w:next": to("next", styleRefVal),
+  "w:link": to("link", styleRefVal),
   "w:autoRedefine": noOption("docx.js has no autoRedefine option"),
   "w:hidden": noOption("docx.js has no hidden style option"),
   "w:uiPriority": to("uiPriority", wholeNumberVal),
@@ -109,7 +112,45 @@ function rawStyle(style: XmlElement, because: RawBecause): StyleRead | StyleDrop
   return { kind: "raw", xml, because };
 }
 
-export function readStyle(style: XmlElement, env: CodecEnv): StyleRead | StyleDropped {
+/** Word's styles whose id docx.js writes as a built-in style of the other type, each with a fresh id: Word's
+ *  character style Strong is docx.js's paragraph style Strong, and a styles.xml cannot hold both. */
+export function clashingStyleIds(styles: XmlElement | null): ReadonlyMap<string, string> {
+  const renames = new Map<string, string>();
+  const all = styles === null ? [] : elementsOf(styles).filter((el) => el.name === "w:style");
+  const taken = new Set(all.map((el) => attrOf(el, "w:styleId")));
+  for (const el of all) {
+    const id = attrOf(el, "w:styleId");
+    const type = attrOf(el, "w:type") ?? "paragraph";
+    const slot = id === null ? undefined : own(DEFAULT_STYLE_SLOTS, id);
+    if (id === null || slot === undefined || slot.kind === type || (type !== "paragraph" && type !== "character")) continue;
+    let fresh = `${id}${type === "character" ? "Char" : "Para"}`;
+    while (taken.has(fresh)) fresh = `${fresh}0`;
+    taken.add(fresh);
+    renames.set(id, fresh);
+  }
+  return renames;
+}
+
+const STYLE_REFERENCES = new Set(["w:rStyle", "w:pStyle", "w:tblStyle"]);
+
+/** `el` with its style references following `clashingStyleIds`' renames, for XML kept verbatim. */
+export function withRenamedStyles(el: XmlElement, renames: ReadonlyMap<string, string> | undefined): XmlElement {
+  if (renames === undefined || renames.size === 0) return el;
+  const walk = (node: XmlElement): XmlElement => {
+    const value = STYLE_REFERENCES.has(node.name) ? attrOf(node, "w:val") : null;
+    const renamed = value === null ? undefined : renames.get(value);
+    return {
+      ...node,
+      attributes: renamed === undefined ? node.attributes : { ...node.attributes, "w:val": renamed },
+      children: node.children.map((child) => (typeof child === "string" ? child : walk(child))),
+    };
+  };
+  return walk(el);
+}
+
+export function readStyle(original: XmlElement, env: CodecEnv): StyleRead | StyleDropped {
+  const renamed = env.styleIds?.get(attrOf(original, "w:styleId") ?? "");
+  const style = renamed === undefined ? original : { ...original, attributes: { ...original.attributes, "w:styleId": renamed } };
   const type = attrOf(style, "w:type") ?? "paragraph";
   if (type !== "paragraph" && type !== "character" && type !== "table" && type !== "numbering") {
     return { kind: "dropped", because: `w:type="${type}" is not a style type` };

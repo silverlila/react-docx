@@ -1,5 +1,6 @@
 /** AC13: DocxPreview draws resolved documents as HTML, rendered through react-dom/server (no DOM here). */
 
+import { PageNumber } from "docx";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test } from "vitest";
 import { DocxPreview, renderToTree, resolveDocument, type ResolvedBlock } from "../src/html/index";
@@ -7,6 +8,8 @@ import {
   Bookmark,
   Document,
   ExternalHyperlink,
+  Footer,
+  PageBreak,
   InternalHyperlink,
   Paragraph,
   Section,
@@ -95,28 +98,30 @@ describe("DocxPreview", () => {
   test.each(inputs)("%s: every resolved block carries its data-docx-path", async (_name, input) => {
     const document = await input();
     const out = html(document);
-    const sections = resolveDocument(document);
+    const pages = resolveDocument(document);
     const blocks = allBlocks(
-      sections.flatMap((s) => [...s.header, ...s.body, ...s.footer, ...s.footnotes.flatMap((note) => note.blocks)])
+      pages.flatMap((p) => [...p.header, ...p.parts.flatMap((part) => part.blocks), ...p.footer, ...p.footnotes.flatMap((note) => note.blocks)])
     );
     expect(blocks.length).toBeGreaterThan(0);
     for (const block of blocks) expect(out).toContain(pathAttr(block));
   });
 
-  test.each(inputs)("%s: one data-docx-section per Section", async (_name, input) => {
+  test.each(inputs)("%s: one data-docx-page per resolved page, at least a page tall", async (_name, input) => {
     const document = await input();
-    const sectionCount = document.children.filter((child) => child.type === "Section").length;
-    expect(sectionCount).toBeGreaterThan(0);
-    expect(count(html(document), "data-docx-section=")).toBe(sectionCount);
+    const pages = resolveDocument(document);
+    const out = html(document);
+    expect(pages.length).toBeGreaterThan(0);
+    expect(count(out, "data-docx-page=")).toBe(pages.length);
+    expect(out).toContain(`min-height:${pages[0].heightPt}pt`);
   });
 
   test("draws the header's first block before the body's first block", () => {
     const document = readWordShaped("resume");
-    const [section] = resolveDocument(document);
-    expect(section.header.length).toBeGreaterThan(0);
+    const [page] = resolveDocument(document);
+    expect(page.header.length).toBeGreaterThan(0);
     const out = html(document);
-    const header = out.indexOf(pathAttr(section.header[0]));
-    const body = out.indexOf(pathAttr(section.body[0]));
+    const header = out.indexOf(pathAttr(page.header[0]));
+    const body = out.indexOf(pathAttr(page.parts[0].blocks[0]));
     expect(header).toBeGreaterThan(-1);
     expect(body).toBeGreaterThan(header);
   });
@@ -139,8 +144,47 @@ describe("DocxPreview", () => {
     expect(out).toMatch(/<span data-docx-marker=""[^>]*>2\.<\/span>/);
   });
 
-  test("draws a page break as a marked rule", async () => {
-    expect(html(await readCase("tab-break-pagebreak"))).toContain("<hr data-docx-page-break");
+  test("a page break starts the next page", () => {
+    const document = renderToTree(
+      <Document>
+        <Section>
+          <Paragraph>
+            one
+            <PageBreak />
+            two
+          </Paragraph>
+        </Section>
+      </Document>
+    );
+    const out = html(document);
+    expect(count(out, "data-docx-page=")).toBe(2);
+    expect(out.indexOf("two")).toBeGreaterThan(out.indexOf('data-docx-page="2"'));
+  });
+
+  test("a page field shows its page's number, and a page-count field the document's page count", () => {
+    const document = renderToTree(
+      <Document>
+        <Section>
+          <Footer>
+            <Paragraph>
+              <TextRun>
+                {"Page "}
+                {PageNumber.CURRENT}
+                {" of "}
+                {PageNumber.TOTAL_PAGES}
+              </TextRun>
+            </Paragraph>
+          </Footer>
+          <Paragraph>
+            one
+            <PageBreak />
+            two
+          </Paragraph>
+        </Section>
+      </Document>
+    );
+    const fields = [...html(document).matchAll(/<span data-docx-field=""[^>]*>([^<]*)<\/span>/g)].map((m) => m[1]);
+    expect(fields).toEqual(["1", "2", "2", "2"]);
   });
 
   test("keeps a page break's following text in the same paragraph", async () => {
@@ -188,7 +232,7 @@ describe("DocxPreview", () => {
     }
   );
 
-  test("draws http, https, mailto and bookmark links with their href", () => {
+  test("draws http, https, mailto and bookmark links with their href, styled only by their runs", () => {
     const out = html(
       renderToTree(
         <Document>
@@ -214,10 +258,10 @@ describe("DocxPreview", () => {
         </Document>
       )
     );
-    expect(out).toContain('<a href="https://example.com/a?b=1">');
-    expect(out).toContain('<a href="http://example.com/">');
-    expect(out).toContain('<a href="mailto:me@example.com">');
-    expect(out).toContain('<a href="#top">');
+    expect(out).toContain('<a href="https://example.com/a?b=1" style="color:inherit;text-decoration:none">');
+    expect(out).toContain('<a href="http://example.com/" style="color:inherit;text-decoration:none">');
+    expect(out).toContain('<a href="mailto:me@example.com" style="color:inherit;text-decoration:none">');
+    expect(out).toContain('<a href="#top" style="color:inherit;text-decoration:none">');
   });
 
   test("forwards className and other div props to its root", () => {

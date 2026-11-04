@@ -1,8 +1,14 @@
-/** CSS has no "at least" line height, so atLeast is drawn as exact. A paragraph's box takes the paragraph
- *  mark's font, so an empty paragraph is as tall as in Word. */
+/** - Right to left: a paragraph's indents are logical (Word's left indent is the start), its borders
+ *    physical.
+ *  - Line height: CSS sets a line box at its tallest inline box, as Word sets a line at its tallest run,
+ *    so each run carries its own line height (ComputedRun.lineHeight) and the paragraph's box carries
+ *    the paragraph mark's. An atLeast line is the paragraph's minimum with each run at its single height;
+ *    an exact line is the paragraph's, inherited by every run.
+ *  - A paragraph's box takes the paragraph mark's font, so an empty paragraph is as tall as in Word. */
 
 import type { CSSProperties } from "react";
 import { isOwnKey } from "../schema/own";
+import { fontFamilyCss, lineHeightOf } from "./fonts";
 import type { ComputedBorder, ComputedParagraph, ComputedRun } from "./resolve";
 
 const UNDERLINE_STYLES: Readonly<Record<string, CSSProperties["textDecorationStyle"]>> = {
@@ -24,7 +30,9 @@ const UNDERLINE_STYLES: Readonly<Record<string, CSSProperties["textDecorationSty
 
 const pt = (n: number): string => `${n}pt`;
 
-const fontFamily = (name: string): string => `"${name.replace(/["\\]/g, "\\$&")}"`;
+/** Word sets superscript and subscript at about two thirds of the run's size, and they do not make
+ *  their line taller. */
+const SCRIPT_SCALE = 0.65;
 
 function textDecoration(r: ComputedRun): CSSProperties {
   const lines = [...(r.underline === null ? [] : ["underline"]), ...(r.strike || r.doubleStrike ? ["line-through"] : [])];
@@ -41,8 +49,9 @@ function textDecoration(r: ComputedRun): CSSProperties {
 export function runStyle(r: ComputedRun): CSSProperties {
   const background = r.highlight ?? r.background;
   return {
-    fontFamily: fontFamily(r.fontFamily),
-    fontSize: pt(r.sizePt),
+    fontFamily: fontFamilyCss([r.fontFamily, ...r.otherFonts]),
+    ...(r.rtl ? { direction: "rtl", unicodeBidi: "embed" } : {}),
+    fontSize: pt(r.verticalAlign === null ? r.sizePt : r.sizePt * SCRIPT_SCALE),
     fontWeight: r.bold ? "bold" : "normal",
     fontStyle: r.italic ? "italic" : "normal",
     ...textDecoration(r),
@@ -53,6 +62,8 @@ export function runStyle(r: ComputedRun): CSSProperties {
     ...(r.verticalAlign === null ? {} : { verticalAlign: r.verticalAlign }),
     ...(r.letterSpacingPt === 0 ? {} : { letterSpacing: pt(r.letterSpacingPt) }),
     ...(r.hidden ? { display: "none" } : {}),
+    ...(r.lineHeight === null ? {} : { lineHeight: r.lineHeight }),
+    ...(r.verticalAlign === null ? {} : { lineHeight: 0 }),
   };
 }
 
@@ -61,21 +72,27 @@ export function borderCss(b: ComputedBorder): string {
 }
 
 function lineHeight(p: ComputedParagraph): CSSProperties["lineHeight"] {
-  return p.lineHeight.kind === "multiple" ? p.lineHeight.value : pt(p.lineHeight.pt);
+  const line = p.lineHeight;
+  return line.kind === "multiple" ? line.value * lineHeightOf(p.markRun.fontFamily) : pt(line.pt);
 }
+
+/** Space before and after is padding, which, unlike margins, adjacent paragraphs do not collapse: Word adds
+ *  one paragraph's space after to the next one's space before. Word's shading and borders take in the
+ *  spacing too. */
+const spacing = (p: ComputedParagraph): CSSProperties => ({ paddingTop: pt(p.spaceBeforePt), paddingBottom: pt(p.spaceAfterPt) });
 
 export function paragraphStyle(p: ComputedParagraph): CSSProperties {
   const { top, bottom, left, right } = p.borders;
   return {
     margin: 0,
-    marginTop: pt(p.spaceBeforePt),
-    marginBottom: pt(p.spaceAfterPt),
-    marginLeft: pt(p.indentLeftPt),
-    marginRight: pt(p.indentRightPt),
+    ...spacing(p),
+    marginInlineStart: pt(p.indentLeftPt),
+    marginInlineEnd: pt(p.indentRightPt),
+    ...(p.rtl ? { direction: "rtl" } : {}),
     textIndent: pt(p.firstLinePt),
     textAlign: p.align,
     lineHeight: lineHeight(p),
-    fontFamily: fontFamily(p.markRun.fontFamily),
+    fontFamily: fontFamilyCss([p.markRun.fontFamily, ...p.markRun.otherFonts]),
     fontSize: pt(p.markRun.sizePt),
     ...(top === undefined ? {} : { borderTop: borderCss(top) }),
     ...(bottom === undefined ? {} : { borderBottom: borderCss(bottom) }),

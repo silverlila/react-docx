@@ -65,3 +65,6 @@ test/.generated/
 
 # Previews written by pnpm run preview (unit 10)
 .preview/
+
+# Preview test corpus: local only, partly third-party documents not licensed for redistribution
+corpus/

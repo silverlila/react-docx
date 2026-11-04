@@ -28,10 +28,18 @@ import type { TreePath } from "../read/diagnostics";
 import type { ChildKind, DocumentNode, Node } from "../schema/elements";
 import { own } from "../schema/own";
 import { xmlRoots } from "../tree/xml-roots";
+import { lineHeightOf } from "./fonts";
+import { paginate, type MeasuredBreaks, type ResolvedPage } from "./pages";
+import { rawBlocks, rawInlines } from "./raw";
+import type { TabStop } from "./tabs";
 import { effectiveSheet, styleChain, type EffectiveSheet, type SheetParagraph } from "./sheet";
 
 export type ComputedRun = {
   readonly fontFamily: string;
+  /** The run's fonts for other scripts, for characters its own font lacks. */
+  readonly otherFonts: readonly string[];
+  /** Right-to-left text (w:rtl). */
+  readonly rtl: boolean;
   readonly sizePt: number;
   readonly bold: boolean;
   readonly italic: boolean;
@@ -50,6 +58,9 @@ export type ComputedRun = {
   readonly verticalAlign: "super" | "sub" | null;
   readonly letterSpacingPt: number;
   readonly hidden: boolean;
+  /** The run's own line height as a multiple of its size, from its paragraph's line rule; null inherits
+   *  the paragraph's. */
+  readonly lineHeight: number | null;
 };
 
 export type ComputedBorder = {
@@ -62,6 +73,8 @@ type Side = "top" | "bottom" | "left" | "right";
 
 export type ComputedParagraph = {
   readonly align: "left" | "center" | "right" | "justify" | "start" | "end";
+  /** A right-to-left paragraph (w:bidi): its alignment and indents are logical, start being the right. */
+  readonly rtl: boolean;
   readonly spaceBeforePt: number;
   readonly spaceAfterPt: number;
   readonly lineHeight:
@@ -74,25 +87,60 @@ export type ComputedParagraph = {
   readonly borders: Partial<Record<Side, ComputedBorder>>;
   readonly background: string | null;
   readonly pageBreakBefore: boolean;
+  /** Keep with the next paragraph on one page. */
+  readonly keepNext: boolean;
+  /** Keep all its lines on one page. */
+  readonly keepLines: boolean;
+  /** Leave no single line of it alone at the foot or head of a page. */
+  readonly widowControl: boolean;
   readonly markRun: ComputedRun;
+  /** Tab stops, relative to the left indent, in position order. */
+  readonly tabStops: readonly TabStop[];
+  readonly defaultTabPt: number;
+  /** The paragraph style in effect, for contextual spacing. */
+  readonly styleId: string | null;
+  readonly contextualSpacing: boolean;
 };
 
 export type ResolvedInline =
-  | { readonly kind: "text"; readonly text: string; readonly run: ComputedRun }
-  | { readonly kind: "tab" | "lineBreak" | "pageBreak" | "columnBreak" }
-  | { readonly kind: "field"; readonly placeholder: string; readonly run: ComputedRun }
+  /** `at`: which text of its paragraph piece this is, and the offset its text starts at there, set by
+   *  pagination so a page break found by measuring can name a character. */
+  | { readonly kind: "text"; readonly text: string; readonly run: ComputedRun; readonly at?: readonly [number, number] }
+  | { readonly kind: "lineBreak" | "columnBreak" }
+  /** A tab, with its run's formatting: an underlined tab draws its gap underlined. */
+  | { readonly kind: "tab"; readonly run: ComputedRun }
+  /** `rendered`: where Word last broke the page on its own (w:lastRenderedPageBreak), not an authored break. */
+  | { readonly kind: "pageBreak"; readonly rendered: boolean }
+  | { readonly kind: "field"; readonly field: FieldKind; readonly placeholder: string; readonly run: ComputedRun }
   | {
       readonly kind: "image";
       readonly src: string;
       readonly widthPx: number;
       readonly heightPx: number;
       readonly alt: string;
-      readonly floating: boolean;
+      /** How a floating picture sits on the page; null for a picture in line with the text. */
+      readonly float: ResolvedFloat | null;
     }
   | { readonly kind: "link"; readonly href: string; readonly inlines: readonly ResolvedInline[] }
   | { readonly kind: "anchor"; readonly id: string; readonly inlines: readonly ResolvedInline[] }
   | { readonly kind: "footnoteRef"; readonly n: number; readonly run: ComputedRun }
   | { readonly kind: "raw"; readonly element: string };
+
+/** A floating picture: its wrap, and where it sits. A horizontal position is from the page's left edge or
+ *  the left margin; a vertical one from the page's top, the top margin, or the anchoring paragraph. Each
+ *  is an offset in points or an alignment in its frame. */
+export type ResolvedFloat = {
+  readonly wrap: "none" | "square" | "topAndBottom";
+  readonly behind: boolean;
+  readonly horizontal: { readonly from: "page" | "margin"; readonly align: "left" | "center" | "right" | null; readonly offsetPt: number };
+  readonly vertical: { readonly from: "page" | "margin" | "paragraph"; readonly align: "top" | "center" | "bottom" | null; readonly offsetPt: number };
+  /** The space kept between the picture and wrapped text. */
+  readonly distancePt: Readonly<Record<Side, number>>;
+};
+
+/** What a field shows: the page's number, the document's or section's page count, the section's number, or
+ *  a value the preview does not compute (a date, a page reference). */
+export type FieldKind = "page" | "numPages" | "sectionPages" | "section" | "date" | "ref";
 
 export type ResolvedMarker = {
   readonly text: string;
@@ -111,7 +159,16 @@ export type ResolvedBlock =
   | {
       readonly kind: "table";
       readonly path: TreePath;
+      /** A right-to-left table (w:bidiVisual): its columns run from the right, and left and right are
+       *  start and end. */
+      readonly rtl: boolean;
       readonly widthPt: number | null;
+      /** A width as a percentage of the space the table stands in. */
+      readonly widthPct: number | null;
+      readonly indentPt: number;
+      readonly align: "start" | "center" | "end";
+      /** Fixed layout: columns keep their widths whatever their content. */
+      readonly fixed: boolean;
       readonly columnWidthsPt: readonly number[];
       readonly rows: readonly ResolvedRow[];
     }
@@ -120,6 +177,10 @@ export type ResolvedBlock =
       readonly path: TreePath;
       readonly widthPt: number | null;
       readonly heightPt: number | null;
+      /** Where an absolutely positioned text box sits; null for one in the flow. */
+      readonly float: ResolvedFloat | null;
+      /** Clockwise, in degrees. */
+      readonly rotation: number;
       readonly blocks: readonly ResolvedBlock[];
     }
   | { readonly kind: "raw"; readonly path: TreePath; readonly element: string };
@@ -130,6 +191,7 @@ export type ResolvedCell = {
   readonly colSpan: number;
   readonly rowSpan: number;
   readonly widthPt: number | null;
+  readonly paddingPt: Readonly<Record<Side, number>>;
   readonly background: string | null;
   readonly borders: ComputedParagraph["borders"];
   readonly verticalAlign: "top" | "center" | "bottom";
@@ -138,14 +200,31 @@ export type ResolvedCell = {
 
 export type ResolvedFootnote = { readonly n: number; readonly blocks: readonly ResolvedBlock[] };
 
-export type ResolvedSection = {
-  readonly path: TreePath;
+export type PageGeometry = {
   readonly widthPt: number;
   readonly heightPt: number;
-  readonly marginsPt: Readonly<Record<"top" | "right" | "bottom" | "left", number>>;
-  readonly header: readonly ResolvedBlock[];
+  /** header and footer: the distance from the page's top (bottom) edge to the header's top (footer's bottom). */
+  readonly marginsPt: Readonly<Record<"top" | "right" | "bottom" | "left" | "header" | "footer", number>>;
+};
+
+export type ResolvedColumns = { readonly count: number; readonly spacePt: number; readonly separate: boolean };
+
+type HeaderFooterType = "default" | "first" | "even";
+
+/** One section, resolved but not yet broken into pages (pages.ts does that). */
+export type ResolvedSection = PageGeometry & {
+  readonly path: TreePath;
+  /** How the section starts: on a new page, or continuing the previous section's last page. */
+  readonly continuous: boolean;
+  readonly titlePage: boolean;
+  /** The section's first page number, when it restarts numbering. */
+  readonly pageNumberStart: number | null;
+  readonly pageNumberFormat: string;
+  readonly columns: ResolvedColumns | null;
+  /** The section's own headers and footers, by type; a type it does not define is inherited (pages.ts). */
+  readonly headers: Readonly<Partial<Record<HeaderFooterType, readonly ResolvedBlock[]>>>;
+  readonly footers: Readonly<Partial<Record<HeaderFooterType, readonly ResolvedBlock[]>>>;
   readonly body: readonly ResolvedBlock[];
-  readonly footer: readonly ResolvedBlock[];
   readonly footnotes: readonly ResolvedFootnote[];
 };
 
@@ -161,6 +240,7 @@ type TableLayer = { readonly paragraph: SheetParagraph; readonly run: RunOptions
 
 type DocumentScope = {
   readonly sheet: EffectiveSheet;
+  readonly defaultTabPt: number;
   readonly levels: ReadonlyMap<string, Levels>;
   readonly bodyCounters: Counters;
   nextFootnote(): number;
@@ -173,11 +253,23 @@ type Story = {
   readonly table: TableLayer | null;
 };
 
-type InlineScope = { readonly story: Story; readonly run: RunOptions };
+type LineRule = ComputedParagraph["lineHeight"];
+
+/** tocEntry: a table-of-contents entry, whose hyperlinks Word draws in the entry's own formatting. */
+type InlineScope = { readonly story: Story; readonly run: RunOptions; readonly line: LineRule | null; readonly tocEntry?: boolean };
+
+const TOC_ENTRY_STYLE = /^TOC[1-9]$/i;
+const HYPERLINK_STYLE = "Hyperlink";
 
 const FALLBACK_RUN = { font: "Times New Roman", size: 20 } as const;
 
-const PAGE_DEFAULTS = { width: 11906, height: 16838, top: 1440, right: 1440, bottom: 1440, left: 1440 } as const;
+const PAGE_DEFAULTS = { width: 11906, height: 16838, top: 1440, right: 1440, bottom: 1440, left: 1440, header: 708, footer: 708 } as const;
+
+/** Word's default tab stop interval: 0.5in. */
+const DEFAULT_TAB_STOP = 720;
+
+/** Word's default space between columns: 0.5in. */
+const DEFAULT_COLUMN_SPACE = 720;
 
 const DOCX_TABLE_BORDER: docx.IBorderOptions = { style: "single", size: 4, color: "auto" };
 
@@ -191,7 +283,6 @@ const BASE64_CHUNK = 0x8000;
 const FONT_SLOTS: readonly FontSlot[] = ["ascii", "hAnsi", "eastAsia", "cs"];
 const POINTS_PER_UNIT: Readonly<Record<string, number>> = { pt: 1, pc: 12, pi: 12, in: 72, cm: 72 / 2.54, mm: 72 / 25.4 };
 const UNIVERSAL_MEASURE = /^(-?[0-9]+(?:\.[0-9]+)?)(mm|cm|in|pt|pc|pi)$/;
-const POINT_LENGTH = /^(-?[0-9]+(?:\.[0-9]+)?)pt$/;
 const HEX = /^[0-9A-Fa-f]{6}$/;
 
 const ALIGNMENTS: Readonly<Record<string, ComputedParagraph["align"]>> = {
@@ -207,6 +298,14 @@ const ALIGNMENTS: Readonly<Record<string, ComputedParagraph["align"]>> = {
   lowKashida: "justify",
   thaiDistribute: "justify",
 };
+
+/** In a right-to-left paragraph Word reads left and right as start and end. */
+function alignOf(alignment: string | undefined, rtl: boolean): ComputedParagraph["align"] {
+  const align = (alignment === undefined ? undefined : own(ALIGNMENTS, alignment)) ?? "left";
+  if (align === "left") return rtl ? "start" : "left";
+  if (align === "right") return rtl ? "end" : "right";
+  return align;
+}
 
 const BORDER_STYLES: Readonly<Record<string, ComputedBorder["style"] | null>> = {
   single: "solid",
@@ -253,9 +352,32 @@ function pointsOf(value: Measure, perPoint: number): number {
 
 const hexOrNull = (color: string | undefined): string | null => (color !== undefined && HEX.test(color) ? color : null);
 
+/** How much of a shading pattern is its foreground colour: Word draws pctN as N%, stripes and crosses as
+ *  their average cover. */
+function patternCover(type: string | undefined): number {
+  if (type === undefined || type === "clear") return 0;
+  if (type === "solid") return 1;
+  const pct = /^pct(\d+)$/.exec(type);
+  if (pct !== null) return Number(pct[1]) / 100;
+  return type.startsWith("thin") ? 0.25 : 0.5;
+}
+
+function mix(foreground: string, background: string, cover: number): string {
+  const channel = (hex: string, i: number) => parseInt(hex.slice(i, i + 2), 16);
+  return [0, 2, 4]
+    .map((i) => Math.round(channel(background, i) * (1 - cover) + channel(foreground, i) * cover).toString(16).padStart(2, "0"))
+    .join("")
+    .toUpperCase();
+}
+
+/** A shading's colour: its fill under its pattern drawn in its colour. An automatic fill is none (white
+ *  under a pattern) and an automatic pattern colour is black. */
 function shadingColor(shading: docx.IShadingAttributesProperties | undefined): string | null {
   if (shading === undefined || shading.type === "nil") return null;
-  return shading.type === "solid" ? hexOrNull(shading.color) : hexOrNull(shading.fill);
+  const fill = hexOrNull(shading.fill);
+  const cover = patternCover(shading.type);
+  if (cover === 0) return fill;
+  return mix(hexOrNull(shading.color) ?? "000000", fill ?? "FFFFFF", cover);
 }
 
 function computeBorder(border: docx.IBorderOptions | undefined): ComputedBorder | null {
@@ -310,25 +432,79 @@ function indentOf(indent: Indent | undefined): Indent {
   };
 }
 
+type TabStops = NonNullable<SheetParagraph["tabStops"]>;
+
+/** Tab stops add up down the cascade: a stop replaces one at its position, and a clear stop removes it. */
+function overTabStops(base: TabStops | undefined, over: TabStops | undefined): TabStops | undefined {
+  if (over === undefined) return base;
+  const at = new Map((base ?? []).map((stop) => [stop.position, stop]));
+  for (const stop of over) {
+    if (stop.type === "clear") at.delete(stop.position);
+    else at.set(stop.position, stop);
+  }
+  return [...at.values()];
+}
+
 function overParagraph(base: SheetParagraph, over: SheetParagraph | undefined): SheetParagraph {
   if (over === undefined) return base;
+  const tabStops = overTabStops(base.tabStops, over.tabStops);
   return {
     ...base,
     ...over,
     spacing: { ...base.spacing, ...over.spacing },
     indent: { ...indentOf(base.indent), ...indentOf(over.indent) },
+    ...(tabStops === undefined ? {} : { tabStops }),
   };
 }
 
-function computeRun(run: RunOptions): ComputedRun {
+const TAB_ALIGNS: Readonly<Record<string, TabStop["align"]>> = {
+  left: "left",
+  start: "left",
+  right: "right",
+  end: "right",
+  center: "center",
+  decimal: "decimal",
+};
+
+const TAB_LEADERS: ReadonlySet<string> = new Set(["dot", "hyphen", "underscore", "heavy", "middleDot"]);
+
+function computeTabStops(stops: TabStops | undefined, indentLeftPt: number, firstLinePt: number): TabStop[] {
+  const out: TabStop[] = [];
+  for (const stop of stops ?? []) {
+    const align = own(TAB_ALIGNS, stop.type);
+    if (align === undefined) continue;
+    const leader = stop.leader !== undefined && TAB_LEADERS.has(stop.leader) ? (stop.leader as TabStop["leader"]) : "none";
+    out.push({ posPt: pointsOf(stop.position, TWIPS_PER_PT) - indentLeftPt, align, leader });
+  }
+  if (firstLinePt < 0 && !out.some((stop) => Math.abs(stop.posPt) < 0.01)) out.push({ posPt: 0, align: "left", leader: "none" });
+  return out.sort((a, b) => a.posPt - b.posPt);
+}
+
+/** A run's line height under its paragraph's rule: Word sets each line at its tallest run's single line
+ *  height times the multiple, or at least the paragraph's minimum. An exact line inherits. */
+function runLineHeight(fontFamily: string, line: LineRule | null): number | null {
+  if (line === null || line.kind === "exact") return null;
+  return lineHeightOf(fontFamily) * (line.kind === "multiple" ? line.value : 1);
+}
+
+/** A right-to-left run takes its complex-script font, size, bold and italic, as Word sets right-to-left
+ *  text. Every run lists its other scripts' fonts after its own, for the characters its own font lacks. */
+function computeRun(run: RunOptions, line: LineRule | null = null): ComputedRun {
   const font = fontSlots(run.font);
+  const rtl = run.rightToLeft ?? false;
+  const latin = font.ascii ?? font.hAnsi;
+  const fontFamily = (rtl ? font.cs ?? latin : latin) ?? FALLBACK_RUN.font;
+  const otherFonts = [latin, font.eastAsia, font.cs].filter((f): f is string => f !== undefined && f !== fontFamily);
+  const size = rtl && run.sizeComplexScript !== undefined && typeof run.sizeComplexScript !== "boolean" ? run.sizeComplexScript : run.size;
   const underline = run.underline === undefined ? null : run.underline.type ?? "single";
   const highlight = run.highlight === undefined ? undefined : own(HIGHLIGHTS, run.highlight);
   return {
-    fontFamily: font.ascii ?? font.hAnsi ?? FALLBACK_RUN.font,
-    sizePt: pointsOf(run.size ?? FALLBACK_RUN.size, HALF_POINTS_PER_PT),
-    bold: run.bold ?? false,
-    italic: run.italics ?? false,
+    fontFamily,
+    otherFonts: [...new Set(otherFonts)],
+    rtl,
+    sizePt: pointsOf(size ?? FALLBACK_RUN.size, HALF_POINTS_PER_PT),
+    bold: (rtl ? run.boldComplexScript ?? run.bold : run.bold) ?? false,
+    italic: (rtl ? run.italicsComplexScript ?? run.italics : run.italics) ?? false,
     underline: underline === "none" ? null : underline,
     strike: run.strike ?? false,
     doubleStrike: run.doubleStrike ?? false,
@@ -340,10 +516,11 @@ function computeRun(run: RunOptions): ComputedRun {
     verticalAlign: run.superScript ? "super" : run.subScript ? "sub" : null,
     letterSpacingPt: (run.characterSpacing ?? 0) / TWIPS_PER_PT,
     hidden: run.vanish ?? false,
+    lineHeight: runLineHeight(fontFamily, line),
   };
 }
 
-function lineHeightOf(spacing: SheetParagraph["spacing"]): ComputedParagraph["lineHeight"] {
+function lineRuleOf(spacing: SheetParagraph["spacing"]): LineRule {
   const line = spacing?.line;
   if (line === undefined) return { kind: "multiple", value: 1 };
   switch (spacing?.lineRule) {
@@ -357,22 +534,30 @@ function lineHeightOf(spacing: SheetParagraph["spacing"]): ComputedParagraph["li
   }
 }
 
-function computeParagraph(p: SheetParagraph, markRun: ComputedRun): ComputedParagraph {
+function computeParagraph(p: SheetParagraph, markRun: ComputedRun, styleId: string | null, defaultTabPt: number): ComputedParagraph {
   const indent = p.indent ?? {};
   const firstLine =
     indent.hanging !== undefined ? -pointsOf(indent.hanging, TWIPS_PER_PT) : pointsOf(indent.firstLine ?? 0, TWIPS_PER_PT);
   return {
-    align: (p.alignment === undefined ? undefined : own(ALIGNMENTS, p.alignment)) ?? "left",
+    align: alignOf(p.alignment, p.bidirectional ?? false),
+    rtl: p.bidirectional ?? false,
     spaceBeforePt: (p.spacing?.before ?? 0) / TWIPS_PER_PT,
     spaceAfterPt: (p.spacing?.after ?? 0) / TWIPS_PER_PT,
-    lineHeight: lineHeightOf(p.spacing),
+    lineHeight: lineRuleOf(p.spacing),
     indentLeftPt: pointsOf(indent.left ?? 0, TWIPS_PER_PT),
     indentRightPt: pointsOf(indent.right ?? 0, TWIPS_PER_PT),
     firstLinePt: firstLine,
     borders: computeBorders(p.border ?? {}),
     background: shadingColor(p.shading),
     pageBreakBefore: p.pageBreakBefore ?? false,
+    keepNext: p.keepNext ?? false,
+    keepLines: p.keepLines ?? false,
+    widowControl: p.widowControl ?? false,
     markRun,
+    tabStops: computeTabStops(p.tabStops, pointsOf(indent.left ?? 0, TWIPS_PER_PT), firstLine),
+    defaultTabPt,
+    styleId,
+    contextualSpacing: p.contextualSpacing ?? false,
   };
 }
 
@@ -385,7 +570,8 @@ function withCharacterStyle(base: RunOptions, style: string | undefined, sheet: 
 }
 
 function runOf(scope: InlineScope, props: RunOptions): ComputedRun {
-  return computeRun(overRun(withCharacterStyle(scope.run, props.style, scope.story.doc.sheet), props));
+  const style = scope.tocEntry && props.style === HYPERLINK_STYLE ? undefined : props.style;
+  return computeRun(overRun(withCharacterStyle(scope.run, style, scope.story.doc.sheet), props), scope.line);
 }
 
 function base64(bytes: Uint8Array): string {
@@ -404,6 +590,16 @@ function firstRoot(xml: string): string {
   return roots.roots[0];
 }
 
+const PAGE_FIELDS: Readonly<Record<Node<"PageNumber">["props"]["field"], FieldKind>> = {
+  CURRENT: "page",
+  TOTAL_PAGES: "numPages",
+  TOTAL_PAGES_IN_SECTION: "sectionPages",
+  SECTION: "section",
+};
+
+const rawInline = (element: string): ResolvedInline =>
+  element === "w:lastRenderedPageBreak" ? { kind: "pageBreak", rendered: true } : { kind: "raw", element };
+
 const repeat = <T>(count: number, item: T): T[] => Array.from({ length: count }, () => item);
 
 function runContent(child: RunChild, run: ComputedRun): ResolvedInline[] {
@@ -411,7 +607,7 @@ function runContent(child: RunChild, run: ComputedRun): ResolvedInline[] {
   switch (child.type) {
     case "Tab":
     case "PositionalTab":
-      return [{ kind: "tab" }];
+      return [{ kind: "tab", run }];
     case "CarriageReturn":
       return [{ kind: "lineBreak" }];
     case "SoftHyphen":
@@ -419,16 +615,16 @@ function runContent(child: RunChild, run: ComputedRun): ResolvedInline[] {
     case "NoBreakHyphen":
       return [{ kind: "text", text: "‑", run }];
     case "PageNumber":
-      return [{ kind: "field", placeholder: "#", run }];
+      return [{ kind: "field", field: PAGE_FIELDS[child.props.field], placeholder: "#", run }];
     case "DayShort":
     case "DayLong":
     case "MonthShort":
     case "MonthLong":
     case "YearShort":
     case "YearLong":
-      return [{ kind: "field", placeholder: "date", run }];
+      return [{ kind: "field", field: "date", placeholder: "date", run }];
     case "RawXml":
-      return [{ kind: "raw", element: firstRoot(child.props.xml) }];
+      return [rawInline(firstRoot(child.props.xml))];
     case "CommentReference":
       return [];
     default: {
@@ -448,6 +644,53 @@ function textRun(node: Node<"TextRun" | "InsertedTextRun">, scope: InlineScope):
   ];
 }
 
+const EMU_PER_PT = 12700;
+
+const H_ALIGNS: Readonly<Record<string, ResolvedFloat["horizontal"]["align"]>> = {
+  left: "left",
+  inside: "left",
+  center: "center",
+  right: "right",
+  outside: "right",
+};
+
+const V_ALIGNS: Readonly<Record<string, ResolvedFloat["vertical"]["align"]>> = {
+  top: "top",
+  inside: "top",
+  center: "center",
+  bottom: "bottom",
+  outside: "bottom",
+};
+
+/** docx.js's TextWrappingType: none, square, tight, top and bottom. */
+const WRAPS: readonly ResolvedFloat["wrap"][] = ["none", "square", "square", "topAndBottom"];
+
+function floatOf(floating: NonNullable<Node<"ImageRun">["props"]["floating"]>): ResolvedFloat {
+  const h = floating.horizontalPosition;
+  const v = floating.verticalPosition;
+  const margins = floating.margins ?? {};
+  return {
+    wrap: WRAPS[floating.wrap?.type ?? 0] ?? "none",
+    behind: floating.behindDocument ?? false,
+    horizontal: {
+      from: h.relative === "page" || h.relative === "leftMargin" || h.relative === "insideMargin" ? "page" : "margin",
+      align: h.align === undefined ? null : own(H_ALIGNS, h.align) ?? null,
+      offsetPt: (h.offset ?? 0) / EMU_PER_PT,
+    },
+    vertical: {
+      from: v.relative === "page" || v.relative === "topMargin" ? "page" : v.relative === "margin" ? "margin" : "paragraph",
+      align: v.align === undefined ? null : own(V_ALIGNS, v.align) ?? null,
+      offsetPt: (v.offset ?? 0) / EMU_PER_PT,
+    },
+    distancePt: {
+      top: (margins.top ?? 0) / EMU_PER_PT,
+      bottom: (margins.bottom ?? 0) / EMU_PER_PT,
+      left: (margins.left ?? 0) / EMU_PER_PT,
+      right: (margins.right ?? 0) / EMU_PER_PT,
+    },
+  };
+}
+
 function image(props: Node<"ImageRun">["props"]): ResolvedInline {
   const alt = props.altText;
   return {
@@ -456,7 +699,7 @@ function image(props: Node<"ImageRun">["props"]): ResolvedInline {
     widthPx: props.transformation.width,
     heightPx: props.transformation.height,
     alt: alt?.description ?? alt?.title ?? alt?.name ?? "",
-    floating: !!props.floating,
+    float: props.floating === undefined ? null : floatOf(props.floating),
   };
 }
 
@@ -475,7 +718,7 @@ function inline(node: InlineNode, at: TreePath, scope: InlineScope): ResolvedInl
     case "CommentRangeEnd":
       return [];
     case "PageBreak":
-      return [{ kind: "pageBreak" }];
+      return [{ kind: "pageBreak", rendered: false }];
     case "ColumnBreak":
       return [{ kind: "columnBreak" }];
     case "SymbolRun": {
@@ -493,26 +736,28 @@ function inline(node: InlineNode, at: TreePath, scope: InlineScope): ResolvedInl
       return [{ kind: "anchor", id: node.props.id, inlines: inlinesOf(node.children, at, scope) }];
     case "Math": {
       const text = node.children.map((mathRun) => mathRun.children.join("")).join("");
-      return [{ kind: "text", text, run: computeRun(overRun(scope.run, { italics: true })) }];
+      return [{ kind: "text", text, run: computeRun(overRun(scope.run, { italics: true }), scope.line) }];
     }
     case "Footnote": {
       const n = scope.story.doc.nextFootnote();
       const story: Story = { ...scope.story, counters: new Map(), table: null };
       scope.story.footnotes.push({ n, blocks: blocksOf(node.children, at, story) });
-      const run = computeRun(withCharacterStyle(scope.run, "FootnoteReference", sheet));
+      const run = computeRun(withCharacterStyle(scope.run, "FootnoteReference", sheet), scope.line);
       return [{ kind: "footnoteRef", n, run }];
     }
     case "SimpleField":
-      return [{ kind: "text", text: node.props.cachedValue ?? "", run: computeRun(scope.run) }];
+      return [{ kind: "text", text: node.props.cachedValue ?? "", run: computeRun(scope.run, scope.line) }];
     case "SimpleMailMergeField":
-      return [{ kind: "text", text: `«${node.props.fieldName}»`, run: computeRun(scope.run) }];
+      return [{ kind: "text", text: `«${node.props.fieldName}»`, run: computeRun(scope.run, scope.line) }];
     case "SequentialIdentifier":
     case "PageReference":
-      return [{ kind: "field", placeholder: "#", run: computeRun(scope.run) }];
+      return [{ kind: "field", field: "ref", placeholder: "#", run: computeRun(scope.run, scope.line) }];
     case "CheckBox":
-      return [{ kind: "text", text: node.props.checked ? "☒" : "☐", run: computeRun(scope.run) }];
-    case "RawXml":
-      return [{ kind: "raw", element: firstRoot(node.props.xml) }];
+      return [{ kind: "text", text: node.props.checked ? "☒" : "☐", run: computeRun(scope.run, scope.line) }];
+    case "RawXml": {
+      const shown = rawInlines(node.props.xml);
+      return shown.length > 0 ? inlinesOf(shown, at, scope) : [rawInline(firstRoot(node.props.xml))];
+    }
     default: {
       const exhaustive: never = node;
       throw new Error(`resolveDocument: unknown inline ${JSON.stringify(exhaustive)}`);
@@ -522,14 +767,14 @@ function inline(node: InlineNode, at: TreePath, scope: InlineScope): ResolvedInl
 
 type Numbering = { readonly reference: string; readonly level: number; readonly instance?: number };
 
-function marker(numbering: Numbering, markRun: RunOptions, story: Story): ResolvedMarker | null {
+function marker(numbering: Numbering, markRun: RunOptions, story: Story, line: LineRule): ResolvedMarker | null {
   const levels = story.doc.levels.get(numbering.reference);
   if (levels === undefined) return null;
   const level = levelOf(levels, numbering.level);
   const key = `${numbering.reference}:${numbering.instance ?? 0}`;
   return {
     text: markerText(levels, story.counters, key, numbering.level),
-    run: computeRun(overRun(markRun, level?.style?.run)),
+    run: computeRun(overRun(markRun, level?.style?.run), line),
     suffix: level?.suffix ?? "tab",
   };
 }
@@ -537,7 +782,8 @@ function marker(numbering: Numbering, markRun: RunOptions, story: Story): Resolv
 function paragraph(node: Node<"Paragraph">, path: TreePath, story: Story): ResolvedBlock {
   const { props } = node;
   const { sheet } = story.doc;
-  const chain = styleChain(sheet, props.style ?? sheet.defaultParagraphStyle);
+  const styleId = props.style ?? sheet.defaultParagraphStyle;
+  const chain = styleChain(sheet, styleId);
   const styled = chain.reduce(
     (p, s) => overParagraph(p, s.paragraph),
     overParagraph(sheet.docDefaults.paragraph, story.table?.paragraph)
@@ -547,12 +793,13 @@ function paragraph(node: Node<"Paragraph">, path: TreePath, story: Story): Resol
   const format = overParagraph(overParagraph(styled, level?.style?.paragraph), props);
   const run = chain.reduce((r, s) => overRun(r, s.run), storyRun(story));
   const markRun = overRun(run, props.run);
+  const line = lineRuleOf(format.spacing);
   return {
     kind: "paragraph",
     path,
-    format: computeParagraph(format, computeRun(markRun)),
-    marker: numbering ? marker(numbering, markRun, story) : null,
-    inlines: inlinesOf(node.children, path, { story, run }),
+    format: computeParagraph(format, computeRun(markRun, line), styleId, story.doc.defaultTabPt),
+    marker: numbering ? marker(numbering, markRun, story, line) : null,
+    inlines: inlinesOf(node.children, path, { story, run, line, tocEntry: styleId !== null && TOC_ENTRY_STYLE.test(styleId) }),
   };
 }
 
@@ -595,6 +842,24 @@ const widthPtOf = (width: docx.ITableWidthProperties | undefined): number | null
     ? width.size / TWIPS_PER_PT
     : null;
 
+/** docx.js writes a pct width of N as N%. */
+function widthPctOf(width: docx.ITableWidthProperties | undefined): number | null {
+  if (width?.type !== "pct") return null;
+  const pct = typeof width.size === "number" ? width.size : parseFloat(width.size);
+  return Number.isFinite(pct) ? pct : null;
+}
+
+type CellMargins = docx.ITableCellOptions["margins"];
+
+/** Word's default cell margins: 0.075in left and right. */
+const DEFAULT_CELL_MARGINS: Readonly<Record<Side, number>> = { top: 0, right: 108, bottom: 0, left: 108 };
+
+/** Each side: the cell's margin, else the table's, else Word's default. */
+function cellPadding(cell: CellMargins, table: CellMargins): Readonly<Record<Side, number>> {
+  const side = (s: Side) => (cell?.[s] ?? table?.[s] ?? DEFAULT_CELL_MARGINS[s]) / TWIPS_PER_PT;
+  return { top: side("top"), right: side("right"), bottom: side("bottom"), left: side("left") };
+}
+
 function tableLayer(table: Node<"Table">, story: Story): TableLayer {
   const { sheet } = story.doc;
   const chain = styleChain(sheet, table.props.style);
@@ -635,6 +900,7 @@ function table(node: Node<"Table">, path: TreePath, story: Story): ResolvedBlock
           colSpan,
           rowSpan,
           widthPt: widthPtOf(props.width),
+          paddingPt: cellPadding(props.margins, node.props.margins),
           background: shadingColor(props.shading),
           borders,
           verticalAlign: props.verticalAlign ?? "top",
@@ -652,16 +918,48 @@ function table(node: Node<"Table">, path: TreePath, story: Story): ResolvedBlock
   return {
     kind: "table",
     path,
+    rtl: node.props.visuallyRightToLeft ?? false,
     widthPt: widthPtOf(node.props.width),
+    widthPct: widthPctOf(node.props.width),
+    indentPt: widthPtOf(node.props.indent) ?? 0,
+    align: node.props.alignment === "center" ? "center" : node.props.alignment === "right" || node.props.alignment === "end" ? "end" : "start",
+    fixed: node.props.layout === "fixed",
     columnWidthsPt: columnWidths.map((w) => w / TWIPS_PER_PT),
     rows,
   };
 }
 
-function pointLength(length: unknown): number | null {
+/** A VML style length in points: a number is px (96 dpi), a string has a unit. */
+function vmlLength(length: unknown): number | null {
+  if (typeof length === "number") return length * 0.75;
   if (typeof length !== "string") return null;
-  const match = POINT_LENGTH.exec(length);
-  return match === null ? null : Number(match[1]);
+  const px = /^(-?[0-9.]+)px$/.exec(length);
+  if (px !== null) return Number(px[1]) * 0.75;
+  return UNIVERSAL_MEASURE.test(length) ? pointsOf(length, 1) : null;
+}
+
+const VML_ALIGNS: Readonly<Record<string, "left" | "center" | "right">> = { left: "left", center: "center", right: "right", inside: "left", outside: "right" };
+const VML_V_ALIGNS: Readonly<Record<string, "top" | "center" | "bottom">> = { top: "top", center: "center", bottom: "bottom", inside: "top", outside: "bottom" };
+
+/** A text box's VML style as a float: an absolute one is placed from its frame (page, margin, or the text
+ *  it is anchored in), out of the flow, as Word shows a text box in front of its text. */
+function textboxFloat(style: Readonly<Record<string, unknown>> | undefined): ResolvedFloat | null {
+  if (style?.position !== "absolute") return null;
+  const offset = (margin: unknown, plain: unknown) => (vmlLength(margin) ?? 0) + (vmlLength(plain) ?? 0);
+  const hAlign = typeof style.positionHorizontal === "string" ? own(VML_ALIGNS, style.positionHorizontal) ?? null : null;
+  const vAlign = typeof style.positionVertical === "string" ? own(VML_V_ALIGNS, style.positionVertical) ?? null : null;
+  const zIndex = typeof style.zIndex === "number" ? style.zIndex : 0;
+  return {
+    wrap: "none",
+    behind: zIndex < 0,
+    horizontal: { from: style.positionHorizontalRelative === "page" ? "page" : "margin", align: hAlign, offsetPt: offset(style.marginLeft, style.left) },
+    vertical: {
+      from: style.positionVerticalRelative === "page" ? "page" : style.positionVerticalRelative === "margin" ? "margin" : "paragraph",
+      align: vAlign,
+      offsetPt: offset(style.marginTop, style.top),
+    },
+    distancePt: { top: 0, bottom: 0, left: 0, right: 0 },
+  };
 }
 
 function block(node: BlockNode, path: TreePath, story: Story): ResolvedBlock {
@@ -678,8 +976,10 @@ function block(node: BlockNode, path: TreePath, story: Story): ResolvedBlock {
       return {
         kind: "textbox",
         path,
-        widthPt: pointLength(node.props.style?.width),
-        heightPt: pointLength(node.props.style?.height),
+        widthPt: vmlLength(node.props.style?.width),
+        heightPt: vmlLength(node.props.style?.height),
+        float: textboxFloat(node.props.style),
+        rotation: typeof node.props.style?.rotation === "number" ? node.props.style.rotation : 0,
         blocks: blocksOf(node.children, path, story),
       };
     default: {
@@ -689,11 +989,74 @@ function block(node: BlockNode, path: TreePath, story: Story): ResolvedBlock {
   }
 }
 
-function blocksOf(children: readonly BlockNode[], at: TreePath, story: Story): ResolvedBlock[] {
-  return children.map((child, i) => block(child, [...at, i], story));
+/** A block, or the blocks a RawXml shows, each with the RawXml's path. */
+function blocksFor(node: BlockNode, path: TreePath, story: Story): ResolvedBlock[] {
+  if (node.type !== "RawXml") return [block(node, path, story)];
+  const shown = rawBlocks(node.props.xml);
+  return shown.length > 0 ? shown.map((child) => block(child, path, story)) : [block(node, path, story)];
 }
 
-function pageOf(section: Node<"Section">): Pick<ResolvedSection, "widthPt" | "heightPt" | "marginsPt"> {
+function blocksOf(children: readonly BlockNode[], at: TreePath, story: Story): ResolvedBlock[] {
+  return adjacency(children.flatMap((child, i) => blocksFor(child, [...at, i], story)));
+}
+
+/** The block before (`step` -1) or after (1) block `i` in the flow: a placed text box stands out of it. */
+function inFlow(blocks: readonly ResolvedBlock[], i: number, step: 1 | -1): ResolvedBlock | undefined {
+  for (let j = i + step; j >= 0 && j < blocks.length; j += step) {
+    const b = blocks[j];
+    if (!(b.kind === "textbox" && b.float !== null)) return b;
+  }
+  return undefined;
+}
+
+/** What a paragraph's neighbours change: contextual spacing, then border groups. */
+const adjacency = (blocks: ResolvedBlock[]): ResolvedBlock[] => withBorderGroups(withContextualSpacing(blocks));
+
+const sameBorder = (a: ComputedBorder | undefined, b: ComputedBorder | undefined): boolean =>
+  a === b || (a !== undefined && b !== undefined && a.style === b.style && a.widthPt === b.widthPt && a.color === b.color);
+
+/** Consecutive paragraphs with the same borders and indents are one box in Word: the box's top border
+ *  is drawn above the first only, its bottom border below the last only. */
+function withBorderGroups(blocks: ResolvedBlock[]): ResolvedBlock[] {
+  const grouped = (a: ResolvedBlock | undefined, b: ResolvedBlock | undefined): boolean => {
+    if (!isParagraph(a) || !isParagraph(b)) return false;
+    const [x, y] = [a.format, b.format];
+    if (Object.keys(x.borders).length === 0) return false;
+    return (
+      (["top", "bottom", "left", "right"] as const).every((side) => sameBorder(x.borders[side], y.borders[side])) &&
+      x.indentLeftPt === y.indentLeftPt &&
+      x.indentRightPt === y.indentRightPt
+    );
+  };
+  return blocks.map((b, i) => {
+    if (!isParagraph(b)) return b;
+    const after = grouped(b, inFlow(blocks, i, 1));
+    const before = grouped(inFlow(blocks, i, -1), b);
+    if (!after && !before) return b;
+    const { top, bottom, ...sides } = b.format.borders;
+    const borders = { ...sides, ...(before || top === undefined ? {} : { top }), ...(after || bottom === undefined ? {} : { bottom }) };
+    return { ...b, format: { ...b.format, borders } };
+  });
+}
+
+type ParagraphBlock = Extract<ResolvedBlock, { kind: "paragraph" }>;
+
+const isParagraph = (b: ResolvedBlock | undefined): b is ParagraphBlock => b?.kind === "paragraph";
+
+/** Word drops a contextual-spacing paragraph's space before (after) when the paragraph before (after) it
+ *  has the same style. */
+function withContextualSpacing(blocks: ResolvedBlock[]): ResolvedBlock[] {
+  return blocks.map((b, i) => {
+    if (!isParagraph(b) || !b.format.contextualSpacing) return b;
+    const same = (other: ResolvedBlock | undefined) => isParagraph(other) && other.format.styleId === b.format.styleId;
+    const before = same(inFlow(blocks, i, -1)) ? 0 : b.format.spaceBeforePt;
+    const after = same(inFlow(blocks, i, 1)) ? 0 : b.format.spaceAfterPt;
+    if (before === b.format.spaceBeforePt && after === b.format.spaceAfterPt) return b;
+    return { ...b, format: { ...b.format, spaceBeforePt: before, spaceAfterPt: after } };
+  });
+}
+
+function pageOf(section: Node<"Section">): PageGeometry {
   const page = section.props.properties?.page;
   const size = page?.size;
   const width = pointsOf(size?.width ?? PAGE_DEFAULTS.width, TWIPS_PER_PT);
@@ -708,36 +1071,69 @@ function pageOf(section: Node<"Section">): Pick<ResolvedSection, "widthPt" | "he
       right: pointsOf(margin?.right ?? PAGE_DEFAULTS.right, TWIPS_PER_PT),
       bottom: pointsOf(margin?.bottom ?? PAGE_DEFAULTS.bottom, TWIPS_PER_PT),
       left: pointsOf(margin?.left ?? PAGE_DEFAULTS.left, TWIPS_PER_PT),
+      header: pointsOf(margin?.header ?? PAGE_DEFAULTS.header, TWIPS_PER_PT),
+      footer: pointsOf(margin?.footer ?? PAGE_DEFAULTS.footer, TWIPS_PER_PT),
     },
+  };
+}
+
+function columnsOf(section: Node<"Section">): ResolvedColumns | null {
+  const column = section.props.properties?.column;
+  const count = column?.count ?? 1;
+  if (count <= 1) return null;
+  return {
+    count,
+    spacePt: pointsOf(column?.space ?? DEFAULT_COLUMN_SPACE, TWIPS_PER_PT),
+    separate: column?.separate ?? false,
   };
 }
 
 function section(node: Node<"Section">, path: TreePath, doc: DocumentScope): ResolvedSection {
   const footnotes: ResolvedFootnote[] = [];
   const body: ResolvedBlock[] = [];
-  let header: ResolvedBlock[] = [];
-  let footer: ResolvedBlock[] = [];
+  const headers: Partial<Record<HeaderFooterType, readonly ResolvedBlock[]>> = {};
+  const footers: Partial<Record<HeaderFooterType, readonly ResolvedBlock[]>> = {};
   const ownStory = (): Story => ({ doc, counters: new Map(), footnotes, table: null });
   node.children.forEach((child, i) => {
     const at = [...path, i];
     if (child.type === "Header") {
-      if (child.props.type === "default") header = blocksOf(child.children, at, ownStory());
+      headers[child.props.type ?? "default"] = blocksOf(child.children, at, ownStory());
     } else if (child.type === "Footer") {
-      if (child.props.type === "default") footer = blocksOf(child.children, at, ownStory());
+      footers[child.props.type ?? "default"] = blocksOf(child.children, at, ownStory());
     } else {
-      body.push(block(child, at, { doc, counters: doc.bodyCounters, footnotes, table: null }));
+      body.push(...blocksFor(child, at, { doc, counters: doc.bodyCounters, footnotes, table: null }));
     }
   });
-  return { path, ...pageOf(node), header, body, footer, footnotes };
+  const properties = node.props.properties;
+  return {
+    path,
+    ...pageOf(node),
+    continuous: properties?.type === "continuous",
+    titlePage: properties?.titlePage ?? false,
+    pageNumberStart: properties?.page?.pageNumbers?.start ?? null,
+    pageNumberFormat: properties?.page?.pageNumbers?.formatType ?? "decimal",
+    columns: columnsOf(node),
+    headers,
+    footers,
+    body: adjacency(body),
+    footnotes,
+  };
 }
 
-export function resolveDocument(document: DocumentNode): readonly ResolvedSection[] {
+/** The document's sections, resolved; `paginate` (pages.ts) breaks them into pages. */
+export function resolveSections(document: DocumentNode): readonly ResolvedSection[] {
   let footnotes = 0;
   const doc: DocumentScope = {
     sheet: effectiveSheet(document.props.styles),
+    defaultTabPt: pointsOf(document.props.defaultTabStop ?? DEFAULT_TAB_STOP, TWIPS_PER_PT),
     levels: new Map((document.props.numbering?.config ?? []).map((c) => [c.reference, c.levels])),
     bodyCounters: new Map(),
     nextFootnote: () => ++footnotes,
   };
   return document.children.flatMap((child, i) => (child.type === "Section" ? [section(child, [i], doc)] : []));
+}
+
+/** The document as the pages Word lays it out on (pages.ts), with breaks found by measuring, if any. */
+export function resolveDocument(document: DocumentNode, measured?: MeasuredBreaks): readonly ResolvedPage[] {
+  return paginate(resolveSections(document), document.props.evenAndOddHeaderAndFooters ?? false, measured);
 }

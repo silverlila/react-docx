@@ -36,11 +36,13 @@ async function twoWrites(bytes: Uint8Array): Promise<{ t2: DocumentNode; t3: Doc
 
 /** What the first read of each Word-shaped fixture reports, in report order. Theme fonts in w:docDefaults
  *  resolve, but Word's empty complex-script theme font cannot; settings, latent styles and editing marks
- *  are ignored noise. */
+ *  are ignored noise. Word's last-rendered page breaks are kept raw, for the preview to break pages at. */
 const LOSSES: Readonly<Record<string, readonly { kind: string; element: string }[]>> = {
   resume: [
     { kind: "dropped", element: "w:tblLook" },
+    { kind: "resolved", element: "w:tblBorders" },
     { kind: "dropped", element: "w:tblLook" },
+    { kind: "raw", element: "w:lastRenderedPageBreak" },
     { kind: "resolved", element: "w:rFonts" },
     { kind: "resolved", element: "w:rFonts" },
     { kind: "resolved", element: "w:rFonts" },
@@ -62,7 +64,6 @@ const LOSSES: Readonly<Record<string, readonly { kind: string; element: string }
     { kind: "ignored", element: "w:compat" },
     { kind: "ignored", element: "w:fldChar" },
     { kind: "ignored", element: "w:history" },
-    { kind: "ignored", element: "w:lastRenderedPageBreak" },
     { kind: "ignored", element: "w:latentStyles" },
     { kind: "ignored", element: "w:multiLevelType" },
     { kind: "ignored", element: "w:nsid" },

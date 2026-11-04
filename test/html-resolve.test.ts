@@ -2,11 +2,18 @@ import { HeadingLevel } from "docx";
 import { createElement as h, type ReactNode } from "react";
 import { describe, expect, test } from "vitest";
 import {
+  ColumnBreak,
   Document,
   Footnote,
+  Header,
   ImageRun,
+  InternalHyperlink,
+  PageBreak,
   Paragraph,
+  RawXml,
   Section,
+  Tab,
+  Textbox,
   Table,
   TableCell,
   TableRow,
@@ -15,8 +22,13 @@ import {
   renderToTree,
 } from "../src/index";
 import { borderCss, paragraphStyle, runStyle } from "../src/html/css";
+import { fontFamilyCss } from "../src/html/fonts";
+import { tabLayout } from "../src/html/tabs";
+import { DocxPreview } from "../src/html/preview";
+import { renderToStaticMarkup } from "react-dom/server";
 import { DOCX_DEFAULT_STYLES } from "../src/html/docx-default-styles.generated";
-import { resolveDocument, type ResolvedBlock, type ResolvedInline, type ResolvedSection } from "../src/html/resolve";
+import type { ResolvedPage } from "../src/html/pages";
+import { resolveDocument, type ResolvedBlock, type ResolvedInline } from "../src/html/resolve";
 import { readDocx } from "../src/read/index";
 import type { DocumentNode } from "../src/schema/elements";
 import { WORD_SHAPED } from "./fixtures/word-shaped";
@@ -29,7 +41,8 @@ type Text = Extract<ResolvedInline, { kind: "text" }>;
 const doc = (props: Record<string, unknown>, ...children: ReactNode[]) =>
   resolveDocument(renderToTree(h(Document, props, h(Section, null, ...children))));
 
-const body = (sections: readonly ResolvedSection[]): readonly ResolvedBlock[] => sections[0].body;
+/** Every page's body blocks, in order. */
+const body = (pages: readonly ResolvedPage[]): readonly ResolvedBlock[] => pages.flatMap((page) => page.parts.flatMap((part) => part.blocks));
 
 function paragraphAt(blocks: readonly ResolvedBlock[], i: number): Paragraph {
   const block = blocks[i];
@@ -231,13 +244,40 @@ describe("units", () => {
   test("line spacing: auto 276 is a 1.15 multiple, exact 240 is 12pt", () => {
     expect(paragraphAt(blocks, 0).format.lineHeight).toEqual({ kind: "multiple", value: 1.15 });
     expect(paragraphAt(blocks, 1).format.lineHeight).toEqual({ kind: "exact", pt: 12 });
-    expect(paragraphStyle(paragraphAt(blocks, 0).format).lineHeight).toBe(1.15);
     expect(paragraphStyle(paragraphAt(blocks, 1).format).lineHeight).toBe("12pt");
+  });
+
+  test("a multiple scales the font's own single line, as Word does: Times New Roman's is 1.15 of its size", () => {
+    const auto = paragraphAt(blocks, 0);
+    expect(paragraphStyle(auto.format).lineHeight).toBeCloseTo(1.15 * 1.1499, 4);
+    expect(textAt(auto.inlines, 0).run.lineHeight).toBeCloseTo(1.15 * 1.1499, 4);
+  });
+
+  test("a line's height follows its tallest run: each run carries its own font's line height", () => {
+    const p = paragraphAt(
+      body(doc({}, h(Paragraph, null, h(TextRun, { font: "Calibri" }, "a"), h(TextRun, { font: "Arial" }, "b")))),
+      0
+    );
+    expect(runStyle(textAt(p.inlines, 0).run).lineHeight).toBeCloseTo(1.2207, 4);
+    expect(runStyle(textAt(p.inlines, 1).run).lineHeight).toBeCloseTo(1.1499, 4);
+  });
+
+  test("an exact line leaves its runs to inherit it; an atLeast line sets each run at its single height", () => {
+    const [exact, atLeast] = body(
+      doc(
+        {},
+        h(Paragraph, { spacing: { line: 300, lineRule: "exact" } }, h(TextRun, { font: "Calibri" }, "a")),
+        h(Paragraph, { spacing: { line: 300, lineRule: "atLeast" } }, h(TextRun, { font: "Calibri" }, "b"))
+      )
+    ).map((_, i, all) => paragraphAt(all, i));
+    expect(runStyle(textAt(exact.inlines, 0).run).lineHeight).toBeUndefined();
+    expect(paragraphStyle(atLeast.format).lineHeight).toBe("15pt");
+    expect(runStyle(textAt(atLeast.inlines, 0).run).lineHeight).toBeCloseTo(1.2207, 4);
   });
 
   test("hanging 360 is a first line of -18pt", () => {
     expect(paragraphAt(blocks, 2).format).toMatchObject({ indentLeftPt: 36, firstLinePt: -18 });
-    expect(paragraphStyle(paragraphAt(blocks, 2).format)).toMatchObject({ marginLeft: "36pt", textIndent: "-18pt" });
+    expect(paragraphStyle(paragraphAt(blocks, 2).format)).toMatchObject({ marginInlineStart: "36pt", textIndent: "-18pt" });
   });
 
   test("a size 4 border is 0.5pt, and an auto colour draws black", () => {
@@ -246,13 +286,13 @@ describe("units", () => {
     expect(bottom === undefined ? null : borderCss(bottom)).toBe("0.5pt solid #000000");
   });
 
-  test("runs become pt sizes, quoted font names and hex colours", () => {
+  test("runs become pt sizes, quoted font names with a generic fallback, and hex colours", () => {
     const run = textAt(
       paragraphAt(body(doc({}, h(Paragraph, null, h(TextRun, { font: "Open Sans", size: 22, color: "auto", bold: true }, "x")))), 0).inlines,
       0
     ).run;
     expect(run.color).toBeNull();
-    expect(runStyle(run)).toMatchObject({ fontFamily: '"Open Sans"', fontSize: "11pt", fontWeight: "bold" });
+    expect(runStyle(run)).toMatchObject({ fontFamily: '"Open Sans", sans-serif', fontSize: "11pt", fontWeight: "bold" });
     expect(runStyle({ ...run, color: "C00000" }).color).toBe("#C00000");
   });
 
@@ -279,7 +319,7 @@ describe("images", () => {
     const image = imageOf(PNG_1PX);
     expect(image.src.startsWith("data:image/png;base64,")).toBe(true);
     expect(decoded(image.src)).toEqual(PNG_1PX);
-    expect(image).toMatchObject({ widthPx: 10, heightPx: 20, floating: false });
+    expect(image).toMatchObject({ widthPx: 10, heightPx: 20, float: null });
   });
 
   test("bytes longer than one 32 KiB chunk decode back whole", () => {
@@ -332,15 +372,571 @@ describe("tables", () => {
 });
 
 describe("footnotes", () => {
-  test("are numbered 1..n across the document and collected per section", () => {
+  test("are numbered 1..n across the document and listed on the page that references them", () => {
     const note = (text: string) => h(Paragraph, null, text, h(Footnote, null, `note ${text}`));
-    const sections = resolveDocument(
+    const pages = resolveDocument(
       renderToTree(h(Document, null, h(Section, null, note("a"), note("b")), h(Section, null, note("c"))))
     );
-    const refs = sections.flatMap((s) => s.body.flatMap((b) => (b.kind === "paragraph" ? b.inlines : [])).filter((i) => i.kind === "footnoteRef"));
+    const refs = body(pages).flatMap((b) => (b.kind === "paragraph" ? b.inlines : [])).filter((i) => i.kind === "footnoteRef");
     expect(refs.map((r) => (r.kind === "footnoteRef" ? r.n : 0))).toEqual([1, 2, 3]);
-    expect(sections.map((s) => s.footnotes.map((f) => f.n))).toEqual([[1, 2], [3]]);
-    expect(textOf(paragraphAt(sections[1].footnotes[0].blocks, 0))).toBe("note c");
+    expect(pages.map((p) => p.footnotes.map((f) => f.n))).toEqual([[1, 2], [3]]);
+    expect(textOf(paragraphAt(pages[1].footnotes[0].blocks, 0))).toBe("note c");
     expect(refs[0]).toMatchObject({ run: { verticalAlign: "super" } });
+  });
+});
+
+describe("pages", () => {
+  const RENDERED = h(RawXml, { xml: "<w:lastRenderedPageBreak/>" });
+  const pagesOf = (...sections: ReactNode[]) => resolveDocument(renderToTree(h(Document, null, ...sections)));
+  const texts = (pages: readonly ResolvedPage[]) =>
+    pages.map((page) => page.parts.flatMap((part) => part.blocks).map((b) => (b.kind === "paragraph" ? textOf(b) : b.kind)));
+
+  test("an authored page break moves the rest of its paragraph to a new page", () => {
+    const pages = pagesOf(
+      h(Section, null, h(Paragraph, { spacing: { before: 100, after: 200 }, indent: { firstLine: 360 } }, "one", h(PageBreak), "two"))
+    );
+    expect(texts(pages)).toEqual([["one"], ["two"]]);
+    const [first, rest] = body(pages).map((_, i, all) => paragraphAt(all, i));
+    expect(first.format).toMatchObject({ spaceBeforePt: 5, spaceAfterPt: 0, firstLinePt: 18 });
+    expect(rest.format).toMatchObject({ spaceBeforePt: 0, spaceAfterPt: 10, firstLinePt: 0 });
+  });
+
+  test("a paragraph that ends with a page break leaves nothing on the next page; two breaks leave a blank page", () => {
+    const pages = pagesOf(
+      h(Section, null, h(Paragraph, null, "one", h(PageBreak)), h(Paragraph, null, h(PageBreak)), h(Paragraph, null, "three"))
+    );
+    expect(texts(pages)).toEqual([["one"], [], ["three"]]);
+  });
+
+  test("Word's rendered page break starts a page, but not right after an authored break", () => {
+    const pages = pagesOf(
+      h(
+        Section,
+        null,
+        h(Paragraph, null, "one"),
+        h(Paragraph, null, h(TextRun, null, RENDERED, "two")),
+        h(Paragraph, null, h(PageBreak)),
+        h(Paragraph, null, h(TextRun, null, RENDERED, "three"))
+      )
+    );
+    expect(texts(pages)).toEqual([["one"], ["two"], ["three"]]);
+  });
+
+  test("a bookmark before a rendered break goes with the text after it, so a list marker is not left behind", () => {
+    const pages = pagesOf(
+      h(Section, null, h(Paragraph, null, "one"), h(Paragraph, null, h(RawXml, { xml: '<w:bookmarkStart w:id="1" w:name="a"/>' }), h(TextRun, null, RENDERED, "two")))
+    );
+    expect(texts(pages)).toEqual([["one"], ["two"]]);
+  });
+
+  test("pageBreakBefore starts a page unless the page is still empty", () => {
+    const pages = pagesOf(
+      h(Section, null, h(Paragraph, { pageBreakBefore: true }, "one"), h(Paragraph, { pageBreakBefore: true }, "two"))
+    );
+    expect(texts(pages)).toEqual([["one"], ["two"]]);
+  });
+
+  test("a continuous section continues the page in a part of its own; other sections start a page", () => {
+    const pages = pagesOf(
+      h(Section, null, h(Paragraph, null, "one")),
+      h(Section, { properties: { type: "continuous", column: { count: 2, space: 720 } } }, h(Paragraph, null, "two")),
+      h(Section, null, h(Paragraph, null, "three"))
+    );
+    expect(texts(pages)).toEqual([["one", "two"], ["three"]]);
+    expect(pages[0].parts.map((part) => part.columns)).toEqual([null, { count: 2, spacePt: 36, separate: false }]);
+  });
+
+  test("in columns, Word's rendered breaks start the next column, then the next page; the first one opens the part", () => {
+    const at = (text: string) => h(Paragraph, null, h(TextRun, null, RENDERED, text));
+    const pages = pagesOf(
+      h(Section, null, h(Paragraph, null, "intro")),
+      h(Section, { properties: { type: "continuous", column: { count: 2 } } }, at("a"), h(Paragraph, null, "b"), at("c"), at("d")),
+      h(Section, { properties: { type: "continuous" } }, at("after"))
+    );
+    expect(texts(pages)).toEqual([["intro", "a", "b", "c"], ["d", "after"]]);
+    expect(pages[0].parts[1]).toMatchObject({ columnStarts: [0, 2] });
+    expect(pages[1].parts.map((part) => part.columnStarts)).toEqual([null, null]);
+  });
+
+  test("a column break in one column starts a page", () => {
+    const pages = pagesOf(h(Section, null, h(Paragraph, null, "one", h(ColumnBreak), "two")));
+    expect(texts(pages)).toEqual([["one"], ["two"]]);
+  });
+
+  test("a table breaks before the row holding a rendered break and repeats its header rows", () => {
+    const row = (text: ReactNode, tableHeader?: boolean) =>
+      h(TableRow, { tableHeader }, h(TableCell, null, h(Paragraph, null, text)));
+    const pages = pagesOf(
+      h(Section, null, h(Table, null, row("head", true), row("a"), row(h(TextRun, null, RENDERED, "b")), row("c")))
+    );
+    const rowsOf = (page: ResolvedPage) =>
+      page.parts[0].blocks.flatMap((b) => (b.kind === "table" ? b.rows.map((r) => textOf(paragraphAt(r.cells[0].blocks, 0))) : []));
+    expect(pages.map(rowsOf)).toEqual([["head", "a"], ["head", "b", "c"]]);
+  });
+
+  test("numbers pages from a section's start, in its format", () => {
+    const pages = pagesOf(
+      h(Section, { properties: { page: { pageNumbers: { start: 4, formatType: "lowerRoman" } } } }, h(Paragraph, null, "a", h(PageBreak), "b")),
+      h(Section, { properties: { page: { pageNumbers: { start: 1 } } } }, h(Paragraph, null, "c")),
+      h(Section, null, h(Paragraph, null, "d"))
+    );
+    expect(pages.map((page) => page.number)).toEqual(["iv", "v", "1", "2"]);
+  });
+
+  test("a title page shows the first-page header; even pages the even header; a section inherits what it lacks", () => {
+    const header = (type: string, text: string) => h(Header, { type }, h(Paragraph, null, text));
+    const tree = renderToTree(
+      h(
+        Document,
+        { evenAndOddHeaderAndFooters: true },
+        h(
+          Section,
+          { properties: { titlePage: true } },
+          header("default", "odd"),
+          header("first", "first"),
+          header("even", "even"),
+          h(Paragraph, null, "1", h(PageBreak), "2", h(PageBreak), "3")
+        ),
+        h(Section, null, h(Paragraph, null, "4"))
+      )
+    );
+    const headers = resolveDocument(tree).map((page) => page.header.map((b) => (b.kind === "paragraph" ? textOf(b) : b.kind)).join());
+    expect(headers).toEqual(["first", "even", "odd", "even"]);
+  });
+});
+
+describe("fonts", () => {
+  test("a font with a metric-compatible substitute lists it before the generic family", () => {
+    expect(fontFamilyCss(["Calibri"])).toBe('"Calibri", "Carlito", sans-serif');
+    expect(fontFamilyCss(["Times New Roman"])).toBe('"Times New Roman", "Liberation Serif", "Tinos", "Times", serif');
+  });
+
+  test("an unknown font's generic family is guessed from its name", () => {
+    expect(fontFamilyCss(["Source Serif Pro"])).toMatch(/, serif$/);
+    expect(fontFamilyCss(["Open Sans"])).toMatch(/, sans-serif$/);
+    expect(fontFamilyCss(["Microsoft Sans Serif"])).toMatch(/, sans-serif$/);
+    expect(fontFamilyCss(["Fira Code"])).toMatch(/, monospace$/);
+  });
+});
+
+describe("paragraph spacing", () => {
+  const spaced = (props: Record<string, unknown>, text: string) => h(Paragraph, { spacing: { before: 120, after: 240 }, ...props }, text);
+
+  test("a contextual-spacing paragraph drops its space next to a paragraph of the same style only", () => {
+    const blocks = body(
+      doc(
+        {},
+        spaced({ style: "ListParagraph", contextualSpacing: true }, "one"),
+        spaced({ style: "ListParagraph", contextualSpacing: true }, "two"),
+        spaced({}, "after")
+      )
+    );
+    expect(paragraphAt(blocks, 0).format).toMatchObject({ spaceBeforePt: 6, spaceAfterPt: 0 });
+    expect(paragraphAt(blocks, 1).format).toMatchObject({ spaceBeforePt: 0, spaceAfterPt: 12 });
+    expect(paragraphAt(blocks, 2).format).toMatchObject({ spaceBeforePt: 6, spaceAfterPt: 12 });
+  });
+});
+
+describe("raw XML the reader kept", () => {
+  const raw = (xml: string) => h(RawXml, { xml });
+  const r = (inner: string) => `<w:r>${inner}</w:r>`;
+
+  test("a content control's paragraphs are drawn with their own properties", () => {
+    const sdt =
+      '<w:sdt><w:sdtPr><w:alias w:val="Client"/></w:sdtPr><w:sdtContent>' +
+      '<w:p><w:pPr><w:jc w:val="center"/></w:pPr>' + r("<w:rPr><w:b/></w:rPr><w:t>John Citizen</w:t>") + "</w:p>" +
+      "<w:p>" + r("<w:t>Contoso</w:t>") + "</w:p>" +
+      "</w:sdtContent></w:sdt>";
+    const blocks = body(doc({}, raw(sdt)));
+    expect(blocks.map((b) => (b.kind === "paragraph" ? textOf(b) : b.kind))).toEqual(["John Citizen", "Contoso"]);
+    expect(paragraphAt(blocks, 0).format.align).toBe("center");
+    expect(textAt(paragraphAt(blocks, 0).inlines, 0).run.bold).toBe(true);
+  });
+
+  test("a table of contents shows its field's result, not its instruction, across paragraphs", () => {
+    const toc =
+      '<w:sdt><w:sdtPr><w:docPartObj><w:docPartGallery w:val="Table of Contents"/></w:docPartObj></w:sdtPr><w:sdtContent>' +
+      "<w:p>" + r('<w:fldChar w:fldCharType="begin"/>') + r('<w:instrText xml:space="preserve"> TOC \\o "1-3" </w:instrText>') +
+      r('<w:fldChar w:fldCharType="separate"/>') +
+      '<w:hyperlink w:anchor="_Toc1">' + r("<w:t>Introduction</w:t>") + r("<w:tab/>") +
+      r('<w:fldChar w:fldCharType="begin"/>') + r("<w:instrText> PAGEREF _Toc1 \\h </w:instrText>") +
+      r('<w:fldChar w:fldCharType="separate"/>') + r("<w:t>6</w:t>") + r('<w:fldChar w:fldCharType="end"/>') +
+      "</w:hyperlink></w:p>" +
+      "<w:p>" + r('<w:fldChar w:fldCharType="end"/>') + "</w:p>" +
+      "</w:sdtContent></w:sdt>";
+    const [entry] = body(doc({}, raw(toc))).map((_, i, all) => paragraphAt(all, i));
+    const link = entry.inlines[0];
+    expect(link).toMatchObject({ kind: "link", href: "#_Toc1" });
+    const shown = link.kind === "link" ? link.inlines.map((i) => (i.kind === "text" ? i.text : i.kind)) : [];
+    expect(shown).toEqual(["Introduction", "tab", "6"]);
+  });
+
+  test("a smart tag's runs are drawn in their paragraph", () => {
+    const p = paragraphAt(body(doc({}, h(Paragraph, null, "Call ", raw(`<w:smartTag w:element="place">${r("<w:t>Seattle</w:t>")}</w:smartTag>`)))), 0);
+    expect(textOf(p)).toBe("Call Seattle");
+  });
+
+  test("raw XML that shows nothing stays a raw marker", () => {
+    expect(body(doc({}, raw("<w:bookmarkStart w:id=\"1\" w:name=\"x\"/>")))[0]).toMatchObject({ kind: "raw", element: "w:bookmarkStart" });
+  });
+});
+
+describe("tab stops", () => {
+  const tabbed = (props: Record<string, unknown>, ...children: ReactNode[]) => paragraphAt(body(doc({}, h(Paragraph, props, ...children))), 0);
+  const stops = (p: Paragraph) => p.format.tabStops.map((s) => [s.posPt, s.align, s.leader]);
+
+  test("are relative to the left indent, merge down the cascade, and a clear stop removes one", () => {
+    const styles = {
+      paragraphStyles: [{ id: "Toc", name: "Toc", paragraph: { tabStops: [{ type: "right", position: 9000, leader: "dot" }, { type: "left", position: 1440 }] } }],
+    };
+    const p = paragraphAt(
+      body(
+        doc(
+          { styles },
+          h(Paragraph, { style: "Toc", indent: { left: 720 }, tabStops: [{ type: "clear", position: 1440 }, { type: "center", position: 4000 }] }, "x")
+        )
+      ),
+      0
+    );
+    expect(stops(p)).toEqual([[200 - 36, "center", "none"], [450 - 36, "right", "dot"]]);
+  });
+
+  test("a hanging indent adds a stop at the left indent", () => {
+    expect(stops(tabbed({ indent: { left: 720, hanging: 360 } }, "x"))).toEqual([[0, "left", "none"]]);
+  });
+
+  test("a left stop widens the text before it to the stop; a right stop ends the text after it there", () => {
+    const p = tabbed(
+      { tabStops: [{ type: "left", position: 2880 }, { type: "right", position: 9000, leader: "dot" }] },
+      "Name",
+      h(Tab),
+      "John",
+      h(Tab),
+      "12"
+    );
+    const spans = tabLayout(p.inlines, { stops: p.format.tabStops, defaultTabPt: 36, startPt: 0 });
+    expect(spans.map((s) => [s.widthPt, s.exact, s.items.map((i) => (i.kind === "gap" ? `gap:${i.leader}` : "text"))])).toEqual([
+      [144, false, ["text", "gap:none"]],
+      [450 - 144, true, ["text", "gap:dot", "text"]],
+      [null, false, []],
+    ]);
+  });
+
+  test("past the last stop, tabs stay tabs in the last span, for the browser to place at default stops", () => {
+    const p = tabbed({ tabStops: [{ type: "left", position: 720 }] }, "a very long label", h(Tab), "x", h(Tab), "y");
+    const spans = tabLayout(p.inlines, { stops: p.format.tabStops, defaultTabPt: 36, startPt: 0 });
+    expect(spans).toHaveLength(1);
+    expect(spans[0].widthPt).toBeNull();
+    const kinds = spans[0].items.flatMap((i) => (i.kind === "content" ? i.inlines.map((x) => (x.kind === "text" ? x.text : x.kind)) : [i.kind]));
+    expect(kinds).toEqual(["a very long label", "tab", "x", "tab", "y"]);
+  });
+
+  test("a paragraph draws its default tab stop as its tab-size", () => {
+    const out = renderToStaticMarkup(h(DocxPreview, { document: renderToTree(h(Document, { defaultTabStop: 360 }, h(Section, null, h(Paragraph, null, "a", h(Tab), "b")))) }));
+    expect(out).toContain("tab-size:18pt");
+    expect(out).toMatch(/<span data-docx-tab=""[^>]*>\t<\/span>/);
+  });
+
+  test("tabs inside a hyperlink split it, so a table-of-contents entry's page number lands on its stop", () => {
+    const p = tabbed(
+      { tabStops: [{ type: "right", position: 9000, leader: "dot" }] },
+      h(InternalHyperlink, { anchor: "_Toc1" }, h(TextRun, null, "Intro"), h(TextRun, null, h(Tab)), h(TextRun, null, "6"))
+    );
+    const [span] = tabLayout(p.inlines, { stops: p.format.tabStops, defaultTabPt: 36, startPt: 0 });
+    expect(span.items.map((i) => (i.kind === "gap" ? "gap" : i.inlines.map((x) => x.kind).join()))).toEqual(["link", "gap", "link"]);
+  });
+
+  test("a tab keeps its run, so an underlined tab draws an underlined gap", () => {
+    const p = tabbed({}, "Name:", h(TextRun, { underline: {} }, h(Tab)));
+    expect(p.inlines[1]).toMatchObject({ kind: "tab", run: { underline: "single" } });
+  });
+});
+
+describe("right to left", () => {
+  test("a bidi paragraph reads left alignment and the left indent as its start, which is the right", () => {
+    const p = paragraphAt(body(doc({}, h(Paragraph, { bidirectional: true, alignment: "left", indent: { left: 1440 } }, "x"))), 0);
+    expect(p.format).toMatchObject({ rtl: true, align: "start" });
+    expect(paragraphStyle(p.format)).toMatchObject({ direction: "rtl", marginInlineStart: "72pt", textAlign: "start" });
+  });
+
+  test("a right-to-left run takes its complex-script font, size and bold", () => {
+    const run = (props: Record<string, unknown>) =>
+      textAt(paragraphAt(body(doc({}, h(Paragraph, null, h(TextRun, { font: { ascii: "Arial", cs: "B Nazanin" }, size: 22, sizeComplexScript: 28, boldComplexScript: true, ...props }, "x")))), 0).inlines, 0).run;
+    expect(run({ rightToLeft: true })).toMatchObject({ fontFamily: "B Nazanin", sizePt: 14, bold: true, rtl: true, otherFonts: ["Arial"] });
+    expect(run({})).toMatchObject({ fontFamily: "Arial", sizePt: 11, bold: false, rtl: false, otherFonts: ["B Nazanin"] });
+    expect(runStyle(run({ rightToLeft: true }))).toMatchObject({ direction: "rtl", unicodeBidi: "embed" });
+    expect(runStyle(run({ rightToLeft: true })).fontFamily).toMatch(/^"B Nazanin", "Arial", /);
+  });
+
+  test("a bidiVisual table is a right-to-left table", () => {
+    const t = tableAt(body(doc({}, h(Table, { visuallyRightToLeft: true }, h(TableRow, null, h(TableCell, null, h(Paragraph, null, "x")))))), 0);
+    expect(t.rtl).toBe(true);
+  });
+});
+
+describe("shading", () => {
+  const cellShading = (shading: Record<string, unknown>) =>
+    tableAt(body(doc({}, h(Table, null, h(TableRow, null, h(TableCell, { shading }, h(Paragraph, null, "x")))))), 0).rows[0].cells[0].background;
+
+  test("a percentage pattern mixes its colour into its fill; automatic colours are black on white", () => {
+    expect(cellShading({ type: "pct5", color: "auto", fill: "auto" })).toBe("F2F2F2");
+    expect(cellShading({ type: "pct50", color: "FF0000", fill: "0000FF" })).toBe("800080");
+  });
+
+  test("clear shows the fill, solid the colour, and an automatic clear fill is no shading", () => {
+    expect(cellShading({ type: "clear", color: "auto", fill: "FFC000" })).toBe("FFC000");
+    expect(cellShading({ type: "solid", color: "00FF00", fill: "auto" })).toBe("00FF00");
+    expect(cellShading({ type: "clear", color: "auto", fill: "auto" })).toBeNull();
+  });
+});
+
+describe("table geometry", () => {
+  const one = (tableProps: Record<string, unknown>, cellProps: Record<string, unknown> = {}) =>
+    tableAt(body(doc({}, h(Table, tableProps, h(TableRow, null, h(TableCell, cellProps, h(Paragraph, null, "x")))))), 0);
+
+  test("a pct width is a percentage, an indent and an alignment place the table", () => {
+    expect(one({ width: { size: 100, type: "pct" } })).toMatchObject({ widthPct: 100, widthPt: null });
+    expect(one({ indent: { size: 720, type: "dxa" }, alignment: "center", layout: "fixed" })).toMatchObject({ indentPt: 36, align: "center", fixed: true });
+  });
+
+  test("cell margins: the cell's side, else the table's, else Word's 0.075in left and right", () => {
+    const t = one({ margins: { top: 40, left: 200 } }, { margins: { left: 60 } });
+    expect(t.rows[0].cells[0].paddingPt).toEqual({ top: 2, right: 5.4, bottom: 0, left: 3 });
+  });
+});
+
+describe("table of contents entries", () => {
+  test("draw their hyperlinks in the entry's formatting, not the Hyperlink character style", () => {
+    const styles = { characterStyles: [{ id: "Hyperlink", name: "Hyperlink", run: { color: "0563C1", underline: {} } }] };
+    const entry = (style: string) =>
+      paragraphAt(body(doc({ styles }, h(Paragraph, { style }, h(InternalHyperlink, { anchor: "_Toc1" }, h(TextRun, { style: "Hyperlink" }, "Intro"))))), 0);
+    const runOfEntry = (p: Paragraph) => (p.inlines[0].kind === "link" ? textAt(p.inlines[0].inlines, 0).run : null);
+    expect(runOfEntry(entry("TOC1"))).toMatchObject({ color: null, underline: null });
+    expect(runOfEntry(entry("Normal"))).toMatchObject({ color: "0563C1", underline: "single" });
+  });
+});
+
+describe("measured breaks", () => {
+  const pagesOf = (measured: ReadonlySet<string>, ...children: ReactNode[]) =>
+    resolveDocument(renderToTree(h(Document, null, h(Section, null, ...children))), measured);
+  const texts = (pages: readonly ResolvedPage[]) =>
+    pages.map((page) => page.parts.flatMap((part) => part.blocks).map((b) => (b.kind === "paragraph" ? textOf(b) : b.kind)));
+
+  test("each body block carries its key; a measured key breaks the page before that block", () => {
+    const children = [h(Paragraph, null, "a"), h(Paragraph, null, "b"), h(Paragraph, null, "c")];
+    expect(pagesOf(new Set(), ...children)[0].parts[0].keys).toEqual(["b0.0", "b1.0", "b2.0"]);
+    expect(texts(pagesOf(new Set(["b2.0"]), ...children))).toEqual([["a", "b"], ["c"]]);
+  });
+
+  test("a measured row key breaks a table there and repeats its header rows; the piece's key names its first row", () => {
+    const row = (text: string, tableHeader?: boolean) => h(TableRow, { tableHeader }, h(TableCell, null, h(Paragraph, null, text)));
+    const pages = pagesOf(new Set(["r0:2"]), h(Table, null, row("head", true), row("a"), row("b")));
+    const rowsOf = (page: ResolvedPage) =>
+      page.parts[0].blocks.flatMap((b) => (b.kind === "table" ? b.rows.map((r) => textOf(paragraphAt(r.cells[0].blocks, 0))) : []));
+    expect(pages.map(rowsOf)).toEqual([["head", "a"], ["head", "b"]]);
+    expect(pages.map((page) => page.parts[0].keys)).toEqual([["t0:0:0"], ["t0:2:1"]]);
+  });
+
+  test("a page that ends at Word's rendered break is marked laid out, for measuring to leave be", () => {
+    const pages = pagesOf(new Set(), h(Paragraph, null, "a"), h(Paragraph, null, h(TextRun, null, h(RawXml, { xml: "<w:lastRenderedPageBreak/>" }), "b")), h(Paragraph, null, "c", h(PageBreak), "d"));
+    expect(pages.map((page) => page.laidOut)).toEqual([true, false, false]);
+  });
+});
+
+describe("page-number fields in raw XML", () => {
+  test("show the page's number, not the field's cached result", () => {
+    const r = (inner: string) => `<w:r>${inner}</w:r>`;
+    const sdt =
+      '<w:sdt><w:sdtPr><w:docPartObj><w:docPartGallery w:val="Page Numbers (Bottom of Page)"/></w:docPartObj></w:sdtPr><w:sdtContent><w:p>' +
+      r('<w:fldChar w:fldCharType="begin"/>') + r('<w:instrText xml:space="preserve"> PAGE   \\* MERGEFORMAT </w:instrText>') +
+      r('<w:fldChar w:fldCharType="separate"/>') + r("<w:t>4</w:t>") + r('<w:fldChar w:fldCharType="end"/>') +
+      '</w:p><w:p><w:fldSimple w:instr=" NUMPAGES "><w:r><w:t>9</w:t></w:r></w:fldSimple></w:p></w:sdtContent></w:sdt>';
+    const [page, total] = body(doc({}, h(RawXml, { xml: sdt }))).map((_, i, all) => paragraphAt(all, i).inlines);
+    expect(page).toEqual([expect.objectContaining({ kind: "field", field: "page" })]);
+    expect(total).toEqual([expect.objectContaining({ kind: "field", field: "numPages" })]);
+  });
+});
+
+describe("floating pictures", () => {
+  const floatOf = (floating: Record<string, unknown>) => {
+    const p = paragraphAt(body(doc({}, h(Paragraph, null, h(ImageRun, { type: "png", data: PNG_1PX, transformation: { width: 10, height: 10 }, floating })))), 0);
+    const image = p.inlines[0];
+    if (image.kind !== "image") throw new Error(`inline is a ${image.kind}`);
+    return image.float;
+  };
+
+  test("positions and distances are in points, from the page, the margin or the paragraph", () => {
+    const float = floatOf({
+      horizontalPosition: { relative: "page", offset: 914400 },
+      verticalPosition: { relative: "paragraph", offset: 127000 },
+      wrap: { type: 1 },
+      margins: { left: 12700, right: 25400 },
+    });
+    expect(float).toMatchObject({
+      wrap: "square",
+      behind: false,
+      horizontal: { from: "page", align: null, offsetPt: 72 },
+      vertical: { from: "paragraph", offsetPt: 10 },
+      distancePt: { left: 1, right: 2 },
+    });
+  });
+
+  test("tight wraps as square; no wrap given is none; an alignment replaces the offset", () => {
+    expect(floatOf({ horizontalPosition: { relative: "margin", align: "right" }, verticalPosition: { relative: "page", align: "top" }, wrap: { type: 2 } })).toMatchObject({
+      wrap: "square",
+      horizontal: { from: "margin", align: "right" },
+      vertical: { from: "page", align: "top" },
+    });
+    expect(floatOf({ horizontalPosition: { offset: 0 }, verticalPosition: { offset: 0 } })?.wrap).toBe("none");
+  });
+});
+
+describe("paragraph border groups", () => {
+  test("consecutive paragraphs with the same borders are one box: top border on the first, bottom on the last", () => {
+    const box = { top: { style: "single", size: 8, color: "000000" }, bottom: { style: "single", size: 8, color: "000000" }, left: { style: "single", size: 8, color: "000000" } };
+    const blocks = body(doc({}, h(Paragraph, { border: box }, "a"), h(Paragraph, { border: box }, "b"), h(Paragraph, { border: box }, "c"), h(Paragraph, null, "d")));
+    const sides = (i: number) => Object.keys(paragraphAt(blocks, i).format.borders).sort();
+    expect([sides(0), sides(1), sides(2), sides(3)]).toEqual([["left", "top"], ["left"], ["bottom", "left"], []]);
+  });
+
+  test("space before and after is padding, so shading covers it and neighbours do not collapse it", () => {
+    const p = paragraphAt(body(doc({}, h(Paragraph, { spacing: { before: 120, after: 240 }, shading: { type: "clear", fill: "FFFF00" } }, "x"))), 0);
+    expect(paragraphStyle(p.format)).toMatchObject({ paddingTop: "6pt", paddingBottom: "12pt", backgroundColor: "#FFFF00" });
+  });
+});
+
+describe("text boxes", () => {
+  const box = (style: Record<string, unknown>) => {
+    const b = body(doc({}, h(Textbox, { style }, h(Paragraph, null, "x"))))[0];
+    if (b.kind !== "textbox") throw new Error(`block is a ${b.kind}`);
+    return b;
+  };
+
+  test("an absolute VML text box is placed from its frame; its lengths may be px or have units", () => {
+    expect(
+      box({ position: "absolute", marginLeft: "1in", marginTop: 20, width: "2in", height: "40pt", positionHorizontalRelative: "page", positionVerticalRelative: "text" })
+    ).toMatchObject({ widthPt: 144, heightPt: 40, float: { wrap: "none", horizontal: { from: "page", offsetPt: 72 }, vertical: { from: "paragraph", offsetPt: 15 } } });
+  });
+
+  test("a text box without a position stays in the flow", () => {
+    expect(box({ width: "100pt" })).toMatchObject({ widthPt: 100, float: null });
+  });
+});
+
+describe("a table row Word broke across pages", () => {
+  test("is split at its cells' rendered breaks, one row per page, each cell up to its next break", () => {
+    const RENDERED = h(RawXml, { xml: "<w:lastRenderedPageBreak/>" });
+    const pages = resolveDocument(
+      renderToTree(
+        h(
+          Document,
+          null,
+          h(
+            Section,
+            null,
+            h(
+              Table,
+              null,
+              h(
+                TableRow,
+                null,
+                h(TableCell, null, h(Paragraph, null, "a1"), h(Paragraph, null, h(TextRun, null, RENDERED, "a2"))),
+                h(TableCell, null, h(Paragraph, null, "b1"), h(Paragraph, null, h(TextRun, null, RENDERED, "b2")), h(Paragraph, null, h(TextRun, null, RENDERED, "b3")))
+              )
+            )
+          )
+        )
+      )
+    );
+    const cellsOf = (page: ResolvedPage) =>
+      page.parts[0].blocks.flatMap((b) => (b.kind === "table" ? b.rows.flatMap((r) => r.cells.map((c) => c.blocks.map((x) => (x.kind === "paragraph" ? textOf(x) : x.kind)).join())) : []));
+    expect(pages.map(cellsOf)).toEqual([["a1", "b1"], ["a2", "b2"], ["", "b3"]]);
+  });
+});
+
+describe("review fixes: pagination edge cases", () => {
+  const RENDERED = h(RawXml, { xml: "<w:lastRenderedPageBreak/>" });
+  const pagesOf = (measured: ReadonlySet<string>, ...sections: ReactNode[]) => resolveDocument(renderToTree(h(Document, null, ...sections)), measured);
+  const texts = (pages: readonly ResolvedPage[]) =>
+    pages.map((page) => page.parts.flatMap((part) => part.blocks).map((b) => (b.kind === "paragraph" ? textOf(b) : b.kind)));
+  const rowTexts = (page: ResolvedPage) =>
+    page.parts.flatMap((part) => part.blocks).flatMap((b) => (b.kind === "table" ? b.rows.map((r) => r.cells.map((c) => c.blocks.map((x) => (x.kind === "paragraph" ? textOf(x) : x.kind)).join()).join("|")) : []));
+  const c = (text: ReactNode, props: Record<string, unknown> = {}) => h(TableCell, props, h(Paragraph, null, text));
+
+  test("a break inside a vertically merged region moves the whole region, so no cell shifts", () => {
+    const pages = pagesOf(
+      new Set(["r0:2"]),
+      h(
+        Section,
+        null,
+        h(
+          Table,
+          { columnWidths: [2000, 4000] },
+          h(TableRow, null, c("top"), c("x")),
+          h(TableRow, null, c("M", { verticalMerge: "restart" }), c("a")),
+          h(TableRow, null, c("", { verticalMerge: "continue" }), c("b"))
+        )
+      )
+    );
+    expect(pages.map(rowTexts)).toEqual([["top|x"], ["M|a", "b"]]);
+  });
+
+  test("a rendered break in a table in columns moves to the next column, not the next page", () => {
+    const pages = pagesOf(
+      new Set(),
+      h(Section, { properties: { column: { count: 2 } } }, h(Paragraph, null, "intro"), h(Table, null, h(TableRow, null, c("a")), h(TableRow, null, c(h(TextRun, null, RENDERED, "b")))))
+    );
+    expect(pages).toHaveLength(1);
+    expect(pages[0].parts[0].columnStarts).toEqual([0, 2]);
+  });
+
+  test("a floating text box goes on the page of the paragraph it is anchored in", () => {
+    const pages = pagesOf(
+      new Set(),
+      h(
+        Section,
+        null,
+        h(Paragraph, null, "page one"),
+        h(Textbox, { style: { position: "absolute", width: "100pt" } }, h(Paragraph, null, "box")),
+        h(Paragraph, null, h(TextRun, null, RENDERED, "page two"))
+      )
+    );
+    expect(texts(pages)).toEqual([["page one"], ["textbox", "page two"]]);
+  });
+
+  test("a cell paragraph that starts on a new page keeps its first-line indent and space before", () => {
+    const pages = pagesOf(
+      new Set(),
+      h(
+        Section,
+        null,
+        h(
+          Table,
+          null,
+          h(
+            TableRow,
+            null,
+            h(TableCell, null, h(Paragraph, null, "one"), h(Paragraph, { indent: { firstLine: 360 }, spacing: { before: 120 } }, h(TextRun, null, RENDERED, "two")))
+          )
+        )
+      )
+    );
+    const second = pages[1].parts[0].blocks[0];
+    const p = second.kind === "table" ? paragraphAt(second.rows[0].cells[0].blocks, 0) : null;
+    expect(p?.format).toMatchObject({ firstLinePt: 18, spaceBeforePt: 6 });
+  });
+
+  test("a measured break before a table's first body row is ignored rather than leave a page of header rows", () => {
+    const pages = pagesOf(new Set(["r0:1"]), h(Section, null, h(Table, null, h(TableRow, { tableHeader: true }, c("H")), h(TableRow, null, c("tall")), h(TableRow, null, c("next")))));
+    expect(pages.map(rowTexts)).toEqual([["H", "tall", "next"]]);
+  });
+
+  test("contextual spacing and border groups look past a placed text box", () => {
+    const tight = { style: "ListParagraph", contextualSpacing: true, spacing: { before: 120, after: 120 } };
+    const blocks = body(
+      doc({}, h(Paragraph, tight, "one"), h(Textbox, { style: { position: "absolute" } }, h(Paragraph, null, "box")), h(Paragraph, tight, "two"))
+    );
+    expect(paragraphAt(blocks, 0).format.spaceAfterPt).toBe(0);
+    expect(paragraphAt(blocks, 2).format.spaceBeforePt).toBe(0);
   });
 });

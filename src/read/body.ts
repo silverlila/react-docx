@@ -33,6 +33,7 @@ import type * as docx from "docx";
 import { isOneOf, type Note } from "../ooxml/codec";
 import { readParagraphProperties, type ParagraphOptions, type ParagraphRead } from "../ooxml/paragraph";
 import { readRunProperties, type RunOptions } from "../ooxml/run";
+import { withRenamedStyles } from "../ooxml/style";
 import { readCellProperties, readRowProperties, readTableProperties } from "../ooxml/table";
 import { PAGE_NUMBER_VALUES, RAW_XML_ROOTS } from "../schema/docx-facts";
 import { isOwnKey, own } from "../schema/own";
@@ -153,7 +154,7 @@ type Fallback =
 
 function fallback(el: XmlElement, slot: Slot, ctx: ReadContext, rawAllowed = true): Fallback {
   const roots: readonly string[] = RAW_XML_ROOTS[slot];
-  const check = rawAllowed && roots.includes(el.name) ? rawXmlOf([el], slot) : null;
+  const check = rawAllowed && roots.includes(el.name) ? rawXmlOf([withRenamedStyles(el, ctx.env.styleIds)], slot) : null;
   if (check?.kind === "raw") {
     ctx.report({ kind: "raw", element: el.name, detail: "no tree kind maps it, so it is kept verbatim" });
     return { kind: "raw", node: rawXml(check.xml) };
@@ -260,7 +261,8 @@ function readBlockElements(elements: readonly XmlElement[], ctx: BodyContext, li
     if (NOISE.has(el.name) || MOVE_RANGES.has(el.name)) {
       ctx.ignore(el.name);
     } else if (el.name === "w:p") {
-      list.blocks.push(readParagraph(el, here, list.inSection));
+      const base = list.start + list.blocks.length;
+      list.blocks.push(...readParagraph(el, (offset) => ctx.within(null, [...ctx.at, base + offset]), list.inSection));
     } else if (el.name === "w:tbl" && list.tables) {
       list.blocks.push(readTable(el, here));
     } else if (el.name === "w:tbl") {
@@ -282,13 +284,63 @@ function readBlockElements(elements: readonly XmlElement[], ctx: BodyContext, li
   }
 }
 
-function readParagraph(p: XmlElement, ctx: BodyContext, inSection: boolean): AuthorNode {
+/** A paragraph, after the text boxes it holds beside other content (Word's anchored text boxes): docx.js
+ *  writes a Textbox as a paragraph of its own, so each becomes a Textbox before the paragraph, in a Section
+ *  body only. */
+function readParagraph(p: XmlElement, at: (offset: number) => BodyContext, inSection: boolean): AuthorNode[] {
+  const all = elementsOf(p).filter((el) => el.name !== "w:pPr");
+  const ctx = at(0);
+  if (!inSection || loneTextBox(all, ctx) !== null) return [readOneParagraph(p, all, ctx, inSection)];
+  const hoisted = hoistTextBoxes(all, ctx);
+  const boxes = hoisted.boxes.map((box, i) => hoistedTextbox(box, at(i)));
+  return [...boxes, readOneParagraph(p, hoisted.content, at(boxes.length), inSection)];
+}
+
+/** The text boxes in `content`'s runs, directly or as alternate content's Fallback, and `content`
+ *  without them. */
+function hoistTextBoxes(content: readonly XmlElement[], ctx: BodyContext): { boxes: TextBox[]; content: XmlElement[] } {
+  const boxes: TextBox[] = [];
+  const boxIn = (el: XmlElement): TextBox | null => {
+    if (el.name === "w:pict") return textBoxOf(el);
+    if (el.name !== "mc:AlternateContent") return null;
+    const chosen = alternateContent(el, (x) => mapsToKind(x, "run", ctx));
+    const [pict, ...rest] = chosen?.used === "Fallback" ? chosen.elements : [];
+    return pict?.name === "w:pict" && rest.length === 0 ? textBoxOf(pict) : null;
+  };
+  const out = content.flatMap((el): XmlElement[] => {
+    if (el.name === "w:pict") {
+      const box = textBoxOf(el);
+      if (box === null) return [el];
+      boxes.push(box);
+      return [];
+    }
+    if (el.name !== "w:r") return [el];
+    const kept = el.children.filter((child) => {
+      const box = typeof child === "string" ? null : boxIn(child);
+      if (box !== null) boxes.push(box);
+      return box === null;
+    });
+    if (kept.length === el.children.length) return [el];
+    const rest = kept.filter((child) => typeof child !== "string" && child.name !== "w:rPr");
+    return rest.length === 0 ? [] : [{ ...el, children: kept }];
+  });
+  return { boxes, content: out };
+}
+
+function hoistedTextbox(box: TextBox, ctx: BodyContext): AuthorNode {
+  ctx.report({ kind: "resolved", element: "w:pict", detail: "a text box beside other content: read as a Textbox before its paragraph" });
+  const notes: Note[] = [];
+  const style = textBoxStyle(box, notes);
+  ctx.notes(notes);
+  return node("Textbox", style === undefined ? {} : { style }, readBlocks(box.content, ctx, { rawBlocks: false, tables: false }));
+}
+
+function readOneParagraph(p: XmlElement, all: readonly XmlElement[], ctx: BodyContext, inSection: boolean): AuthorNode {
   const read = readParagraphProperties(childNamed(p, "w:pPr"), ctx.env);
   ctx.notes(read.notes);
   if (read.sectPr !== null) {
     ctx.report({ kind: "dropped", element: "w:sectPr", detail: "only a paragraph in the document body ends a section" });
   }
-  const all = elementsOf(p).filter((el) => el.name !== "w:pPr");
   const lone = loneTextBox(all, ctx);
   if (lone !== null && inSection) return textboxNode(read, lone, ctx);
   if (lone !== null) {
@@ -767,9 +819,6 @@ function atomPieces(run: XmlElement, el: XmlElement, scope: InlineScope): Piece[
       const props = { ...scope.runProps(run), char, ...(font === null ? {} : { symbolfont: font }) };
       return inline([node("SymbolRun", props)]);
     }
-    case "w:lastRenderedPageBreak":
-      ctx.ignore(el.name);
-      return [];
     default:
       return runFallbackPieces(run, el, scope);
   }

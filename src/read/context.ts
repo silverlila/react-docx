@@ -3,6 +3,8 @@ import { createDiagnostics, type DiagnosticCollector, type LocatedDiagnostic, ty
 import { createOrdinals, type Ordinals } from "./ordinals";
 import { targetOfType, type OpcPackage } from "./package";
 import type { XmlElement } from "../ooxml/xml";
+import { clashingStyleIds } from "../ooxml/style";
+import { tableStyleBorders } from "../ooxml/table";
 
 type Report = Omit<LocatedDiagnostic, "part" | "at">;
 
@@ -57,12 +59,18 @@ export function partOfType(pkg: OpcPackage, typeSuffix: string, fallback: string
   return targetOfType(pkg.relsOf(pkg.mainPart), typeSuffix) ?? fallback;
 }
 
+function readerEnv(pkg: OpcPackage): CodecEnv {
+  const styles = pkg.part(partOfType(pkg, "/styles", "word/styles.xml"));
+  const theme = { theme: pkg.theme };
+  return { ...theme, styleIds: clashingStyleIds(styles), tableStyleBorders: tableStyleBorders(styles, theme) };
+}
+
 export function createReadSession(pkg: OpcPackage): ReadSession {
   const diagnostics = createDiagnostics();
   const consumed = new Set<string>();
   const shared: Shared = {
     pkg,
-    env: { theme: pkg.theme },
+    env: readerEnv(pkg),
     ordinals: createOrdinals(),
     ignore: diagnostics.ignore,
     readPart(path) {

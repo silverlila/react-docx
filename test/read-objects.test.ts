@@ -209,10 +209,23 @@ describe("VML", () => {
     expect(read(parts).diagnostics).toContainEqual(diagnostic("resolved", "mc:AlternateContent", "used Fallback"));
   });
 
-  test("a text box sharing its paragraph is dropped", () => {
+  test("a text box sharing its paragraph becomes a Textbox before the paragraph, and the result writes", async () => {
     const parts: FixtureParts = { body: p(run("before") + r(textBox(p(run("x"))))) };
-    expect(blocksOf(parts)).toEqual([node("Paragraph", {}, [text("before")])]);
-    expect(read(parts).diagnostics).toContainEqual(diagnostic("dropped", "w:pict", "text box sharing a paragraph with other content"));
+    const [box, paragraph] = blocksOf(parts);
+    expect(box.type).toBe("Textbox");
+    expect(findAll(box, "TextRun").map((r) => r.children)).toEqual([["x"]]);
+    expect(paragraph).toEqual(node("Paragraph", {}, [text("before")]));
+    expect(read(parts).diagnostics).toContainEqual(diagnostic("resolved", "w:pict", "read as a Textbox before its paragraph"));
+    const again = readDocx(new Uint8Array(await renderToBuffer(read(parts).document)));
+    expect(findAll(again.document as never, "Textbox")).toHaveLength(1);
+  });
+
+  test("each hoisted text box reports at its own path", () => {
+    const parts: FixtureParts = { body: p(run("before") + r(textBox(p(run("x")))) + r(textBox(p(run("y"))))) };
+    const at = read(parts)
+      .diagnostics.filter((d) => d.kind === "resolved" && d.element === "w:pict")
+      .map((d) => ("at" in d ? d.at : null));
+    expect(at).toEqual([[0, 0], [0, 1]]);
   });
 
   test("a text box in a table cell is dropped: Textbox stands only in a Section body", () => {
