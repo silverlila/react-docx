@@ -42,7 +42,7 @@ function elementOf(name: string, attributes: Record<string, string>, children: r
 
 export function parseXmlRoots(text: string): XmlElement[] {
   return contentOf(parseDocument(text, { xmlMode: true }).children).filter(
-    (node): node is XmlElement => typeof node !== "string"
+    (node): node is XmlElement => typeof node !== "string",
   );
 }
 

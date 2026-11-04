@@ -42,7 +42,7 @@ describe("1. strings directly in a TextRun", () => {
     'the string "%s" becomes a PageNumber field',
     (field) => {
       expect(inline(canon(doc(n("Paragraph", {}, n("TextRun", {}, field)))))).toEqual([run({}, page(field))]);
-    }
+    },
   );
 
   test("other strings stay literal, adjacent ones merge and empty ones drop", () => {
@@ -60,7 +60,9 @@ describe("1. strings directly in a TextRun", () => {
   });
 
   test("a merged PageNumber value splits its run, and only the first part keeps break", () => {
-    const tree = canon(doc(n("Paragraph", {}, n("TextRun", { italics: true, break: 1 }, "a", n("Tab"), "CURR", "ENT", n("Tab")))));
+    const tree = canon(
+      doc(n("Paragraph", {}, n("TextRun", { italics: true, break: 1 }, "a", n("Tab"), "CURR", "ENT", n("Tab")))),
+    );
     expect(inline(tree)).toEqual([
       run({ italics: true, break: 1 }, "a", tab),
       run({ italics: true, text: "CURRENT" }),
@@ -73,12 +75,15 @@ describe("1. strings directly in a TextRun", () => {
     expect(inline(tree)).toEqual([runOf(kind, change, "Page ", page("CURRENT"))]);
   });
 
-  test.each(TRACKED)("in a %s, strings that merge into a PageNumber value are the text of a run of the same kind", (kind) => {
-    expect(inline(canon(doc(n("Paragraph", {}, n(kind, change, "a", n("Tab"), "TOTAL_", "PAGES")))))).toEqual([
-      runOf(kind, change, "a", tab),
-      runOf(kind, { ...change, text: "TOTAL_PAGES" }),
-    ]);
-  });
+  test.each(TRACKED)(
+    "in a %s, strings that merge into a PageNumber value are the text of a run of the same kind",
+    (kind) => {
+      expect(inline(canon(doc(n("Paragraph", {}, n(kind, change, "a", n("Tab"), "TOTAL_", "PAGES")))))).toEqual([
+        runOf(kind, change, "a", tab),
+        runOf(kind, { ...change, text: "TOTAL_PAGES" }),
+      ]);
+    },
+  );
 });
 
 describe("2. strings directly in an inline slot", () => {
@@ -95,7 +100,14 @@ describe("2. strings directly in an inline slot", () => {
 
   test("strings in a hyperlink or bookmark are wrapped the same way", () => {
     const tree = canon(
-      doc(n("Paragraph", {}, n("ExternalHyperlink", { link: "https://x.test" }, "go"), n("Bookmark", { id: "b" }, "here")))
+      doc(
+        n(
+          "Paragraph",
+          {},
+          n("ExternalHyperlink", { link: "https://x.test" }, "go"),
+          n("Bookmark", { id: "b" }, "here"),
+        ),
+      ),
     );
     expect(inline(tree)).toEqual([
       { type: "ExternalHyperlink", props: { link: "https://x.test" }, children: [run({}, "go")] },
@@ -148,7 +160,9 @@ describe("4. the text prop", () => {
   });
 
   test("a kept text with children is a run of its own; the children follow with the same props, minus break", () => {
-    const tree = canon(doc(n("Paragraph", {}, n("TextRun", { text: "TOTAL_PAGES", bold: true, break: 1 }, n("Tab"), "b"))));
+    const tree = canon(
+      doc(n("Paragraph", {}, n("TextRun", { text: "TOTAL_PAGES", bold: true, break: 1 }, n("Tab"), "b"))),
+    );
     expect(inline(tree)).toEqual([run({ bold: true, break: 1, text: "TOTAL_PAGES" }), run({ bold: true }, tab, "b")]);
   });
 
@@ -179,16 +193,15 @@ describe("4. the text prop", () => {
   });
 
   test.each(TRACKED)("on a %s it becomes the first child, and stays the text when it is a PageNumber value", (kind) => {
-    const tree = canon(doc(n("Paragraph", {}, n(kind, { ...change, text: "a" }, "b"), n(kind, { ...change, text: "SECTION" }))));
-    expect(inline(tree)).toEqual([
-      runOf(kind, change, "ab"),
-      runOf(kind, { ...change, text: "SECTION" }),
-    ]);
+    const tree = canon(
+      doc(n("Paragraph", {}, n(kind, { ...change, text: "a" }, "b"), n(kind, { ...change, text: "SECTION" }))),
+    );
+    expect(inline(tree)).toEqual([runOf(kind, change, "ab"), runOf(kind, { ...change, text: "SECTION" })]);
   });
 
   test("a non-string text throws", () => {
     expect(() => canon(doc(n("Paragraph", {}, n("TextRun", { text: 5 }))))).toThrow(
-      "Document > Section[0] > Paragraph[0] > TextRun[0]: text must be a string, got number"
+      "Document > Section[0] > Paragraph[0] > TextRun[0]: text must be a string, got number",
     );
   });
 });
@@ -203,7 +216,9 @@ describe("5. run content directly in an inline slot", () => {
   });
 
   test("a PageNumber node in a hyperlink is wrapped in a TextRun", () => {
-    const tree = canon(doc(n("Paragraph", {}, n("InternalHyperlink", { anchor: "a" }, n("PageNumber", { field: "TOTAL_PAGES" })))));
+    const tree = canon(
+      doc(n("Paragraph", {}, n("InternalHyperlink", { anchor: "a" }, n("PageNumber", { field: "TOTAL_PAGES" })))),
+    );
     expect(inline(tree)).toEqual([
       { type: "InternalHyperlink", props: { anchor: "a" }, children: [run({}, page("TOTAL_PAGES"))] },
     ]);
@@ -212,8 +227,10 @@ describe("5. run content directly in an inline slot", () => {
   test.each(["PositionalTab", "CarriageReturn", "SoftHyphen", "NoBreakHyphen", "DayShort", "YearLong"])(
     "a %s in a Paragraph is wrapped in its own TextRun",
     (kind) => {
-      expect(inline(canon(doc(n("Paragraph", {}, n(kind)))))).toEqual([run({}, { type: kind, props: {}, children: [] })]);
-    }
+      expect(inline(canon(doc(n("Paragraph", {}, n(kind)))))).toEqual([
+        run({}, { type: kind, props: {}, children: [] }),
+      ]);
+    },
   );
 
   test.each(TRACKED)("a %s in a Paragraph is not wrapped, and holds run content", (kind) => {
@@ -246,7 +263,9 @@ describe("6. Break", () => {
   });
 
   test("k consecutive Breaks inside a run give the next run break: k", () => {
-    const tree = canon(doc(n("Paragraph", {}, n("TextRun", { text: "a" }, n("Break"), n("Break"), "b", n("Break"), n("Tab")))));
+    const tree = canon(
+      doc(n("Paragraph", {}, n("TextRun", { text: "a" }, n("Break"), n("Break"), "b", n("Break"), n("Tab")))),
+    );
     expect(inline(tree)).toEqual([run({}, "a"), run({ break: 2 }, "b"), run({ break: 1 }, tab)]);
   });
 
@@ -269,12 +288,14 @@ describe("6. Break", () => {
   });
 
   test("a Break in a Section throws", () => {
-    expect(() => canon(doc(n("Break")))).toThrow("Document > Section[0] > Break[0]: <Break> is not allowed in <Section>");
+    expect(() => canon(doc(n("Break")))).toThrow(
+      "Document > Section[0] > Break[0]: <Break> is not allowed in <Section>",
+    );
   });
 
   test("a Break in Math throws", () => {
     expect(() => canon(doc(n("Paragraph", {}, n("Math", {}, n("Break")))))).toThrow(
-      "Document > Section[0] > Paragraph[0] > Math[0] > Break[0]: <Break> is not allowed in <Math>"
+      "Document > Section[0] > Paragraph[0] > Math[0] > Break[0]: <Break> is not allowed in <Math>",
     );
   });
 });
@@ -292,7 +313,7 @@ describe("7. heading", () => {
 
   test("a heading that differs from style throws", () => {
     expect(() => canon(doc(n("Paragraph", { heading: "Heading1", style: "Quote" })))).toThrow(
-      'Document > Section[0] > Paragraph[0]: heading="Heading1" and style="Quote" conflict; use one'
+      'Document > Section[0] > Paragraph[0]: heading="Heading1" and style="Quote" conflict; use one',
     );
   });
 
@@ -311,9 +332,9 @@ describe("8. presence-only booleans", () => {
         n(
           "Section",
           { properties: { titlePage: false } },
-          n("Table", {}, n("TableRow", { tableHeader: false }, n("TableCell", {}, n("Paragraph"))))
-        )
-      )
+          n("Table", {}, n("TableRow", { tableHeader: false }, n("TableCell", {}, n("Paragraph")))),
+        ),
+      ),
     );
     expect(tree.children[0].props).toEqual({ properties: { titlePage: false } });
     expect(blocks(tree)[0]).toMatchObject({ children: [{ props: { tableHeader: false } }] });
@@ -342,7 +363,7 @@ describe("9. Header and Footer", () => {
 
   test("a second Footer of the same type in one Section throws", () => {
     expect(() => canon(doc(n("Footer", { type: "first" }), n("Footer", { type: "first" })))).toThrow(
-      'Document > Section[0] > Footer[1]: A second <Footer type="first"> in one <Section>'
+      'Document > Section[0] > Footer[1]: A second <Footer type="first"> in one <Section>',
     );
   });
 });
@@ -350,12 +371,14 @@ describe("9. Header and Footer", () => {
 describe("10. placement", () => {
   test("a Paragraph inside a Paragraph throws with the full path", () => {
     const error = treeError(() =>
-      canon(doc(n("Paragraph"), n("Paragraph", {}, n("TextRun", {}, "a"), n("Paragraph"))))
+      canon(doc(n("Paragraph"), n("Paragraph", {}, n("TextRun", {}, "a"), n("Paragraph")))),
     );
     expect(error).toBeInstanceOf(TreeError);
     expect(error.name).toBe("TreeError");
     expect(error.path).toEqual(["Document", "Section[0]", "Paragraph[1]", "Paragraph[1]"]);
-    expect(error.message).toBe("Document > Section[0] > Paragraph[1] > Paragraph[1]: <Paragraph> is not allowed in <Paragraph>");
+    expect(error.message).toBe(
+      "Document > Section[0] > Paragraph[1] > Paragraph[1]: <Paragraph> is not allowed in <Paragraph>",
+    );
   });
 
   test("a TableCell directly in a Table throws with the full path", () => {
@@ -366,7 +389,7 @@ describe("10. placement", () => {
 
   test("an unknown element throws", () => {
     expect(() => canon(doc(n("Paragraph", {}, n("Marquee"))))).toThrow(
-      "Document > Section[0] > Paragraph[0] > Marquee[0]: Unknown element <Marquee>"
+      "Document > Section[0] > Paragraph[0] > Marquee[0]: Unknown element <Marquee>",
     );
   });
 
@@ -378,7 +401,7 @@ describe("10. placement", () => {
 
   test("a leaf with children throws", () => {
     expect(() => canon(doc(n("Paragraph", {}, n("PageBreak", {}, n("TextRun")))))).toThrow(
-      "<TextRun> is not allowed in <PageBreak>"
+      "<TextRun> is not allowed in <PageBreak>",
     );
   });
 });
@@ -432,12 +455,14 @@ describe("ImageRun type and fallback", () => {
   test("an svg without a fallback throws", () => {
     const error = treeError(() => canon(image({ type: "svg" })));
     expect(error.path).toEqual(at);
-    expect(error.message).toContain('An svg ImageRun needs a fallback: { type: one of "jpg", "png", "gif", "bmp", data }');
+    expect(error.message).toContain(
+      'An svg ImageRun needs a fallback: { type: one of "jpg", "png", "gif", "bmp", data }',
+    );
   });
 
   test("a fallback that is not a raster image throws", () => {
     expect(treeError(() => canon(image({ type: "svg", fallback: "AQID" }))).message).toContain(
-      'ImageRun fallback must be { type, data } of a raster image, got "AQID"'
+      'ImageRun fallback must be { type, data } of a raster image, got "AQID"',
     );
     const error = treeError(() => canon(image({ type: "svg", fallback: { type: "svg", data: "AQID" } })));
     expect(error.path).toEqual(at);
@@ -456,7 +481,7 @@ describe("Textbox style", () => {
   const styleOf = (tree: DocumentNode) => (blocks(tree)[0] as { props: { style: unknown } }).props.style;
 
   test.each([
-    ["positionHorizontal", 3, "one of \"absolute\", \"left\", \"center\", \"right\", \"inside\", \"outside\", got number"],
+    ["positionHorizontal", 3, 'one of "absolute", "left", "center", "right", "inside", "outside", got number'],
     ["positionVertical", "middle", 'one of "absolute", "left", "center", "right", "inside", "outside", got "middle"'],
     ["positionHorizontalRelative", "column", 'one of "margin", "page", "text", "char", got "column"'],
     ["position", "fixed", 'one of "static", "absolute", "relative", got "fixed"'],
@@ -470,19 +495,26 @@ describe("Textbox style", () => {
     expect(error.message).toContain(`Textbox style.${field} must be ${expected}`);
   });
 
-  test.each([".5in", "-.5cm", "+2pt", "1.25mm", "10%"])("style.width = %j, a CSS length Word reads, is kept", (width) => {
-    expect(styleOf(canon(box({ width })))).toEqual({ width });
-  });
+  test.each([".5in", "-.5cm", "+2pt", "1.25mm", "10%"])(
+    "style.width = %j, a CSS length Word reads, is kept",
+    (width) => {
+      expect(styleOf(canon(box({ width })))).toEqual({ width });
+    },
+  );
 
   test.each(["1e2pt", "1.in", "0x10in", " 1in", "1 in", "--1in"])(
     "style.width = %j, which docx.js's type allows but a VML style cannot hold, throws",
     (width) => {
-      expect(treeError(() => canon(box({ width }))).message).toContain(`Textbox style.width must be "auto", a number or a measure such as "2in", got "${width}"`);
-    }
+      expect(treeError(() => canon(box({ width }))).message).toContain(
+        `Textbox style.width must be "auto", a number or a measure such as "2in", got "${width}"`,
+      );
+    },
   );
 
   test("a style that is not an object throws", () => {
-    expect(treeError(() => canon(box("width:1in"))).message).toContain('Textbox style must be an object, got "width:1in"');
+    expect(treeError(() => canon(box("width:1in"))).message).toContain(
+      'Textbox style must be an object, got "width:1in"',
+    );
   });
 
   test("a style with every value VmlShapeStyle allows is kept as authored", () => {
@@ -540,13 +572,13 @@ describe("12. style folding", () => {
 
   test("a paragraph style with a character style's id throws", () => {
     expect(() => styled({ paragraphStyles: [{ id: "Hyperlink" }] })).toThrow(
-      'Document: styles.paragraphStyles entry "Hyperlink" is docx.js\'s built-in character style'
+      'Document: styles.paragraphStyles entry "Hyperlink" is docx.js\'s built-in character style',
     );
   });
 
   test("a character style with a paragraph style's id throws", () => {
     expect(() => styled({ characterStyles: [{ id: "Heading2" }] })).toThrow(
-      'Document: styles.characterStyles entry "Heading2" is docx.js\'s built-in paragraph style'
+      'Document: styles.characterStyles entry "Heading2" is docx.js\'s built-in paragraph style',
     );
   });
 
@@ -577,11 +609,14 @@ describe("xmlRoots", () => {
   });
 
   test("a > inside a quoted attribute value does not end the tag", () => {
-    expect(xmlRoots(`<w:r w:a="x>y" w:b='/>'><w:t>a</w:t></w:r><w:r/>`)).toEqual({ kind: "roots", roots: ["w:r", "w:r"] });
+    expect(xmlRoots(`<w:r w:a="x>y" w:b='/>'><w:t>a</w:t></w:r><w:r/>`)).toEqual({
+      kind: "roots",
+      roots: ["w:r", "w:r"],
+    });
   });
 
   test("skips whitespace, comments, processing instructions and CDATA inside an element", () => {
-    const xml = ' <!-- <w:p> --> <?mso-application x?>\n<w:r><w:t><![CDATA[</w:t>]]></w:t></w:r> ';
+    const xml = " <!-- <w:p> --> <?mso-application x?>\n<w:r><w:t><![CDATA[</w:t>]]></w:t></w:r> ";
     expect(xmlRoots(xml)).toEqual({ kind: "roots", roots: ["w:r"] });
   });
 
@@ -616,7 +651,10 @@ describe("xmlRoots", () => {
   });
 
   test("character and entity references are not bare ampersands", () => {
-    expect(xmlRoots('<w:t a="&quot;">a &amp; b &lt;&gt;&apos; &#169; &#xA9;</w:t>')).toEqual({ kind: "roots", roots: ["w:t"] });
+    expect(xmlRoots('<w:t a="&quot;">a &amp; b &lt;&gt;&apos; &#169; &#xA9;</w:t>')).toEqual({
+      kind: "roots",
+      roots: ["w:t"],
+    });
   });
 
   test("attributes may be single- or double-quoted and spaced around =", () => {
@@ -624,12 +662,30 @@ describe("xmlRoots", () => {
   });
 
   test.each([
-    ['<w:r><w:rPr/>x<w:t>a</w:t></w:r>', '<w:r> mixes text "x" with elements, and docx.js drops the element before the text'],
-    ["<w:r><w:t>a</w:t>tail</w:r>", '<w:r> mixes text "tail" with elements, and docx.js drops the element before the text'],
-    ["<w:r><![CDATA[x]]><w:t/></w:r>", '<w:r> mixes text "x" with elements, and docx.js drops the element before the text'],
-    ["<w:r><w:t>a</w:t>\u00a0<w:tab/></w:r>", '<w:r> mixes text "\u00a0" with elements, and docx.js drops the element before the text'],
-    ["<w:r><w:t>a</w:t>&#160;<w:tab/></w:r>", '<w:r> mixes text "&#160;" with elements, and docx.js drops the element before the text'],
-    ["<w:r><w:t>a</w:t>\ufeff<w:tab/></w:r>", '<w:r> mixes text "\ufeff" with elements, and docx.js drops the element before the text'],
+    [
+      "<w:r><w:rPr/>x<w:t>a</w:t></w:r>",
+      '<w:r> mixes text "x" with elements, and docx.js drops the element before the text',
+    ],
+    [
+      "<w:r><w:t>a</w:t>tail</w:r>",
+      '<w:r> mixes text "tail" with elements, and docx.js drops the element before the text',
+    ],
+    [
+      "<w:r><![CDATA[x]]><w:t/></w:r>",
+      '<w:r> mixes text "x" with elements, and docx.js drops the element before the text',
+    ],
+    [
+      "<w:r><w:t>a</w:t>\u00a0<w:tab/></w:r>",
+      '<w:r> mixes text "\u00a0" with elements, and docx.js drops the element before the text',
+    ],
+    [
+      "<w:r><w:t>a</w:t>&#160;<w:tab/></w:r>",
+      '<w:r> mixes text "&#160;" with elements, and docx.js drops the element before the text',
+    ],
+    [
+      "<w:r><w:t>a</w:t>\ufeff<w:tab/></w:r>",
+      '<w:r> mixes text "\ufeff" with elements, and docx.js drops the element before the text',
+    ],
   ])("%j cannot be written: %s", (xml, reason) => {
     expect(xmlRoots(xml)).toEqual({ kind: "unwritable", reason });
   });
@@ -657,8 +713,8 @@ describe("13. RawXml fragment roots", () => {
       doc(
         raw("<w:sdt/>"),
         n("Paragraph", {}, raw("<w:r/>"), n("TextRun", { bold: true }, "x", raw("<w:fldChar/>"))),
-        n("Table", {}, n("TableRow", {}, n("TableCell", {}, raw("<w:tbl/>"), n("Paragraph"))))
-      )
+        n("Table", {}, n("TableRow", {}, n("TableCell", {}, raw("<w:tbl/>"), n("Paragraph")))),
+      ),
     );
     const rawNode = (xml: string) => ({ type: "RawXml", props: { xml }, children: [] });
     expect(blocks(tree)).toEqual([
@@ -668,7 +724,11 @@ describe("13. RawXml fragment roots", () => {
         type: "Table",
         props: {},
         children: [
-          { type: "TableRow", props: {}, children: [{ type: "TableCell", props: {}, children: [rawNode("<w:tbl/>"), paragraph({})] }] },
+          {
+            type: "TableRow",
+            props: {},
+            children: [{ type: "TableCell", props: {}, children: [rawNode("<w:tbl/>"), paragraph({})] }],
+          },
         ],
       },
     ]);
@@ -684,11 +744,16 @@ describe("13. RawXml fragment roots", () => {
             "Section",
             {},
             n("Header", {}, raw("<w:p/>")),
-            n("Paragraph", {}, n("ExternalHyperlink", { link: "https://x.test" }, raw("<w:r/>")), n("Bookmark", { id: "b" }, raw("<w:r/>"))),
-            n("List", {}, n("ListItem", {}, raw("<w:r/>")))
-          )
-        )
-      )
+            n(
+              "Paragraph",
+              {},
+              n("ExternalHyperlink", { link: "https://x.test" }, raw("<w:r/>")),
+              n("Bookmark", { id: "b" }, raw("<w:r/>")),
+            ),
+            n("List", {}, n("ListItem", {}, raw("<w:r/>"))),
+          ),
+        ),
+      ),
     ).not.toThrow();
   });
 
@@ -696,7 +761,7 @@ describe("13. RawXml fragment roots", () => {
     ["<w:p/>", "Paragraph", "RawXml <w:p> is not allowed in <Paragraph>"],
     ["<w:r/><w:p/>", "Paragraph", "RawXml <w:p> is not allowed in <Paragraph>"],
     ["<w:r/>", "Section", "RawXml <w:r> is not allowed in <Section>"],
-    ["<w:footnoteReference w:id=\"1\"/>", "TextRun", "RawXml <w:footnoteReference> is not allowed in <TextRun>"],
+    ['<w:footnoteReference w:id="1"/>', "TextRun", "RawXml <w:footnoteReference> is not allowed in <TextRun>"],
   ])("%s in a %s throws", (xml, parent, message) => {
     const input =
       parent === "Section"
@@ -709,7 +774,7 @@ describe("13. RawXml fragment roots", () => {
 
   test("the error names the authored parent: a ListItem, not the Paragraph it becomes", () => {
     expect(() => canon(doc(n("List", {}, n("ListItem", {}, raw("<w:p/>")))))).toThrow(
-      "RawXml <w:p> is not allowed in <ListItem>"
+      "RawXml <w:p> is not allowed in <ListItem>",
     );
   });
 
@@ -727,7 +792,7 @@ describe("13. RawXml fragment roots", () => {
     const error = treeError(() => canon(doc(n("Paragraph", {}, raw("<w:r><w:t>x</w:t>junk<w:tab/></w:r>")))));
     expect(error.path).toEqual(rawPath);
     expect(error.message).toContain(
-      'RawXml cannot be written: <w:r> mixes text "junk" with elements, and docx.js drops the element before the text'
+      'RawXml cannot be written: <w:r> mixes text "junk" with elements, and docx.js drops the element before the text',
     );
   });
 
@@ -749,7 +814,7 @@ describe("13. RawXml fragment roots", () => {
 
   test("a RawXml with children throws", () => {
     expect(() => canon(doc(n("Paragraph", {}, n("RawXml", { xml: "<w:r/>" }, n("TextRun")))))).toThrow(
-      "<TextRun> is not allowed in <RawXml>"
+      "<TextRun> is not allowed in <RawXml>",
     );
   });
 });
@@ -758,7 +823,7 @@ describe("14. RawXml relationship references", () => {
   test.each(['r:id="rId1"', 'r:embed="rId5"', "r:link = 'rId2'"])("an attribute %s throws", (attribute) => {
     const xml = `<w:r><w:drawing><a:blip ${attribute}/></w:drawing></w:r>`;
     expect(() => canon(doc(n("Paragraph", {}, n("RawXml", { xml }))))).toThrow(
-      "RawXml cannot carry relationship references (r:id, r:embed, …): docx.js cannot write their targets"
+      "RawXml cannot carry relationship references (r:id, r:embed, …): docx.js cannot write their targets",
     );
   });
 
@@ -802,17 +867,21 @@ describe("16. styles.importedStyles", () => {
   });
 
   test("a root other than w:style throws", () => {
-    expect(() => imported([`${style("A")}<w:p/>`])).toThrow("styles.importedStyles[0] <w:p> is not allowed in styles.xml");
+    expect(() => imported([`${style("A")}<w:p/>`])).toThrow(
+      "styles.importedStyles[0] <w:p> is not allowed in styles.xml",
+    );
   });
 
   test("a relationship reference throws", () => {
     expect(() => imported(['<w:style w:styleId="A" r:id="rId1"/>'])).toThrow(
-      "styles.importedStyles[0] cannot carry relationship references"
+      "styles.importedStyles[0] cannot carry relationship references",
     );
   });
 
   test.each(["Heading1", "Title", "Hyperlink", "FootnoteTextChar"])("the id of docx.js's built-in %s throws", (id) => {
-    expect(() => imported([style(id)])).toThrow(`styles.importedStyles[0] defines style "${id}", which is already defined`);
+    expect(() => imported([style(id)])).toThrow(
+      `styles.importedStyles[0] defines style "${id}", which is already defined`,
+    );
   });
 
   test("an id a paragraph or character style defines throws", () => {
@@ -822,7 +891,7 @@ describe("16. styles.importedStyles", () => {
 
   test("an id an earlier imported style defines throws", () => {
     expect(() => imported([style("A"), style("B"), style("A")])).toThrow(
-      'styles.importedStyles[2] defines style "A", which is already defined'
+      'styles.importedStyles[2] defines style "A", which is already defined',
     );
   });
 });
@@ -862,7 +931,7 @@ describe("17. loose content in Footnote, Comment and Textbox", () => {
         paragraph({}, run({}, "c")),
         paragraph({}, run({}, tab)),
       ]);
-    }
+    },
   );
 
   test("an error in wrapped content names its authored path, with no Paragraph in it", () => {
@@ -905,7 +974,7 @@ describe("18. Footnote placement", () => {
 
   test("a Footnote in a Footnote throws", () => {
     expect(() => canon(doc(n("Paragraph", {}, n("Footnote", {}, "a", footnote()))))).toThrow(
-      "Footnote is only allowed in the document body"
+      "Footnote is only allowed in the document body",
     );
   });
 
@@ -931,7 +1000,7 @@ describe("19. comment ids", () => {
       n("CommentRangeStart", { id: 0 }),
       "x",
       n("CommentRangeEnd", { id: 0 }),
-      n("CommentReference", { id: 0 })
+      n("CommentReference", { id: 0 }),
     );
     const tree = canon(withComments([marked], comment(0)));
     expect(inline(tree)).toEqual([
@@ -948,11 +1017,14 @@ describe("19. comment ids", () => {
     expect(error.message).toContain("A second <Comment id={0}>");
   });
 
-  test.each(["CommentRangeStart", "CommentRangeEnd", "CommentReference"])("a %s with no matching Comment throws", (kind) => {
-    const error = treeError(() => canon(withComments([n("Paragraph", {}, n(kind, { id: 1 }))], comment(0))));
-    expect(error.path).toEqual(["Document", "Section[0]", "Paragraph[0]", `${kind}[0]`]);
-    expect(error.message).toContain("No <Comment id={1}>");
-  });
+  test.each(["CommentRangeStart", "CommentRangeEnd", "CommentReference"])(
+    "a %s with no matching Comment throws",
+    (kind) => {
+      const error = treeError(() => canon(withComments([n("Paragraph", {}, n(kind, { id: 1 }))], comment(0))));
+      expect(error.path).toEqual(["Document", "Section[0]", "Paragraph[0]", `${kind}[0]`]);
+      expect(error.message).toContain("No <Comment id={1}>");
+    },
+  );
 
   test("a Comment no range or reference names is fine", () => {
     expect(() => canon(withComments([n("Paragraph", {}, "x")], comment(0)))).not.toThrow();
@@ -976,13 +1048,24 @@ describe("TableOfContents and Textbox are Section-body blocks", () => {
 
 describe("removed props", () => {
   test.each([
-    ["Document", "footnotes", "Document.footnotes was removed: put a <Footnote> in the paragraph where its number goes"],
+    [
+      "Document",
+      "footnotes",
+      "Document.footnotes was removed: put a <Footnote> in the paragraph where its number goes",
+    ],
     ["Document", "comments", "Document.comments was removed: put <Comment> elements directly in the <Document>"],
-    ["Document", "externalStyles", "Document.externalStyles was removed: use styles.importedStyles, XML strings of <w:style> elements"],
+    [
+      "Document",
+      "externalStyles",
+      "Document.externalStyles was removed: use styles.importedStyles, XML strings of <w:style> elements",
+    ],
     ["Section", "headers", "Section.headers was removed: use <Header> children"],
     ["Section", "footers", "Section.footers was removed: use <Footer> children"],
   ])("%s.%s throws", (kind, prop, message) => {
-    const input = kind === "Document" ? n("Document", { [prop]: {} }, n("Section")) : n("Document", {}, n("Section", { [prop]: {} }));
+    const input =
+      kind === "Document"
+        ? n("Document", { [prop]: {} }, n("Section"))
+        : n("Document", {}, n("Section", { [prop]: {} }));
     const error = treeError(() => canon(input));
     expect(error.path).toEqual(kind === "Document" ? ["Document"] : ["Document", "Section[0]"]);
     expect(error.message).toContain(message);
@@ -990,13 +1073,15 @@ describe("removed props", () => {
 
   test("styles.initialStyles throws", () => {
     expect(() => canon(n("Document", { styles: { initialStyles: {} } }, n("Section")))).toThrow(
-      "Document: styles.initialStyles was removed: use styles.importedStyles, XML strings of <w:style> elements"
+      "Document: styles.initialStyles was removed: use styles.importedStyles, XML strings of <w:style> elements",
     );
   });
 });
 
 describe("lists", () => {
-  const numbering = (reference: string, level: number, instance: number) => ({ numbering: { reference, level, instance } });
+  const numbering = (reference: string, level: number, instance: number) => ({
+    numbering: { reference, level, instance },
+  });
 
   test("a List expands into bullet paragraphs by default, at level 0 and instance 0", () => {
     const tree = canon(doc(n("List", {}, n("ListItem", {}, "a"), n("ListItem", {}, "b"))));
@@ -1008,7 +1093,11 @@ describe("lists", () => {
 
   test("two Lists get instances 0 and 1, so the second restarts", () => {
     const tree = canon(
-      doc(n("List", { type: "numbered" }, n("ListItem", {}, "a")), n("Paragraph"), n("List", { type: "numbered" }, n("ListItem", {}, "b")))
+      doc(
+        n("List", { type: "numbered" }, n("ListItem", {}, "a")),
+        n("Paragraph"),
+        n("List", { type: "numbered" }, n("ListItem", {}, "b")),
+      ),
     );
     expect(blocks(tree)).toEqual([
       paragraph(numbering("NumberedList", 0, 0), run({}, "a")),
@@ -1018,7 +1107,9 @@ describe("lists", () => {
   });
 
   test("a List nested in a List is one level deeper with the same instance", () => {
-    const tree = canon(doc(n("List", {}, n("ListItem", {}, "a"), n("List", {}, n("ListItem", {}, "a.1")), n("ListItem", {}, "b"))));
+    const tree = canon(
+      doc(n("List", {}, n("ListItem", {}, "a"), n("List", {}, n("ListItem", {}, "a.1")), n("ListItem", {}, "b"))),
+    );
     expect(blocks(tree)).toEqual([
       paragraph(numbering("BulletList", 0, 0), run({}, "a")),
       paragraph(numbering("BulletList", 1, 0), run({}, "a.1")),
@@ -1034,10 +1125,10 @@ describe("lists", () => {
           { type: "numbered" },
           n("ListItem", {}, "a", n("List", { type: "bullet" }, n("ListItem", {}, "a.1"))),
           n("List", {}, n("ListItem", {}, "a.2")),
-          n("ListItem", {}, "b")
+          n("ListItem", {}, "b"),
         ),
-        n("List", { type: "numbered" }, n("ListItem", {}, "c"))
-      )
+        n("List", { type: "numbered" }, n("ListItem", {}, "c")),
+      ),
     );
     expect(blocks(tree)).toEqual([
       paragraph(numbering("NumberedList", 0, 0), run({}, "a")),
@@ -1049,8 +1140,20 @@ describe("lists", () => {
     const [, , nested] = (tree.props.numbering as typeof LIST_NUMBERING).config;
     expect(nested.reference).toBe("BulletList@1");
     expect(nested.levels.slice(0, 2)).toEqual([
-      { level: 0, format: "bullet", text: "◦", alignment: "left", style: { paragraph: { indent: { left: 1440, hanging: 360 } } } },
-      { level: 1, format: "bullet", text: "▪", alignment: "left", style: { paragraph: { indent: { left: 2160, hanging: 360 } } } },
+      {
+        level: 0,
+        format: "bullet",
+        text: "◦",
+        alignment: "left",
+        style: { paragraph: { indent: { left: 1440, hanging: 360 } } },
+      },
+      {
+        level: 1,
+        format: "bullet",
+        text: "▪",
+        alignment: "left",
+        style: { paragraph: { indent: { left: 2160, hanging: 360 } } },
+      },
     ]);
     expect(nested.levels).toHaveLength(8);
   });
@@ -1061,9 +1164,18 @@ describe("lists", () => {
         n(
           "List",
           { type: "bullet" },
-          n("ListItem", {}, "a", n("List", { type: "numbered" }, n("ListItem", {}, "1", n("List", { type: "numbered" }, n("ListItem", {}, "1.a")))))
-        )
-      )
+          n(
+            "ListItem",
+            {},
+            "a",
+            n(
+              "List",
+              { type: "numbered" },
+              n("ListItem", {}, "1", n("List", { type: "numbered" }, n("ListItem", {}, "1.a"))),
+            ),
+          ),
+        ),
+      ),
     );
     expect(blocks(tree)).toEqual([
       paragraph(numbering("BulletList", 0, 0), run({}, "a")),
@@ -1079,7 +1191,13 @@ describe("lists", () => {
 
   test("a List inside a ListItem splits the item: its paragraph first, then the nested items", () => {
     const tree = canon(
-      doc(n("List", { type: "numbered" }, n("ListItem", {}, "a", n("List", { type: "numbered" }, n("ListItem", {}, "a.1")), " tail")))
+      doc(
+        n(
+          "List",
+          { type: "numbered" },
+          n("ListItem", {}, "a", n("List", { type: "numbered" }, n("ListItem", {}, "a.1")), " tail"),
+        ),
+      ),
     );
     expect(blocks(tree)).toEqual([
       paragraph(numbering("NumberedList", 0, 0), run({}, "a tail")),
@@ -1103,8 +1221,8 @@ describe("lists", () => {
     const tree = canon(
       doc(
         n("Header", {}, n("List", {}, n("ListItem", {}, "h"))),
-        n("Table", {}, n("TableRow", {}, n("TableCell", {}, n("List", {}, n("ListItem", {}, "c")))))
-      )
+        n("Table", {}, n("TableRow", {}, n("TableCell", {}, n("List", {}, n("ListItem", {}, "c"))))),
+      ),
     );
     const [header, table] = blocks(tree);
     expect(header).toMatchObject({ children: [paragraph(numbering("BulletList", 0, 0), run({}, "h"))] });
@@ -1120,7 +1238,7 @@ describe("lists", () => {
     expect(() => canon(doc(nest(nine)))).not.toThrow();
     for (const tenth of ["bullet", "numbered"]) {
       expect(() => canon(doc(nest(["bullet", ...Array<string>(8).fill("bullet"), tenth])))).toThrow(
-        "Lists nest at most 9 deep: Word numbers 9 levels"
+        "Lists nest at most 9 deep: Word numbers 9 levels",
       );
     }
   });
@@ -1128,9 +1246,18 @@ describe("lists", () => {
   test.each([
     ["oops", "Document: numbering must be an object with a config array, docx.js's INumberingOptions"],
     [{ config: { reference: "NumberedList" } }, "Document: numbering.config must be an array"],
-    [{ config: [{ reference: 1, levels: [] }] }, "Document: numbering.config[0] must have a string reference and a levels array"],
-    [{ config: [{ reference: "NumberedList", levels: [null] }] }, "Document: numbering.config[0].levels[0] must be an object with a whole-number level"],
-    [{ config: [{ reference: "NumberedList", levels: [{ level: "1" }] }] }, "Document: numbering.config[0].levels[0] must be an object with a whole-number level"],
+    [
+      { config: [{ reference: 1, levels: [] }] },
+      "Document: numbering.config[0] must have a string reference and a levels array",
+    ],
+    [
+      { config: [{ reference: "NumberedList", levels: [null] }] },
+      "Document: numbering.config[0].levels[0] must be an object with a whole-number level",
+    ],
+    [
+      { config: [{ reference: "NumberedList", levels: [{ level: "1" }] }] },
+      "Document: numbering.config[0].levels[0] must be an object with a whole-number level",
+    ],
   ])("a malformed numbering %j throws, with or without Lists", (numbering, message) => {
     for (const body of [n("Paragraph"), n("List", {}, n("ListItem", {}, "a"))]) {
       expect(() => canon(n("Document", { numbering }, n("Section", {}, body)))).toThrow(message);
@@ -1159,11 +1286,21 @@ describe("lists", () => {
     });
 
     test("apply to BulletList too, and leave the type the document does not configure on its defaults", () => {
-      const square = (level: number) => ({ level, format: "bullet", text: "■", alignment: "left", style: indent(720 * (level + 1)) });
+      const square = (level: number) => ({
+        level,
+        format: "bullet",
+        text: "■",
+        alignment: "left",
+        style: indent(720 * (level + 1)),
+      });
       const input = n(
         "Document",
         { numbering: { config: [{ reference: "BulletList", levels: [square(0), square(1), square(2)] }] } },
-        n("Section", {}, n("List", { type: "numbered" }, n("ListItem", {}, "1", n("List", {}, n("ListItem", {}, "b")))))
+        n(
+          "Section",
+          {},
+          n("List", { type: "numbered" }, n("ListItem", {}, "1", n("List", {}, n("ListItem", {}, "b")))),
+        ),
       );
       const config = (canon(input).props.numbering as typeof LIST_NUMBERING).config;
       expect(config.map((c) => c.reference)).toEqual(["BulletList", "NumberedList", "BulletList@1"]);
@@ -1176,25 +1313,33 @@ describe("lists", () => {
       const bare = { level: 3, format: "decimal", alignment: "left", style: indent(2880) };
       const innermost = () => n("List", { type: "numbered" }, n("ListItem", {}, "n"));
       const twoDeep = (levels: readonly object[]) =>
-        withNumbering(levels, n("List", { type: "numbered" }, n("ListItem", {}, "1", n("List", {}, n("ListItem", {}, "b", innermost())))));
+        withNumbering(
+          levels,
+          n("List", { type: "numbered" }, n("ListItem", {}, "1", n("List", {}, n("ListItem", {}, "b", innermost())))),
+        );
       const definition = (levels: readonly object[], reference: string) => {
         const config = (canon(twoDeep(levels)).props.numbering as typeof LIST_NUMBERING).config;
         return config.find((c) => c.reference === reference);
       };
-      expect(definition([roman, letter, digit, four], "NumberedList@2")?.levels.map((l) => l.text)).toEqual(["%1)", "%1.%2"]);
+      expect(definition([roman, letter, digit, four], "NumberedList@2")?.levels.map((l) => l.text)).toEqual([
+        "%1)",
+        "%1.%2",
+      ]);
       expect(definition([roman, letter, digit, bare], "NumberedList@2")?.levels[1]).toEqual({ ...bare, level: 1 });
     });
 
     test("throw when a marker there would show the number of a level the enclosing list owns", () => {
       const dotted = { ...letter, text: "%1.%2." };
       expect(() => canon(withNumbering([roman, dotted, digit], numberedUnderBullet(n("ListItem", {}, "n"))))).toThrow(
-        'numbering NumberedList level 1 marker "%1.%2." shows the number of level 0, which belongs to the enclosing list here'
+        'numbering NumberedList level 1 marker "%1.%2." shows the number of level 0, which belongs to the enclosing list here',
       );
     });
 
     test("restrict only the levels a nested list's items reach", () => {
       const dottedFive = { level: 5, format: "decimal", text: "%1.%6.", alignment: "left", style: indent(4320) };
-      const tree = canon(withNumbering([roman, letter, digit, dottedFive], numberedUnderBullet(n("ListItem", {}, "n"))));
+      const tree = canon(
+        withNumbering([roman, letter, digit, dottedFive], numberedUnderBullet(n("ListItem", {}, "n"))),
+      );
       expect(blocks(tree)[1]).toEqual(paragraph(numbering("NumberedList@1", 0, 1), run({}, "n")));
       expect(() => canon(withNumbering([roman, letter, digit], numberedUnderBullet()))).not.toThrow();
     });
@@ -1203,17 +1348,30 @@ describe("lists", () => {
       const own = { level: 0, format: "upperLetter", text: "(%1)", alignment: "left", style: indent(1440) };
       const input = n(
         "Document",
-        { numbering: { config: [{ reference: "NumberedList", levels: [roman] }, { reference: "NumberedList@1", levels: [own] }] } },
-        n("Section", {}, numberedUnderBullet(n("ListItem", {}, "n")))
+        {
+          numbering: {
+            config: [
+              { reference: "NumberedList", levels: [roman] },
+              { reference: "NumberedList@1", levels: [own] },
+            ],
+          },
+        },
+        n("Section", {}, numberedUnderBullet(n("ListItem", {}, "n"))),
       );
       const config = (canon(input).props.numbering as typeof LIST_NUMBERING).config;
       expect(config.find((c) => c.reference === "NumberedList@1")?.levels).toEqual([own]);
     });
 
     test("throw when they define no level a list item needs", () => {
-      const nestedSameType = n("List", { type: "numbered" }, n("ListItem", {}, "a", n("List", { type: "numbered" }, n("ListItem", {}, "b"))));
+      const nestedSameType = n(
+        "List",
+        { type: "numbered" },
+        n("ListItem", {}, "a", n("List", { type: "numbered" }, n("ListItem", {}, "b"))),
+      );
       for (const body of [nestedSameType, numberedUnderBullet(n("ListItem", {}, "n"))]) {
-        expect(() => canon(withNumbering([roman], body))).toThrow("numbering NumberedList defines no level 1, which this list item needs");
+        expect(() => canon(withNumbering([roman], body))).toThrow(
+          "numbering NumberedList defines no level 1, which this list item needs",
+        );
       }
     });
   });
@@ -1222,19 +1380,21 @@ describe("lists", () => {
     const error = treeError(() => canon(doc(n("List", {}, n("List", {}, n("ListItem", {}, "a"))))));
     expect(error.path).toEqual(["Document", "Section[0]", "List[0]", "List[0]"]);
     expect(error.message).toContain("A <List> must start with a <ListItem>, the item its numbering restarts at");
-    expect(() => canon(doc(n("List", {}, n("ListItem", {}, "a", n("List", {}, n("List", {}, n("ListItem", {}, "b")))))))).toThrow(
-      "A <List> must start with a <ListItem>"
-    );
+    expect(() =>
+      canon(doc(n("List", {}, n("ListItem", {}, "a", n("List", {}, n("List", {}, n("ListItem", {}, "b"))))))),
+    ).toThrow("A <List> must start with a <ListItem>");
   });
 
   test("List.level throws", () => {
     expect(() => canon(doc(n("List", { level: 1 }, n("ListItem", {}, "a"))))).toThrow(
-      "Document > Section[0] > List[0]: List.level was removed; nest <List> instead"
+      "Document > Section[0] > List[0]: List.level was removed; nest <List> instead",
     );
   });
 
   test("a List type other than bullet or numbered throws, at that List", () => {
-    const error = treeError(() => canon(doc(n("List", {}, n("ListItem", {}, "a", n("List", { type: "number" }, n("ListItem", {}, "b")))))));
+    const error = treeError(() =>
+      canon(doc(n("List", {}, n("ListItem", {}, "a", n("List", { type: "number" }, n("ListItem", {}, "b")))))),
+    );
     expect(error.path).toEqual(["Document", "Section[0]", "List[0]", "ListItem[0]", "List[1]"]);
     expect(error.message).toContain('List type must be "bullet" or "numbered", got "number"');
   });
@@ -1247,21 +1407,23 @@ describe("lists", () => {
 
   test("a List in a Paragraph throws", () => {
     expect(() => canon(doc(n("Paragraph", {}, n("List"))))).toThrow(
-      "Document > Section[0] > Paragraph[0] > List[0]: <List> is not allowed in <Paragraph>"
+      "Document > Section[0] > Paragraph[0] > List[0]: <List> is not allowed in <Paragraph>",
     );
   });
 
   test("a List in a ListItem outside a List throws", () => {
     expect(() => canon(doc(n("ListItem", {}, "a", n("List"))))).toThrow(
-      "Document > Section[0] > ListItem[0] > List[1]: <List> is not allowed in <ListItem>"
+      "Document > Section[0] > ListItem[0] > List[1]: <List> is not allowed in <ListItem>",
     );
   });
 
   test("a List holds only ListItems and Lists", () => {
     expect(() => canon(doc(n("List", {}, n("Paragraph"))))).toThrow(
-      "Document > Section[0] > List[0] > Paragraph[0]: <Paragraph> is not allowed in <List>"
+      "Document > Section[0] > List[0] > Paragraph[0]: <Paragraph> is not allowed in <List>",
     );
-    expect(() => canon(doc(n("List", {}, "a")))).toThrow("Document > Section[0] > List[0]: Text is not allowed directly in <List>");
+    expect(() => canon(doc(n("List", {}, "a")))).toThrow(
+      "Document > Section[0] > List[0]: Text is not allowed directly in <List>",
+    );
   });
 
   test("an expanded List adds both LIST_NUMBERING configs to the Document", () => {
@@ -1271,7 +1433,13 @@ describe("lists", () => {
 
   test("a user's own config for a reference is kept, and only the missing one is added", () => {
     const own = { reference: "NumberedList", levels: [{ level: 0, format: "upperRoman", text: "%1)" }] };
-    const tree = canon(n("Document", { numbering: { config: [own] } }, n("Section", {}, n("List", { type: "numbered" }, n("ListItem", {}, "a")))));
+    const tree = canon(
+      n(
+        "Document",
+        { numbering: { config: [own] } },
+        n("Section", {}, n("List", { type: "numbered" }, n("ListItem", {}, "a"))),
+      ),
+    );
     expect(tree.props.numbering).toEqual({ config: [own, LIST_NUMBERING.config[1]] });
   });
 
@@ -1284,7 +1452,10 @@ describe("LIST_NUMBERING", () => {
   test("level 0 of each reference is 0.1.8's DEFAULT_NUMBERING, which DEFAULT_NUMBERING still exports", () => {
     const indent = { paragraph: { indent: { left: 720, hanging: 360 } } };
     const released = [
-      { reference: "NumberedList", level0: { level: 0, format: "decimal", text: "%1.", alignment: "left", style: indent } },
+      {
+        reference: "NumberedList",
+        level0: { level: 0, format: "decimal", text: "%1.", alignment: "left", style: indent },
+      },
       { reference: "BulletList", level0: { level: 0, format: "bullet", text: "•", alignment: "left", style: indent } },
     ];
     for (const numbering of [LIST_NUMBERING, DEFAULT_NUMBERING]) {
@@ -1325,7 +1496,9 @@ describe("SymbolRun char", () => {
     const error = treeError(() => canon(doc(n("Paragraph", {}, n("SymbolRun", { char: "★" })))));
     expect(error.path).toEqual(["Document", "Section[0]", "Paragraph[0]", "SymbolRun[0]"]);
     expect(error.message).toContain('SymbolRun char must be four hex digits, as in "F071", got "★"');
-    expect(inline(canon(doc(n("Paragraph", {}, n("SymbolRun", { char: "f071" })))))).toEqual([runOf("SymbolRun", { char: "f071" })]);
+    expect(inline(canon(doc(n("Paragraph", {}, n("SymbolRun", { char: "f071" })))))).toEqual([
+      runOf("SymbolRun", { char: "f071" }),
+    ]);
   });
 });
 
@@ -1342,8 +1515,8 @@ describe("canonicalize as a whole", () => {
         n("List", { type: "numbered" }, n("ListItem", {}, "a", n("List", {}, n("ListItem", {}, "b")))),
         n("Paragraph", {}, n("TextRun", { bold: true }, "a", n("Break"), "b"), n("Math", { text: "x" })),
         n("Paragraph", { text: "SECTION" }, "CURRENT", n("TextRun", { text: "" }, "TOTAL_", "PAGES")),
-        n("Table", {}, n("TableRow", {}, n("TableCell", {}, n("Paragraph", {}, "cell"))))
-      )
+        n("Table", {}, n("TableRow", {}, n("TableCell", {}, n("Paragraph", {}, "cell")))),
+      ),
     );
 
   test("is idempotent: canonicalize(canonicalize(x)) equals canonicalize(x)", () => {

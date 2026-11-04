@@ -179,7 +179,10 @@ function cutAt(inlines: readonly ResolvedInline[], [index, offset]: Split): [Res
   return [before, after];
 }
 
-function cutAtSplits(inlines: ResolvedInline[], splits: readonly Split[]): { inlines: ResolvedInline[]; from: Split }[] {
+function cutAtSplits(
+  inlines: ResolvedInline[],
+  splits: readonly Split[],
+): { inlines: ResolvedInline[]; from: Split }[] {
   const parts: { inlines: ResolvedInline[]; from: Split }[] = [];
   let rest = inlines;
   let from: Split = [0, 0];
@@ -227,7 +230,9 @@ function cutAtRenderedBreaks(blocks: readonly ResolvedBlock[]): ResolvedBlock[][
       if (inlines.length > 0) pieces.push({ group: groups[groups.length - 1], inlines });
     });
     if (pieces.length === 0) pieces.push({ group: groups[groups.length - 1], inlines: [] });
-    pieces.forEach(({ group, inlines }, k) => group.push(paragraphPiece(block, inlines, k === 0, k === pieces.length - 1)));
+    pieces.forEach(({ group, inlines }, k) =>
+      group.push(paragraphPiece(block, inlines, k === 0, k === pieces.length - 1)),
+    );
   }
   return groups;
 }
@@ -262,7 +267,8 @@ function rowPieces(row: ResolvedRow, cells: readonly ResolvedBlock[][][]): Resol
 function containsRenderedBreak(blocks: readonly ResolvedBlock[]): boolean {
   return blocks.some((block) => {
     if (block.kind === "paragraph") return cutInlines(block.inlines, breakOf).cuts.includes("rendered");
-    if (block.kind === "table") return block.rows.some((row) => row.cells.some((cell) => containsRenderedBreak(cell.blocks)));
+    if (block.kind === "table")
+      return block.rows.some((row) => row.cells.some((cell) => containsRenderedBreak(cell.blocks)));
     return false;
   });
 }
@@ -337,7 +343,10 @@ function paginateSections(sections: readonly ResolvedSection[], measured: Measur
       }
     }
     const tail = pieces[pieces.length - 1];
-    const host = pieces.slice(0, -1).reverse().find((piece) => piece.inlines.length > 0);
+    const host = pieces
+      .slice(0, -1)
+      .reverse()
+      .find((piece) => piece.inlines.length > 0);
     if (host !== undefined && !tail.inlines.some(isVisibleInline)) {
       host.inlines = [...host.inlines, ...tail.inlines];
       tail.inlines = [];
@@ -351,7 +360,11 @@ function paginateSections(sections: readonly ResolvedSection[], measured: Measur
       parts.forEach((part, i) => {
         const first = k === 0 && i === 0;
         const last = k === kept.length - 1 && i === parts.length - 1;
-        const key = formatKey(i === 0 ? { kind: "piece", block: n, piece: k } : { kind: "continuation", block: n, piece: k, from: part.from });
+        const key = formatKey(
+          i === 0
+            ? { kind: "piece", block: n, piece: k }
+            : { kind: "continuation", block: n, piece: k, from: part.from },
+        );
         if (i === 0) measuredBreak(key);
         else newPage();
         const whole = breaks.length === 0 && parts.length === 1;
@@ -366,7 +379,8 @@ function paginateSections(sections: readonly ResolvedSection[], measured: Measur
     const mergeStart = t.rows.map((_, r) => r);
     t.rows.forEach((row, i) => {
       for (const cell of row.cells) {
-        for (let k = i + 1; k < Math.min(i + cell.rowSpan, t.rows.length); k++) mergeStart[k] = Math.min(mergeStart[k], mergeStart[i]);
+        for (let k = i + 1; k < Math.min(i + cell.rowSpan, t.rows.length); k++)
+          mergeStart[k] = Math.min(mergeStart[k], mergeStart[i]);
       }
     });
     let chunk: ResolvedRow[] = [];
@@ -453,7 +467,8 @@ function footnoteNumbers(blocks: readonly ResolvedBlock[], out: Set<number>): Se
   };
   for (const block of blocks) {
     if (block.kind === "paragraph") inInlines(block.inlines);
-    else if (block.kind === "table") for (const row of block.rows) for (const cell of row.cells) footnoteNumbers(cell.blocks, out);
+    else if (block.kind === "table")
+      for (const row of block.rows) for (const cell of row.cells) footnoteNumbers(cell.blocks, out);
     else if (block.kind === "textbox") footnoteNumbers(block.blocks, out);
   }
   return out;
@@ -468,7 +483,7 @@ function inherited(sections: readonly ResolvedSection[], of: (s: ResolvedSection
 export function paginate(
   sections: readonly ResolvedSection[],
   evenAndOddHeaders: boolean,
-  measured: MeasuredBreaks = NO_BREAKS
+  measured: MeasuredBreaks = NO_BREAKS,
 ): ResolvedPage[] {
   if (sections.length === 0) return [];
   const drafts = paginateSections(sections, measured);
@@ -479,7 +494,12 @@ export function paginate(
   for (const draft of drafts) pagesInSection.set(draft.section, (pagesInSection.get(draft.section) ?? 0) + 1);
   return drafts.map((draft): ResolvedPage => {
     const s = sections[draft.section - 1];
-    const type = s.titlePage && draft.indexInSection === 0 ? "first" : evenAndOddHeaders && draft.number % 2 === 0 ? "even" : "default";
+    const type =
+      s.titlePage && draft.indexInSection === 0
+        ? "first"
+        : evenAndOddHeaders && draft.number % 2 === 0
+          ? "even"
+          : "default";
     const parts = draft.parts
       .filter((part, i) => i === 0 || part.blocks.length > 0)
       .map((part): ResolvedPart => ({

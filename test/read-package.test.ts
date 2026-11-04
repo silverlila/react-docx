@@ -80,7 +80,7 @@ describe("openPackage", () => {
         body: "<w:p/>",
         rels: `<Relationship Id="rId1" Type="${IMAGE}" Target="media/image1.png"/>`,
         media: { "word/media/image1.png": PICTURE },
-      })
+      }),
     );
     const rel = pkg.relsOf("word/document.xml").get("rId1");
     expect(rel).toEqual({ type: IMAGE, target: "word/media/image1.png", external: false });
@@ -97,7 +97,7 @@ describe("openPackage", () => {
           "word/header1.xml": part("w:hdr", "<w:p/>"),
           "word/_rels/header1.xml.rels": `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${IMAGE}" Target="media/image2.png"/><Relationship Id="rId2" Type="${IMAGE}" Target="../media/./top.png"/><Relationship Id="rId3" Type="${IMAGE}" Target="/word/x.png"/></Relationships>`,
         },
-      })
+      }),
     );
     const header = pkg.relsOf("word/document.xml").get("rId7")?.target;
     expect(header).toBe("word/header1.xml");
@@ -111,7 +111,7 @@ describe("openPackage", () => {
       docx({
         body: "<w:p/>",
         rels: `<Relationship Id="rId9" Type="${HYPERLINK}" Target="https://example.com/a/../b?x=1&amp;y=2" TargetMode="External"/>`,
-      })
+      }),
     );
     expect(pkg.relsOf("word/document.xml").get("rId9")).toEqual({
       type: HYPERLINK,
@@ -137,7 +137,10 @@ describe("openPackage", () => {
 
   test("reads the core properties", () => {
     const pkg = openPackage(
-      docx({ body: "<w:p/>", core: "<dc:title>My &amp; Resume</dc:title><dc:creator>Ada</dc:creator><cp:revision>3</cp:revision>" })
+      docx({
+        body: "<w:p/>",
+        core: "<dc:title>My &amp; Resume</dc:title><dc:creator>Ada</dc:creator><cp:revision>3</cp:revision>",
+      }),
     );
     expect(pkg.core).toEqual({ title: "My & Resume", creator: "Ada", revision: 3 });
   });

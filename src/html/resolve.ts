@@ -91,14 +91,28 @@ type Story = {
 
 type LineRule = ComputedParagraph["lineHeight"];
 
-type InlineScope = { readonly story: Story; readonly run: RunOptions; readonly line: LineRule; readonly tocEntry: boolean };
+type InlineScope = {
+  readonly story: Story;
+  readonly run: RunOptions;
+  readonly line: LineRule;
+  readonly tocEntry: boolean;
+};
 
 const TOC_ENTRY_STYLE = /^TOC[1-9]$/i;
 const HYPERLINK_STYLE = "Hyperlink";
 
 const FALLBACK_RUN = { font: "Times New Roman", size: 20 } as const;
 
-const PAGE_DEFAULTS = { width: 11906, height: 16838, top: 1440, right: 1440, bottom: 1440, left: 1440, header: 708, footer: 708 } as const;
+const PAGE_DEFAULTS = {
+  width: 11906,
+  height: 16838,
+  top: 1440,
+  right: 1440,
+  bottom: 1440,
+  left: 1440,
+  header: 708,
+  footer: 708,
+} as const;
 
 const DEFAULT_TAB_STOP = 720;
 
@@ -114,7 +128,14 @@ const EIGHTHS_PER_PT = 8;
 const LINE_UNITS = 240;
 const BASE64_CHUNK = 0x8000;
 const FONT_SLOTS: readonly FontSlot[] = ["ascii", "hAnsi", "eastAsia", "cs"];
-const POINTS_PER_UNIT: Readonly<Record<string, number>> = { pt: 1, pc: 12, pi: 12, in: 72, cm: 72 / 2.54, mm: 72 / 25.4 };
+const POINTS_PER_UNIT: Readonly<Record<string, number>> = {
+  pt: 1,
+  pc: 12,
+  pi: 12,
+  in: 72,
+  cm: 72 / 2.54,
+  mm: 72 / 25.4,
+};
 const UNIVERSAL_MEASURE = /^(-?[0-9]+(?:\.[0-9]+)?)(mm|cm|in|pt|pc|pi)$/;
 
 const ALIGNMENTS: Readonly<Record<string, ComputedParagraph["align"]>> = {
@@ -194,7 +215,11 @@ function patternCover(type: string | undefined): number {
 function mix(foreground: string, background: string, cover: number): string {
   const channel = (hex: string, i: number) => parseInt(hex.slice(i, i + 2), 16);
   return [0, 2, 4]
-    .map((i) => Math.round(channel(background, i) * (1 - cover) + channel(foreground, i) * cover).toString(16).padStart(2, "0"))
+    .map((i) =>
+      Math.round(channel(background, i) * (1 - cover) + channel(foreground, i) * cover)
+        .toString(16)
+        .padStart(2, "0"),
+    )
     .join("")
     .toUpperCase();
 }
@@ -299,10 +324,12 @@ function computeTabStops(stops: TabStops | undefined, indentLeftPt: number, firs
   for (const stop of stops ?? []) {
     const align = own(TAB_ALIGNS, stop.type);
     if (align === undefined) continue;
-    const leader = stop.leader !== undefined && TAB_LEADERS.has(stop.leader) ? (stop.leader as TabStop["leader"]) : "none";
+    const leader =
+      stop.leader !== undefined && TAB_LEADERS.has(stop.leader) ? (stop.leader as TabStop["leader"]) : "none";
     out.push({ posPt: pointsOf(stop.position, TWIPS_PER_PT) - indentLeftPt, align, leader });
   }
-  if (firstLinePt < 0 && !out.some((stop) => Math.abs(stop.posPt) < 0.01)) out.push({ posPt: 0, align: "left", leader: "none" });
+  if (firstLinePt < 0 && !out.some((stop) => Math.abs(stop.posPt) < 0.01))
+    out.push({ posPt: 0, align: "left", leader: "none" });
   return out.sort((a, b) => a.posPt - b.posPt);
 }
 
@@ -315,18 +342,21 @@ function computeRun(run: RunOptions, line: LineRule): ComputedRun {
   const font = fontSlots(run.font);
   const rtl = run.rightToLeft ?? false;
   const latin = font.ascii ?? font.hAnsi;
-  const fontFamily = (rtl ? font.cs ?? latin : latin) ?? FALLBACK_RUN.font;
+  const fontFamily = (rtl ? (font.cs ?? latin) : latin) ?? FALLBACK_RUN.font;
   const otherFonts = [latin, font.eastAsia, font.cs].filter((f): f is string => f !== undefined && f !== fontFamily);
-  const size = rtl && run.sizeComplexScript !== undefined && typeof run.sizeComplexScript !== "boolean" ? run.sizeComplexScript : run.size;
-  const underline = run.underline === undefined ? null : run.underline.type ?? "single";
+  const size =
+    rtl && run.sizeComplexScript !== undefined && typeof run.sizeComplexScript !== "boolean"
+      ? run.sizeComplexScript
+      : run.size;
+  const underline = run.underline === undefined ? null : (run.underline.type ?? "single");
   const highlight = run.highlight === undefined ? undefined : own(HIGHLIGHTS, run.highlight);
   return {
     fontFamily,
     otherFonts: [...new Set(otherFonts)],
     rtl,
     sizePt: pointsOf(size ?? FALLBACK_RUN.size, HALF_POINTS_PER_PT),
-    bold: (rtl ? run.boldComplexScript ?? run.bold : run.bold) ?? false,
-    italic: (rtl ? run.italicsComplexScript ?? run.italics : run.italics) ?? false,
+    bold: (rtl ? (run.boldComplexScript ?? run.bold) : run.bold) ?? false,
+    italic: (rtl ? (run.italicsComplexScript ?? run.italics) : run.italics) ?? false,
     underline: underline === "none" ? null : underline,
     strike: run.strike ?? false,
     doubleStrike: run.doubleStrike ?? false,
@@ -356,10 +386,17 @@ function lineRuleOf(spacing: SheetParagraph["spacing"]): LineRule {
   }
 }
 
-function computeParagraph(p: SheetParagraph, markRun: ComputedRun, styleId: string | null, defaultTabPt: number): ComputedParagraph {
+function computeParagraph(
+  p: SheetParagraph,
+  markRun: ComputedRun,
+  styleId: string | null,
+  defaultTabPt: number,
+): ComputedParagraph {
   const indent = p.indent ?? {};
   const firstLine =
-    indent.hanging !== undefined ? -pointsOf(indent.hanging, TWIPS_PER_PT) : pointsOf(indent.firstLine ?? 0, TWIPS_PER_PT);
+    indent.hanging !== undefined
+      ? -pointsOf(indent.hanging, TWIPS_PER_PT)
+      : pointsOf(indent.firstLine ?? 0, TWIPS_PER_PT);
   return {
     align: alignOf(p.alignment, p.bidirectional ?? false),
     rtl: p.bidirectional ?? false,
@@ -447,7 +484,9 @@ function runContent(child: RunChild, run: ComputedRun): ResolvedInline[] {
       return [{ kind: "field", field: "date", placeholder: "date", run }];
     case "RawXml": {
       const shown = rawRunItems(child.props.xml);
-      return shown.length > 0 ? shown.flatMap((item) => rawRunItem(item, run)) : [rawInline(firstRoot(child.props.xml))];
+      return shown.length > 0
+        ? shown.flatMap((item) => rawRunItem(item, run))
+        : [rawInline(firstRoot(child.props.xml))];
     }
     case "CommentReference":
       return [];
@@ -468,7 +507,13 @@ function rawRunItem(item: RunItem, run: ComputedRun): ResolvedInline[] {
     case "ColumnBreak":
       return [{ kind: "columnBreak" }];
     case "SymbolRun":
-      return [{ kind: "text", text: symbolText(item.props.char), run: { ...run, fontFamily: item.props.symbolfont ?? "Wingdings", otherFonts: [] } }];
+      return [
+        {
+          kind: "text",
+          text: symbolText(item.props.char),
+          run: { ...run, fontFamily: item.props.symbolfont ?? "Wingdings", otherFonts: [] },
+        },
+      ];
     case "RawXml":
       return [rawInline(firstRoot(item.props.xml))];
     default:
@@ -515,12 +560,13 @@ function floatOf(floating: NonNullable<Node<"ImageRun">["props"]["floating"]>): 
     behind: floating.behindDocument ?? false,
     horizontal: {
       from: h.relative === "page" || h.relative === "leftMargin" || h.relative === "insideMargin" ? "page" : "margin",
-      align: h.align === undefined ? null : own(H_ALIGNS, h.align) ?? null,
+      align: h.align === undefined ? null : (own(H_ALIGNS, h.align) ?? null),
       offsetPt: (h.offset ?? 0) / EMU_PER_PT,
     },
     vertical: {
-      from: v.relative === "page" || v.relative === "topMargin" ? "page" : v.relative === "margin" ? "margin" : "paragraph",
-      align: v.align === undefined ? null : own(V_ALIGNS, v.align) ?? null,
+      from:
+        v.relative === "page" || v.relative === "topMargin" ? "page" : v.relative === "margin" ? "margin" : "paragraph",
+      align: v.align === undefined ? null : (own(V_ALIGNS, v.align) ?? null),
       offsetPt: (v.offset ?? 0) / EMU_PER_PT,
     },
     distancePt: {
@@ -627,7 +673,7 @@ function paragraph(node: Node<"Paragraph">, path: TreePath, story: Story): Resol
   const chain = styleChain(sheet, styleId);
   const styled = chain.reduce(
     (p, s) => overParagraph(p, s.paragraph),
-    overParagraph(sheet.docDefaults.paragraph, story.table?.paragraph)
+    overParagraph(sheet.docDefaults.paragraph, story.table?.paragraph),
   );
   const numbering = props.numbering !== undefined ? props.numbering : styled.numbering;
   const level = numbering ? levelOf(story.doc.levels.get(numbering.reference) ?? [], numbering.level) : undefined;
@@ -640,12 +686,22 @@ function paragraph(node: Node<"Paragraph">, path: TreePath, story: Story): Resol
     path,
     format: computeParagraph(format, computeRun(markRun, line), styleId, story.doc.defaultTabPt),
     marker: numbering ? marker(numbering, markRun, story, line) : null,
-    inlines: inlinesOf(node.children, path, { story, run, line, tocEntry: styleId !== null && TOC_ENTRY_STYLE.test(styleId) }),
+    inlines: inlinesOf(node.children, path, {
+      story,
+      run,
+      line,
+      tocEntry: styleId !== null && TOC_ENTRY_STYLE.test(styleId),
+    }),
   };
 }
 
 type TableBorderSide = keyof docx.ITableBordersOptions;
-type PlacedCell = { readonly cell: Node<"TableCell">; readonly index: number; readonly gridCol: number; readonly colSpan: number };
+type PlacedCell = {
+  readonly cell: Node<"TableCell">;
+  readonly index: number;
+  readonly gridCol: number;
+  readonly colSpan: number;
+};
 type Span = { readonly colSpan: number; readonly rows: number };
 
 function placeCells(rows: readonly Node<"TableRow">[]): PlacedCell[][] {
@@ -718,14 +774,22 @@ function table(node: Node<"Table">, path: TreePath, story: Story): ResolvedBlock
   };
   const grid = placeCells(node.children);
   const columnWidths = node.props.columnWidths ?? [];
-  const columns = Math.max(columnWidths.length, ...grid.map((row) => row.reduce((n, p) => Math.max(n, p.gridCol + p.colSpan), 0)));
+  const columns = Math.max(
+    columnWidths.length,
+    ...grid.map((row) => row.reduce((n, p) => Math.max(n, p.gridCol + p.colSpan), 0)),
+  );
   const cellStory: Story = { ...story, table: tableLayer(node, story) };
   const lastRow = grid.length - 1;
   const rows = node.children.map((row, r): ResolvedRow => {
     const cells = grid[r].flatMap(({ cell, index, gridCol, colSpan }): ResolvedCell[] => {
       const { props } = cell;
       if (props.verticalMerge === "continue") return [];
-      const rowSpan = (props.rowSpan ?? 1) > 1 ? props.rowSpan ?? 1 : props.verticalMerge === "restart" ? mergedRows(grid, r, gridCol) : 1;
+      const rowSpan =
+        (props.rowSpan ?? 1) > 1
+          ? (props.rowSpan ?? 1)
+          : props.verticalMerge === "restart"
+            ? mergedRows(grid, r, gridCol)
+            : 1;
       const own = props.borders ?? {};
       const borders = computeBorders({
         top: own.top ?? (r === 0 ? sides.top : sides.insideHorizontal),
@@ -760,7 +824,12 @@ function table(node: Node<"Table">, path: TreePath, story: Story): ResolvedBlock
     widthPt: widthPtOf(node.props.width),
     widthPct: widthPctOf(node.props.width),
     indentPt: widthPtOf(node.props.indent) ?? 0,
-    align: node.props.alignment === "center" ? "center" : node.props.alignment === "right" || node.props.alignment === "end" ? "end" : "start",
+    align:
+      node.props.alignment === "center"
+        ? "center"
+        : node.props.alignment === "right" || node.props.alignment === "end"
+          ? "end"
+          : "start",
     fixed: node.props.layout === "fixed",
     columnWidthsPt: columnWidths.map((w) => w / TWIPS_PER_PT),
     rows,
@@ -775,21 +844,42 @@ function vmlLength(length: unknown): number | null {
   return match === null || perUnit === undefined ? null : Number(match[1]) * perUnit;
 }
 
-const VML_ALIGNS: Readonly<Record<string, "left" | "center" | "right">> = { left: "left", center: "center", right: "right", inside: "left", outside: "right" };
-const VML_V_ALIGNS: Readonly<Record<string, "top" | "center" | "bottom">> = { top: "top", center: "center", bottom: "bottom", inside: "top", outside: "bottom" };
+const VML_ALIGNS: Readonly<Record<string, "left" | "center" | "right">> = {
+  left: "left",
+  center: "center",
+  right: "right",
+  inside: "left",
+  outside: "right",
+};
+const VML_V_ALIGNS: Readonly<Record<string, "top" | "center" | "bottom">> = {
+  top: "top",
+  center: "center",
+  bottom: "bottom",
+  inside: "top",
+  outside: "bottom",
+};
 
 function textboxFloat(style: Props<"Textbox">["style"]): ResolvedFloat | null {
   if (style?.position !== "absolute") return null;
   const offset = (margin: unknown, plain: unknown) => (vmlLength(margin) ?? 0) + (vmlLength(plain) ?? 0);
-  const hAlign = style.positionHorizontal === undefined ? null : own(VML_ALIGNS, style.positionHorizontal) ?? null;
-  const vAlign = style.positionVertical === undefined ? null : own(VML_V_ALIGNS, style.positionVertical) ?? null;
+  const hAlign = style.positionHorizontal === undefined ? null : (own(VML_ALIGNS, style.positionHorizontal) ?? null);
+  const vAlign = style.positionVertical === undefined ? null : (own(VML_V_ALIGNS, style.positionVertical) ?? null);
   const zIndex = typeof style.zIndex === "number" ? style.zIndex : 0;
   return {
     wrap: "none",
     behind: zIndex < 0,
-    horizontal: { from: style.positionHorizontalRelative === "page" ? "page" : "margin", align: hAlign, offsetPt: offset(style.marginLeft, style.left) },
+    horizontal: {
+      from: style.positionHorizontalRelative === "page" ? "page" : "margin",
+      align: hAlign,
+      offsetPt: offset(style.marginLeft, style.left),
+    },
     vertical: {
-      from: style.positionVerticalRelative === "page" ? "page" : style.positionVerticalRelative === "margin" ? "margin" : "paragraph",
+      from:
+        style.positionVerticalRelative === "page"
+          ? "page"
+          : style.positionVerticalRelative === "margin"
+            ? "margin"
+            : "paragraph",
       align: vAlign,
       offsetPt: offset(style.marginTop, style.top),
     },
@@ -845,7 +935,8 @@ function inFlow(blocks: readonly ResolvedBlock[], i: number, step: 1 | -1): Reso
 const adjacency = (blocks: ResolvedBlock[]): ResolvedBlock[] => withBorderGroups(withContextualSpacing(blocks));
 
 const sameBorder = (a: ComputedBorder | undefined, b: ComputedBorder | undefined): boolean =>
-  a === b || (a !== undefined && b !== undefined && a.style === b.style && a.widthPt === b.widthPt && a.color === b.color);
+  a === b ||
+  (a !== undefined && b !== undefined && a.style === b.style && a.widthPt === b.widthPt && a.color === b.color);
 
 function withBorderGroups(blocks: ResolvedBlock[]): ResolvedBlock[] {
   const grouped = (a: ResolvedBlock | undefined, b: ResolvedBlock | undefined): boolean => {
@@ -864,7 +955,11 @@ function withBorderGroups(blocks: ResolvedBlock[]): ResolvedBlock[] {
     const before = grouped(inFlow(blocks, i, -1), b);
     if (!after && !before) return b;
     const { top, bottom, ...sides } = b.format.borders;
-    const borders = { ...sides, ...(before || top === undefined ? {} : { top }), ...(after || bottom === undefined ? {} : { bottom }) };
+    const borders = {
+      ...sides,
+      ...(before || top === undefined ? {} : { top }),
+      ...(after || bottom === undefined ? {} : { bottom }),
+    };
     return { ...b, format: { ...b.format, borders } };
   });
 }

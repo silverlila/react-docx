@@ -54,7 +54,7 @@ function readStyles(root: XmlElement, ctx: ReadContext, numbering: NumberingRead
 
 function withNumbering(
   style: docx.IParagraphStyleOptions,
-  numbering: NonNullable<docx.IParagraphStylePropertiesOptions["numbering"]>
+  numbering: NonNullable<docx.IParagraphStylePropertiesOptions["numbering"]>,
 ): docx.IParagraphStyleOptions {
   return { ...style, paragraph: { ...style.paragraph, numbering } };
 }

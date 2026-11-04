@@ -64,8 +64,8 @@ function Home() {
         <p className="eyebrow">Open source · React 18 and 19</p>
         <h1 className="display hero-title">Word documents, written in React.</h1>
         <p className="lead">
-          Build <code>.docx</code> files from components that map one-to-one to docx.js. Read existing Word files
-          back into JSX, and preview either one as HTML in the browser.
+          Build <code>.docx</code> files from components that map one-to-one to docx.js. Read existing Word files back
+          into JSX, and preview either one as HTML in the browser.
         </p>
         <div className="hero-actions">
           <a className="btn btn-primary" href="/docs/">
@@ -92,8 +92,8 @@ function Home() {
             One document tree, four directions.
           </h2>
           <p className="lead">
-            Every path meets at the same plain-data tree, so a document you wrote and a document you read are the
-            same kind of thing.
+            Every path meets at the same plain-data tree, so a document you wrote and a document you read are the same
+            kind of thing.
           </p>
         </div>
         <div className="paths">
@@ -133,8 +133,8 @@ function Home() {
           <div>
             <h2 className="display cta-title">Have a Word file at hand?</h2>
             <p>
-              Open it in the previewer to see it as HTML, as JSX, and as a list of anything the reader could not
-              keep. The file is read on the page and never uploaded.
+              Open it in the previewer to see it as HTML, as JSX, and as a list of anything the reader could not keep.
+              The file is read on the page and never uploaded.
             </p>
           </div>
           <a className="btn btn-primary" href="/preview/">

@@ -63,11 +63,15 @@ export function numberingOption(
   numPr: { readonly numId: string; readonly level: number },
   options: { readonly custom: boolean },
   numbering: NumberingReader,
-  ctx: ReadContext
+  ctx: ReadContext,
 ): NumberingOption | null {
   if (numPr.numId === "0") return false;
   if (numPr.level < 0 || numPr.level > MAX_LEVEL) {
-    ctx.report({ kind: "dropped", element: "w:numPr", detail: `level ${numPr.level} is not one docx.js writes (0 to ${MAX_LEVEL})` });
+    ctx.report({
+      kind: "dropped",
+      element: "w:numPr",
+      detail: `level ${numPr.level} is not one docx.js writes (0 to ${MAX_LEVEL})`,
+    });
     return null;
   }
   const ref = numbering.refOf(numPr.numId);

@@ -65,7 +65,12 @@ try {
     throw new Error(`an error boundary's fallback is missing from word/document.xml:\n${fallback}`);
   }
   const uncaught = h(Document, null, h(Section, null, h(Throws, { value: undefined })));
-  const outcome = await quietly(() => renderToBuffer(uncaught).then(() => "resolved", (error) => error));
+  const outcome = await quietly(() =>
+    renderToBuffer(uncaught).then(
+      () => "resolved",
+      (error) => error,
+    ),
+  );
   if (outcome !== undefined) {
     throw new Error(`a component throwing undefined should reject with undefined, got ${String(outcome)}`);
   }

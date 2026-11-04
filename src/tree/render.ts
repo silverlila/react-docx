@@ -50,10 +50,21 @@ function render29(element: React.ReactElement, container: HostContainer): void {
 function renderSync(
   reconciler: ReturnType<typeof Reconciler31> | ReturnType<typeof Reconciler33>,
   element: React.ReactElement,
-  container: HostContainer
+  container: HostContainer,
 ): void {
   const errors = firstError();
-  const root = reconciler.createContainer(container, 0, null, false, null, "", errors.record, logCaught, errors.record, null);
+  const root = reconciler.createContainer(
+    container,
+    0,
+    null,
+    false,
+    null,
+    "",
+    errors.record,
+    logCaught,
+    errors.record,
+    null,
+  );
   reconciler.updateContainerSync(element, root, null, null);
   reconciler.flushSyncWork();
   errors.rethrow();

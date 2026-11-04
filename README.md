@@ -39,13 +39,7 @@ pnpm add @react-docx/core
 
 ```tsx
 import React from "react";
-import {
-  Document,
-  Section,
-  Paragraph,
-  TextRun,
-  renderToBuffer,
-} from "@react-docx/core";
+import { Document, Section, Paragraph, TextRun, renderToBuffer } from "@react-docx/core";
 import fs from "fs";
 
 const MyDocument = () => (
@@ -87,11 +81,7 @@ Every document follows this hierarchy:
 The `Document` component accepts document-level properties including metadata and styles:
 
 ```tsx
-<Document
-  title="My Resume"
-  creator="John Doe"
-  description="Professional resume"
->
+<Document title="My Resume" creator="John Doe" description="Professional resume">
   <Section>{/* content */}</Section>
 </Document>
 ```
@@ -122,11 +112,7 @@ Sections define page layout properties like margins, page size, headers, and foo
 Paragraphs contain text and inline elements:
 
 ```tsx
-<Paragraph
-  spacing={{ before: 200, after: 200 }}
-  alignment="center"
-  indent={{ left: 720 }}
->
+<Paragraph spacing={{ before: 200, after: 200 }} alignment="center" indent={{ left: 720 }}>
   <TextRun text="Centered paragraph" />
 </Paragraph>
 ```
@@ -234,20 +220,32 @@ Put `<Header>` and `<Footer>` directly inside a `<Section>`. They take the same 
   <Header>
     <Table width={{ size: 100, type: "pct" }}>
       <TableRow>
-        <TableCell><Paragraph><TextRun text="Acme Ltd" /></Paragraph></TableCell>
-        <TableCell><Paragraph><TextRun text="Report" /></Paragraph></TableCell>
+        <TableCell>
+          <Paragraph>
+            <TextRun text="Acme Ltd" />
+          </Paragraph>
+        </TableCell>
+        <TableCell>
+          <Paragraph>
+            <TextRun text="Report" />
+          </Paragraph>
+        </TableCell>
       </TableRow>
     </Table>
   </Header>
   <Header type="first">
-    <Paragraph><TextRun text="Only on page one" /></Paragraph>
+    <Paragraph>
+      <TextRun text="Only on page one" />
+    </Paragraph>
   </Header>
   <Footer>
     <Paragraph>
       <TextRun children={["Page ", PageNumber.CURRENT, " of ", PageNumber.TOTAL_PAGES]} />
     </Paragraph>
   </Footer>
-  <Paragraph><TextRun text="Body" /></Paragraph>
+  <Paragraph>
+    <TextRun text="Body" />
+  </Paragraph>
 </Section>
 ```
 
@@ -304,12 +302,7 @@ Each takes a JSX element, or a tree returned by `renderToTree`.
 All components have full TypeScript support. Props map directly to the `docx` library interfaces, so you can reference [docx documentation](https://docx.js.org/) for detailed prop options.
 
 ```tsx
-import {
-  DocumentProps,
-  SectionProps,
-  ParagraphProps,
-  TextRunProps,
-} from "@react-docx/core";
+import { DocumentProps, SectionProps, ParagraphProps, TextRunProps } from "@react-docx/core";
 ```
 
 ## Examples

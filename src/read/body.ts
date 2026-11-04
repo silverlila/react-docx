@@ -71,7 +71,9 @@ type InlineMode = "live" | "deleted";
 
 type InlineScope = { readonly ctx: BodyContext; readonly mode: InlineMode; runProps(run: XmlElement): RunOptions };
 
-type RawXmlCheck = { readonly kind: "raw"; readonly xml: string } | { readonly kind: "refused"; readonly reason: string };
+type RawXmlCheck =
+  | { readonly kind: "raw"; readonly xml: string }
+  | { readonly kind: "refused"; readonly reason: string };
 
 type BlockOptions = {
   readonly rawBlocks?: boolean;
@@ -101,7 +103,15 @@ const RUN_KINDS: Readonly<Record<string, string>> = {
 
 const MAPPED_RUN_CONTENT = new Set([...Object.keys(RUN_KINDS), "w:t", "w:br", "w:sym", "w:ptab"]);
 
-const HEADINGS = ["Title", "Heading1", "Heading2", "Heading3", "Heading4", "Heading5", "Heading6"] as const satisfies readonly (typeof docx.HeadingLevel)[keyof typeof docx.HeadingLevel][];
+const HEADINGS = [
+  "Title",
+  "Heading1",
+  "Heading2",
+  "Heading3",
+  "Heading4",
+  "Heading5",
+  "Heading6",
+] as const satisfies readonly (typeof docx.HeadingLevel)[keyof typeof docx.HeadingLevel][];
 
 const DROPPED_IN_RUN: Readonly<Record<string, string>> = {
   "w:endnoteReference": "docx.js cannot write endnotes",
@@ -127,7 +137,9 @@ function rawXmlOf(elements: readonly XmlElement[], slot: Slot, ctx: ReadContext)
   if (roots.kind !== "roots") return { kind: "refused", reason: roots.reason };
   const allowed: readonly string[] = RAW_XML_ROOTS[slot];
   const stray = roots.roots.find((root) => !allowed.includes(root));
-  return stray === undefined ? { kind: "raw", xml } : { kind: "refused", reason: `it holds <${stray}>, which ${slot} RawXml cannot` };
+  return stray === undefined
+    ? { kind: "raw", xml }
+    : { kind: "refused", reason: `it holds <${stray}>, which ${slot} RawXml cannot` };
 }
 
 type Fallback =
@@ -158,7 +170,9 @@ function mapsToKind(el: XmlElement, slot: Slot, ctx: ReadContext): boolean {
       return el.name === "w:p" || el.name === "w:tbl";
     case "inline":
       if (el.name === "m:oMath") return isPlainMath(el);
-      return el.name === "w:r" && elementsOf(el).every((child) => child.name === "w:rPr" || mapsToKind(child, "run", ctx));
+      return (
+        el.name === "w:r" && elementsOf(el).every((child) => child.name === "w:rPr" || mapsToKind(child, "run", ctx))
+      );
     case "run":
       if (el.name === "w:drawing") return parseDrawing(el, ctx).kind === "image";
       if (el.name === "w:pict") return parseVmlImage(el, ctx)?.kind === "image";
@@ -173,7 +187,11 @@ function mapsToKind(el: XmlElement, slot: Slot, ctx: ReadContext): boolean {
 function alternateElements(el: XmlElement, slot: Slot, ctx: ReadContext): readonly XmlElement[] {
   const chosen = alternateContent(el, (child) => mapsToKind(child, slot, ctx));
   if (chosen === null) {
-    ctx.report({ kind: "dropped", element: el.name, detail: "its Choice holds content no tree kind maps, and it has no Fallback content" });
+    ctx.report({
+      kind: "dropped",
+      element: el.name,
+      detail: "its Choice holds content no tree kind maps, and it has no Fallback content",
+    });
     return [];
   }
   ctx.report({ kind: "resolved", element: el.name, detail: `alternate content: used ${chosen.used}` });
@@ -258,7 +276,11 @@ function readBlockElements(elements: readonly XmlElement[], ctx: BodyContext, li
       const raw = rawBookmark(el, "block", here);
       if (raw !== null) list.blocks.push(raw);
     } else if (el.name === "w:altChunk") {
-      here.report({ kind: "dropped", element: el.name, detail: "it imports another part through r:id, which docx.js cannot write" });
+      here.report({
+        kind: "dropped",
+        element: el.name,
+        detail: "it imports another part through r:id, which docx.js cannot write",
+      });
     } else {
       const read = fallback(el, "block", here, list.rawBlocks);
       if (read.kind === "raw") list.blocks.push(read.node);
@@ -280,8 +302,18 @@ function readParagraph(p: XmlElement, at: (offset: number) => BodyContext, inSec
   const read = paragraphProperties(p, ctx);
   if (lone === null) return [readOneParagraph(read, all, ctx)];
   if (inSection) return [textboxNode(read, lone, ctx)];
-  ctx.report({ kind: "dropped", element: "w:pict", detail: "a text box outside a Section body: Textbox stands only in a Section" });
-  return [readOneParagraph(read, all.filter((el) => el !== lone.holder), ctx)];
+  ctx.report({
+    kind: "dropped",
+    element: "w:pict",
+    detail: "a text box outside a Section body: Textbox stands only in a Section",
+  });
+  return [
+    readOneParagraph(
+      read,
+      all.filter((el) => el !== lone.holder),
+      ctx,
+    ),
+  ];
 }
 
 function hoistTextBoxes(content: readonly XmlElement[], ctx: BodyContext): { boxes: TextBox[]; content: XmlElement[] } {
@@ -311,18 +343,30 @@ function hoistTextBoxes(content: readonly XmlElement[], ctx: BodyContext): { box
 }
 
 function hoistedTextbox(box: TextBox, ctx: BodyContext): AuthorNode {
-  ctx.report({ kind: "resolved", element: "w:pict", detail: "a text box beside other content: read as a Textbox before its paragraph" });
+  ctx.report({
+    kind: "resolved",
+    element: "w:pict",
+    detail: "a text box beside other content: read as a Textbox before its paragraph",
+  });
   const notes: Note[] = [];
   const style = textBoxStyle(box, notes);
   ctx.notes(notes);
-  return node("Textbox", style === undefined ? {} : { style }, readBlocks(box.content, ctx, { rawBlocks: false, tables: false }));
+  return node(
+    "Textbox",
+    style === undefined ? {} : { style },
+    readBlocks(box.content, ctx, { rawBlocks: false, tables: false }),
+  );
 }
 
 function paragraphProperties(p: XmlElement, ctx: BodyContext): ParagraphRead {
   const read = readParagraphProperties(childNamed(p, "w:pPr"), ctx.env);
   ctx.notes(read.notes);
   if (read.sectPr !== null) {
-    ctx.report({ kind: "dropped", element: "w:sectPr", detail: "only a paragraph in the document body ends a section" });
+    ctx.report({
+      kind: "dropped",
+      element: "w:sectPr",
+      detail: "only a paragraph in the document body ends a section",
+    });
   }
   return read;
 }
@@ -333,7 +377,9 @@ function readOneParagraph(read: ParagraphRead, content: readonly XmlElement[], c
     return markedParagraph(read.options, numPr, content, ctx);
   }
   const numbering =
-    numPr === null ? null : numberingOption(numPr, { custom: read.options.style === undefined }, ctx.parts.numbering, ctx);
+    numPr === null
+      ? null
+      : numberingOption(numPr, { custom: read.options.style === undefined }, ctx.parts.numbering, ctx);
   const props = numbering === null ? read.options : { ...read.options, numbering };
   return node("Paragraph", props, readInline(content, ctx));
 }
@@ -342,7 +388,7 @@ function markedParagraph(
   options: ParagraphOptions,
   numPr: NonNullable<ParagraphRead["numPr"]>,
   content: readonly XmlElement[],
-  ctx: BodyContext
+  ctx: BodyContext,
 ): AuthorNode {
   const marker = ctx.parts.numbering.markerOf(numPr.numId, numPr.level, ctx);
   if (marker === null) {
@@ -357,7 +403,8 @@ function markedParagraph(
   const suffix = marker.level?.suffix ?? "tab";
   const text = suffix === "space" ? `${marker.text} ` : marker.text;
   const markerContent = [...(text === "" ? [] : [text]), ...(suffix === "tab" ? [node("Tab")] : [])];
-  const markerRuns = markerContent.length === 0 ? [] : textRuns({ ...options.run, ...marker.level?.style?.run }, markerContent);
+  const markerRuns =
+    markerContent.length === 0 ? [] : textRuns({ ...options.run, ...marker.level?.style?.run }, markerContent);
   const indent = options.indent ?? marker.level?.style?.paragraph?.indent;
   const props = indent === undefined ? options : { ...options, indent };
   return node("Paragraph", props, [...markerRuns, ...readInline(content, ctx)]);
@@ -433,7 +480,12 @@ const TABLE_DROPPED: Readonly<Record<string, string>> = {
   "w:tblPrEx": "docx.js has no table property exceptions option",
 };
 
-function readTableLevel(elements: readonly XmlElement[], ctx: BodyContext, level: TableLevel, out: AuthorNode[]): AuthorNode[] {
+function readTableLevel(
+  elements: readonly XmlElement[],
+  ctx: BodyContext,
+  level: TableLevel,
+  out: AuthorNode[],
+): AuthorNode[] {
   for (const el of elements) {
     if (level.own.has(el.name)) continue;
     if (el.name === level.child) {
@@ -441,7 +493,11 @@ function readTableLevel(elements: readonly XmlElement[], ctx: BodyContext, level
     } else if (NOISE.has(el.name)) {
       ctx.ignore(el.name);
     } else if (el.name === "w:sdt" || el.name === "w:customXml") {
-      ctx.report({ kind: "dropped", element: el.name, detail: `a table's ${level.holds} cannot be RawXml; its content is read without it` });
+      ctx.report({
+        kind: "dropped",
+        element: el.name,
+        detail: `a table's ${level.holds} cannot be RawXml; its content is read without it`,
+      });
       readTableLevel(WRAPPED_CONTENT[el.name](el), ctx, level, out);
     } else {
       const detail = own(TABLE_DROPPED, el.name) ?? `this level of a table holds only ${level.holds}`;
@@ -495,7 +551,7 @@ function itemsOf(elements: readonly XmlElement[]): Item[] {
       ? elementsOf(el)
           .filter((child) => child.name !== "w:rPr")
           .map((child) => ({ kind: "atom", run: el, el: child }))
-      : [{ kind: "element", el }]
+      : [{ kind: "element", el }],
   );
 }
 
@@ -547,7 +603,11 @@ function piecesOf(items: readonly Item[], scope: InlineScope): Piece[] {
       strayReported = true;
     } else if (item.kind === "atom" && (item.el.name === "w:instrText" || fldCharType(item) !== null)) {
       if (!strayReported) {
-        scope.ctx.report({ kind: "dropped", element: item.el.name, detail: "part of a field that begins in another paragraph" });
+        scope.ctx.report({
+          kind: "dropped",
+          element: item.el.name,
+          detail: "part of a field that begins in another paragraph",
+        });
         strayReported = true;
       }
     } else if (item.kind === "atom") {
@@ -578,10 +638,18 @@ function fieldPieces(span: readonly Item[], scope: InlineScope): Piece[] {
       const raw = field.raw.map((el) => (BOOKMARKS.has(el.name) ? renumberedBookmark(el, scope.ctx) : el));
       const check = rawXmlOf(raw, "inline", scope.ctx);
       if (check.kind === "raw") {
-        scope.ctx.report({ kind: "raw", element: "w:fldChar", detail: "a field no tree kind maps, kept verbatim with its result" });
+        scope.ctx.report({
+          kind: "raw",
+          element: "w:fldChar",
+          detail: "a field no tree kind maps, kept verbatim with its result",
+        });
         return inline([rawXml(check.xml)]);
       }
-      scope.ctx.report({ kind: "dropped", element: "w:fldChar", detail: `the field code: ${check.reason}; its result is kept as text` });
+      scope.ctx.report({
+        kind: "dropped",
+        element: "w:fldChar",
+        detail: `the field code: ${check.reason}; its result is kept as text`,
+      });
       return piecesOf(field.result, scope);
     }
     default: {
@@ -639,7 +707,11 @@ function commentMark(el: XmlElement, ctx: BodyContext): AuthorNode | null {
   const source = attrOf(el, "w:id") ?? "";
   const id = ctx.parts.notes.commentId(source);
   if (id === null) {
-    ctx.report({ kind: "dropped", element: el.name, detail: `comment ${source} is not in ${ctx.parts.notes.commentsPart}` });
+    ctx.report({
+      kind: "dropped",
+      element: el.name,
+      detail: `comment ${source} is not in ${ctx.parts.notes.commentsPart}`,
+    });
     return null;
   }
   return node(COMMENT_MARKS[el.name], { id });
@@ -649,7 +721,9 @@ function changePieces(el: XmlElement, ctx: BodyContext): Piece[] {
   const deleted = isDeletion(el.name);
   const tracked = trackedRuns(el, ctx);
   if (tracked === null) {
-    const detail = deleted ? "it holds more than runs; its deleted content is dropped with it" : "it holds more than runs; its content is kept untracked";
+    const detail = deleted
+      ? "it holds more than runs; its deleted content is dropped with it"
+      : "it holds more than runs; its content is kept untracked";
     ctx.report({ kind: "dropped", element: el.name, detail });
     return deleted ? [] : inline(readInline(elementsOf(el), ctx));
   }
@@ -658,9 +732,13 @@ function changePieces(el: XmlElement, ctx: BodyContext): Piece[] {
     nodes.flatMap((read) => {
       if (read.type === "TextRun") return [node(tracked.kind, { ...tracked.props, ...read.props }, read.children)];
       const fate = deleted ? "dropped" : "kept untracked";
-      ctx.report({ kind: "dropped", element: el.name, detail: `<${read.type}> cannot be a tracked change; it is ${fate}` });
+      ctx.report({
+        kind: "dropped",
+        element: el.name,
+        detail: `<${read.type}> cannot be a tracked change; it is ${fate}`,
+      });
       return deleted ? [] : [read];
-    })
+    }),
   );
 }
 
@@ -688,7 +766,11 @@ const HYPERLINK_ATTRIBUTES = new Set(["r:id", "w:anchor", "w:history"]);
 function hyperlinkPieces(el: XmlElement, ctx: BodyContext): Piece[] {
   for (const name of Object.keys(el.attributes)) {
     if (!HYPERLINK_ATTRIBUTES.has(name)) {
-      ctx.report({ kind: "dropped", element: "w:hyperlink", detail: `${name}="${el.attributes[name]}": docx.js has no option for it` });
+      ctx.report({
+        kind: "dropped",
+        element: "w:hyperlink",
+        detail: `${name}="${el.attributes[name]}": docx.js has no option for it`,
+      });
     }
   }
   if (attrOf(el, "w:history") !== null) ctx.ignore("w:history");
@@ -698,9 +780,15 @@ function hyperlinkPieces(el: XmlElement, ctx: BodyContext): Piece[] {
   if (relId !== null) {
     const rel = ctx.pkg.relsOf(ctx.part).get(relId);
     if (rel !== undefined) {
-      return inline([node("ExternalHyperlink", { link: anchor === null ? rel.target : `${rel.target}#${anchor}` }, children)]);
+      return inline([
+        node("ExternalHyperlink", { link: anchor === null ? rel.target : `${rel.target}#${anchor}` }, children),
+      ]);
     }
-    ctx.report({ kind: "dropped", element: "w:hyperlink", detail: `r:id="${relId}" has no relationship; its content is kept` });
+    ctx.report({
+      kind: "dropped",
+      element: "w:hyperlink",
+      detail: `r:id="${relId}" has no relationship; its content is kept`,
+    });
     return inline(children);
   }
   if (anchor !== null) return inline([node("InternalHyperlink", { anchor }, children)]);
@@ -725,7 +813,11 @@ function simpleFieldPieces(el: XmlElement, ctx: BodyContext): Piece[] {
     case "other": {
       const check = rawXmlOf([el], "inline", ctx);
       if (check.kind === "raw") {
-        ctx.report({ kind: "raw", element: el.name, detail: "a field no tree kind maps, kept verbatim with its result" });
+        ctx.report({
+          kind: "raw",
+          element: el.name,
+          detail: "a field no tree kind maps, kept verbatim with its result",
+        });
         return inline([rawXml(check.xml)]);
       }
       ctx.report({ kind: "dropped", element: el.name, detail: `${check.reason}; its result is kept as text` });
@@ -811,7 +903,11 @@ function atomPieces(run: XmlElement, el: XmlElement, scope: InlineScope): Piece[
 
 function footnotePieces(run: XmlElement, el: XmlElement, ctx: BodyContext): Piece[] {
   if (ctx.part !== ctx.pkg.mainPart) {
-    ctx.report({ kind: "dropped", element: el.name, detail: "docx.js writes footnote references only in the document body" });
+    ctx.report({
+      kind: "dropped",
+      element: el.name,
+      detail: "docx.js writes footnote references only in the document body",
+    });
     return [];
   }
   const id = attrOf(el, "w:id") ?? "";
@@ -820,7 +916,12 @@ function footnotePieces(run: XmlElement, el: XmlElement, ctx: BodyContext): Piec
   const onlyReference = elementsOf(run).every((child) => child === el || child.name === "w:rPr");
   for (const property of onlyReference ? elementsOf(childNamed(run, "w:rPr")) : []) {
     if (property.name === "w:rStyle" && attrOf(property, "w:val") === "FootnoteReference") ctx.ignore("w:rStyle");
-    else ctx.report({ kind: "dropped", element: property.name, detail: "docx.js writes the footnote reference run's properties itself" });
+    else
+      ctx.report({
+        kind: "dropped",
+        element: property.name,
+        detail: "docx.js writes the footnote reference run's properties itself",
+      });
   }
   const here = ctx.within(ctx.parts.notes.footnotesPart, ctx.at);
   return inline([footnoteNode(readBlocks(footnote, here, { rawBlocks: false }), id, here)]);
@@ -828,7 +929,8 @@ function footnotePieces(run: XmlElement, el: XmlElement, ctx: BodyContext): Piec
 
 function breakPieces(run: XmlElement, el: XmlElement, scope: InlineScope): Piece[] {
   const clear = attrOf(el, "w:clear");
-  if (clear !== null) scope.ctx.report({ kind: "dropped", element: "w:br", detail: `w:clear="${clear}": docx.js has no option for it` });
+  if (clear !== null)
+    scope.ctx.report({ kind: "dropped", element: "w:br", detail: `w:clear="${clear}": docx.js has no option for it` });
   switch (attrOf(el, "w:type")) {
     case null:
     case "textWrapping":

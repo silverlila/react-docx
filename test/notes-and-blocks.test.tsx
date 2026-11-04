@@ -56,7 +56,7 @@ describe("footnotes", () => {
             c<Footnote>third</Footnote>
           </Paragraph>
         </Section>
-      </Document>
+      </Document>,
     );
     const references = [...xml["word/document.xml"].matchAll(/<w:footnoteReference w:id="(\d+)"\/>/g)];
     expect(references.map(([, id]) => id)).toEqual(["1", "2", "3"]);
@@ -68,15 +68,26 @@ describe("footnotes", () => {
     ]);
   });
 
-  test("<Footnote>text</Footnote> writes the text inside <w:footnote w:id=\"1\">", async () => {
-    const xml = await parts(body(<Paragraph key="p">Claim<Footnote>Source: 2026 report</Footnote></Paragraph>));
+  test('<Footnote>text</Footnote> writes the text inside <w:footnote w:id="1">', async () => {
+    const xml = await parts(
+      body(
+        <Paragraph key="p">
+          Claim<Footnote>Source: 2026 report</Footnote>
+        </Paragraph>,
+      ),
+    );
     expect(xml["word/footnotes.xml"]).toMatch(
-      /<w:footnote w:id="1"><w:p><w:r><w:rPr><w:rStyle w:val="FootnoteReference"\/><\/w:rPr><w:footnoteRef\/><\/w:r><w:r><w:t xml:space="preserve">Source: 2026 report<\/w:t><\/w:r><\/w:p><\/w:footnote>/
+      /<w:footnote w:id="1"><w:p><w:r><w:rPr><w:rStyle w:val="FootnoteReference"\/><\/w:rPr><w:footnoteRef\/><\/w:r><w:r><w:t xml:space="preserve">Source: 2026 report<\/w:t><\/w:r><\/w:p><\/w:footnote>/,
     );
   });
 
   test("a second document starts again at 1", async () => {
-    const one = () => body(<Paragraph key="p">x<Footnote>note</Footnote></Paragraph>);
+    const one = () =>
+      body(
+        <Paragraph key="p">
+          x<Footnote>note</Footnote>
+        </Paragraph>,
+      );
     await renderToBuffer(one());
     expect((await parts(one()))["word/document.xml"]).toContain('<w:footnoteReference w:id="1"/>');
   });
@@ -115,13 +126,13 @@ describe("comments", () => {
           c0
         </Comment>
         <Section>{marked(0)}</Section>
-      </Document>
+      </Document>,
     );
     expect(xml["word/document.xml"]).toContain(
-      '<w:p><w:commentRangeStart w:id="0"/><w:r><w:t xml:space="preserve">marked</w:t></w:r><w:commentRangeEnd w:id="0"/><w:r><w:commentReference w:id="0"/></w:r></w:p>'
+      '<w:p><w:commentRangeStart w:id="0"/><w:r><w:t xml:space="preserve">marked</w:t></w:r><w:commentRangeEnd w:id="0"/><w:r><w:commentReference w:id="0"/></w:r></w:p>',
     );
     expect(xml["word/comments.xml"]).toContain(
-      '<w:comment w:id="0" w:author="Ada" w:date="2026-01-01T00:00:00.000Z"><w:p><w:r><w:t xml:space="preserve">c0</w:t></w:r></w:p></w:comment>'
+      '<w:comment w:id="0" w:author="Ada" w:date="2026-01-01T00:00:00.000Z"><w:p><w:r><w:t xml:space="preserve">c0</w:t></w:r></w:p></w:comment>',
     );
   });
 
@@ -132,7 +143,7 @@ describe("comments", () => {
           c0
         </Comment>
         <Section>{marked(0)}</Section>
-      </Document>
+      </Document>,
     );
     expect(xml["word/comments.xml"]).toContain('<w:comment w:id="0" w:author="Ada"><w:p>');
   });
@@ -176,10 +187,10 @@ test("a Textbox writes its paragraphs into w:txbxContent", async () => {
     body(
       <Textbox key="box" style={{ width: "200pt", height: "50pt" }}>
         <Paragraph>in box</Paragraph>
-      </Textbox>
-    )
+      </Textbox>,
+    ),
   );
   expect(xml["word/document.xml"]).toContain(
-    '<w:txbxContent><w:p><w:r><w:t xml:space="preserve">in box</w:t></w:r></w:p></w:txbxContent>'
+    '<w:txbxContent><w:p><w:r><w:t xml:space="preserve">in box</w:t></w:r></w:p></w:txbxContent>',
   );
 });

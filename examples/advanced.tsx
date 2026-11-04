@@ -49,12 +49,7 @@ const AdvancedExample = () => (
       </Paragraph>
 
       <Paragraph alignment="center" spacing={{ after: 800 }}>
-        <TextRun
-          text="Comprehensive Feature Demonstration"
-          size={24}
-          italics={true}
-          color="666666"
-        />
+        <TextRun text="Comprehensive Feature Demonstration" size={24} italics={true} color="666666" />
       </Paragraph>
 
       <Paragraph>
@@ -71,10 +66,7 @@ const AdvancedExample = () => (
       }}
     >
       {/* Tables */}
-      <Paragraph
-        spacing={{ after: 200 }}
-        border={{ bottom: { style: "single", size: 10, color: "2B6CB0" } }}
-      >
+      <Paragraph spacing={{ after: 200 }} border={{ bottom: { style: "single", size: 10, color: "2B6CB0" } }}>
         <TextRun text="1. Tables" bold={true} size={32} />
       </Paragraph>
 
@@ -94,18 +86,12 @@ const AdvancedExample = () => (
         }}
       >
         <TableRow>
-          <TableCell
-            width={{ size: 3000, type: "dxa" }}
-            shading={{ fill: "2B6CB0" }}
-          >
+          <TableCell width={{ size: 3000, type: "dxa" }} shading={{ fill: "2B6CB0" }}>
             <Paragraph>
               <TextRun text="Feature" bold={true} color="FFFFFF" />
             </Paragraph>
           </TableCell>
-          <TableCell
-            width={{ size: 6000, type: "dxa" }}
-            shading={{ fill: "2B6CB0" }}
-          >
+          <TableCell width={{ size: 6000, type: "dxa" }} shading={{ fill: "2B6CB0" }}>
             <Paragraph>
               <TextRun text="Description" bold={true} color="FFFFFF" />
             </Paragraph>
@@ -164,22 +150,14 @@ const AdvancedExample = () => (
       <Paragraph spacing={{ after: 100 }}>
         <TextRun text="• Visit our " />
         <ExternalHyperlink link="https://github.com">
-          <TextRun
-            text="GitHub repository"
-            color="2B6CB0"
-            underline={{ type: "single" }}
-          />
+          <TextRun text="GitHub repository" color="2B6CB0" underline={{ type: "single" }} />
         </ExternalHyperlink>
       </Paragraph>
 
       <Paragraph spacing={{ after: 100 }}>
         <TextRun text="• Check out the " />
         <ExternalHyperlink link="https://docx.js.org">
-          <TextRun
-            text="DOCX documentation"
-            color="2B6CB0"
-            underline={{ type: "single" }}
-          />
+          <TextRun text="DOCX documentation" color="2B6CB0" underline={{ type: "single" }} />
         </ExternalHyperlink>
       </Paragraph>
 
@@ -211,12 +189,7 @@ const AdvancedExample = () => (
       </Paragraph>
 
       <Paragraph alignment="center">
-        <TextRun
-          text="Generated with React-DOCX"
-          size={20}
-          color="999999"
-          italics={true}
-        />
+        <TextRun text="Generated with React-DOCX" size={20} color="999999" italics={true} />
       </Paragraph>
     </Section>
   </Document>

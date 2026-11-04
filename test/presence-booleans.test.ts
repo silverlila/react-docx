@@ -78,10 +78,12 @@ describe("docx.js presence-only booleans", () => {
   test.each(BOOLEAN_OPTIONS.map((option) => [`${option.kind} ${option.path}`, option] as const))(
     "docx.js writes %s differently for true and false",
     async (_name, { kind, path }) => {
-      const [absent, yes, no] = await Promise.all([undefined, true, false].map((value) => documentXml(kind, path, value)));
+      const [absent, yes, no] = await Promise.all(
+        [undefined, true, false].map((value) => documentXml(kind, path, value)),
+      );
       const presenceOnly = no === yes && no !== absent;
       expect(presenceOnly).toBe(false);
-    }
+    },
   );
 
   test("the probe reaches the option, including a nested section property", async () => {
@@ -110,6 +112,6 @@ describe("docx.js facts canonicalize relies on", () => {
       expect(definitions).toHaveLength(1);
       expect(definitions[0]).toContain(`w:type="${kind}"`);
       expect(definitions[0]).toContain('w:val="ABCDEF"');
-    }
+    },
   );
 });

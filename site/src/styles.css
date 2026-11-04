@@ -37,7 +37,8 @@
   --ignored: oklch(0.6 0.015 262);
 
   --shadow-sm: 0 1px 2px oklch(0.2 0.02 262 / 0.06);
-  --shadow-md: 0 0 0 1px oklch(0.2 0.02 262 / 0.06), 0 2px 4px oklch(0.2 0.02 262 / 0.04),
+  --shadow-md:
+    0 0 0 1px oklch(0.2 0.02 262 / 0.06), 0 2px 4px oklch(0.2 0.02 262 / 0.04),
     0 12px 32px -8px oklch(0.2 0.02 262 / 0.12);
 
   --radius-sm: 6px;
@@ -210,7 +211,9 @@ kbd {
   font-weight: 500;
   color: var(--text-muted);
   text-decoration: none;
-  transition: color 150ms ease-out, background-color 150ms ease-out;
+  transition:
+    color 150ms ease-out,
+    background-color 150ms ease-out;
 }
 .site-nav a:hover {
   color: var(--text);
@@ -251,7 +254,10 @@ kbd {
   text-decoration: none;
   white-space: nowrap;
   cursor: pointer;
-  transition: background-color 150ms ease-out, border-color 150ms ease-out, color 150ms ease-out,
+  transition:
+    background-color 150ms ease-out,
+    border-color 150ms ease-out,
+    color 150ms ease-out,
     transform 100ms ease-out;
 }
 .btn:active {
@@ -337,7 +343,9 @@ kbd {
   color: inherit;
   opacity: 0.7;
   cursor: pointer;
-  transition: opacity 150ms ease-out, background-color 150ms ease-out;
+  transition:
+    opacity 150ms ease-out,
+    background-color 150ms ease-out;
 }
 .copy-btn::before {
   content: "";
@@ -726,7 +734,9 @@ kbd {
   background: var(--surface);
   text-align: center;
   cursor: pointer;
-  transition: border-color 150ms ease-out, background-color 150ms ease-out;
+  transition:
+    border-color 150ms ease-out,
+    background-color 150ms ease-out;
 }
 .dropzone:hover {
   border-color: var(--accent);
@@ -884,7 +894,10 @@ kbd {
   font-size: 13.5px;
   font-weight: 500;
   cursor: pointer;
-  transition: color 150ms ease-out, background-color 150ms ease-out, box-shadow 150ms ease-out;
+  transition:
+    color 150ms ease-out,
+    background-color 150ms ease-out,
+    box-shadow 150ms ease-out;
 }
 .tab:hover {
   color: var(--text);
@@ -892,7 +905,9 @@ kbd {
 .tab[aria-selected="true"] {
   background: var(--surface-raised);
   color: var(--text);
-  box-shadow: 0 0 0 1px var(--border), 0 1px 2px oklch(0.2 0.02 262 / 0.08);
+  box-shadow:
+    0 0 0 1px var(--border),
+    0 1px 2px oklch(0.2 0.02 262 / 0.08);
 }
 .tab-badge {
   min-width: 20px;
@@ -940,7 +955,9 @@ kbd {
   color: var(--text-muted);
   font: inherit;
   cursor: pointer;
-  transition: color 150ms ease-out, background-color 150ms ease-out;
+  transition:
+    color 150ms ease-out,
+    background-color 150ms ease-out;
 }
 .zoom-btn {
   display: grid;
@@ -1066,7 +1083,9 @@ main:has(.workspace) + .site-footer {
   font: inherit;
   text-align: left;
   cursor: pointer;
-  transition: border-color 150ms ease-out, box-shadow 150ms ease-out;
+  transition:
+    border-color 150ms ease-out,
+    box-shadow 150ms ease-out;
 }
 .diag-card:hover {
   border-color: var(--border-strong);
@@ -1256,7 +1275,9 @@ main:has(.workspace) + .site-footer {
   font-size: 14px;
   color: var(--text-muted);
   text-decoration: none;
-  transition: color 150ms ease-out, border-color 150ms ease-out;
+  transition:
+    color 150ms ease-out,
+    border-color 150ms ease-out;
 }
 .docs-nav a:hover {
   color: var(--text);

@@ -65,7 +65,7 @@ const PAGE_NUMBER_TERM = "(typeof PageNumber)[keyof typeof PageNumber]";
 function runChildNames(): string[] {
   const union = captured(
     /export declare type IRunOptions = \{\s*readonly children\?: readonly \(([^;]+)\)\[\];/,
-    "IRunOptions's children"
+    "IRunOptions's children",
   );
   const terms = union.split("|").map((term) => term.trim());
   const named = terms.filter((term) => term !== "string" && term !== PAGE_NUMBER_TERM);

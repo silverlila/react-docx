@@ -16,7 +16,9 @@ export type LocatedDiagnostic = {
   readonly detail: string;
 };
 
-export type Diagnostic = LocatedDiagnostic | { readonly kind: "ignored"; readonly element: string; readonly count: number };
+export type Diagnostic =
+  | LocatedDiagnostic
+  | { readonly kind: "ignored"; readonly element: string; readonly count: number };
 
 export type DiagnosticCollector = {
   report(diagnostic: LocatedDiagnostic): void;

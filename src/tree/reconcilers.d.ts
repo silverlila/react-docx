@@ -9,7 +9,7 @@ declare module "react-reconciler-29" {
       concurrentOverride: null,
       identifierPrefix: string,
       onRecoverableError: (error: unknown) => void,
-      transitionCallbacks: null
+      transitionCallbacks: null,
     ): Root;
     updateContainer(element: unknown, root: Root, parent: null, callback: (() => void) | null): void;
   }
@@ -30,7 +30,7 @@ declare module "react-reconciler-31" {
       onUncaughtError: (error: unknown) => void,
       onCaughtError: (error: unknown) => void,
       onRecoverableError: (error: unknown) => void,
-      transitionCallbacks: null
+      transitionCallbacks: null,
     ): Root;
     updateContainerSync(element: unknown, root: Root, parent: null, callback: null): void;
     flushSyncWork(): void;
@@ -52,7 +52,7 @@ declare module "react-reconciler-33" {
       onUncaughtError: (error: unknown) => void,
       onCaughtError: (error: unknown) => void,
       onRecoverableError: (error: unknown) => void,
-      onDefaultTransitionIndicator: null
+      onDefaultTransitionIndicator: null,
     ): Root;
     updateContainerSync(element: unknown, root: Root, parent: null, callback: null): void;
     flushSyncWork(): void;

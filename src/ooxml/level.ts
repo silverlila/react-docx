@@ -35,7 +35,6 @@ export const MAX_LEVEL = 9;
 const LEVEL_FORMATS: readonly ValueOf<typeof docx.LevelFormat>[] = [...NUMBER_FORMATS, "custom"];
 const SUFFIXES: readonly ValueOf<typeof docx.LevelSuffix>[] = ["nothing", "space", "tab"];
 
-
 const to = <K extends keyof LevelOptions>(key: K, read: ValueReader<NonNullable<Draft<LevelOptions>[K]>>) =>
   mapTo<LevelOptions, K>(key, read);
 

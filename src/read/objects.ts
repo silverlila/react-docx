@@ -34,8 +34,10 @@ const oneOf =
   <const V extends string>(values: readonly V[]) =>
   (value: string): V | null =>
     values.find((known) => known === value) ?? null;
-const flag = (value: string): boolean | null => (value === "t" || value === "true" ? true : value === "f" || value === "false" ? false : null);
-const zIndex = (value: string): "auto" | number | null => (value === "auto" ? value : INTEGER.test(value) ? Number(value) : null);
+const flag = (value: string): boolean | null =>
+  value === "t" || value === "true" ? true : value === "f" || value === "false" ? false : null;
+const zIndex = (value: string): "auto" | number | null =>
+  value === "auto" ? value : INTEGER.test(value) ? Number(value) : null;
 
 const POSITIONS = oneOf(VML_POSITIONS);
 const RELATIVE_TO = oneOf(VML_RELATIVE_TO);
@@ -94,7 +96,8 @@ export function textBoxStyle(box: TextBox, notes: Note[]): Readonly<ShapeStyleRe
   }
   const textbox = childNamed(shape, "v:textbox");
   for (const [name, value] of Object.entries(textbox?.attributes ?? {})) {
-    if (DOCX_TEXTBOX_ATTRIBUTES[name] !== value) notes.push(dropped("v:textbox", `${name}="${value}": docx.js writes its own`));
+    if (DOCX_TEXTBOX_ATTRIBUTES[name] !== value)
+      notes.push(dropped("v:textbox", `${name}="${value}": docx.js writes its own`));
   }
   const style: ShapeStyleRead = {};
   for (const [name, value] of styleDeclarations(attrOf(shape, "style") ?? "")) {
@@ -109,7 +112,10 @@ export function textBoxStyle(box: TextBox, notes: Note[]): Readonly<ShapeStyleRe
   return Object.keys(style).length === 0 ? undefined : style;
 }
 
-function declaration<K extends keyof ShapeStyle>([key, parse]: readonly [K, StyleReader<K>], value: string): ShapeStyleRead | null {
+function declaration<K extends keyof ShapeStyle>(
+  [key, parse]: readonly [K, StyleReader<K>],
+  value: string,
+): ShapeStyleRead | null {
   const parsed = parse(value);
   if (parsed === null) return null;
   const style: ShapeStyleRead = {};

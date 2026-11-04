@@ -14,11 +14,47 @@ import Report from "../examples/header-footer";
 import reportSource from "../examples/header-footer.tsx?raw";
 
 const NAV: readonly { group: string; items: readonly [id: string, label: string][] }[] = [
-  { group: "Getting started", items: [["introduction", "Introduction"], ["installation", "Installation"], ["first-document", "Your first document"]] },
-  { group: "Writing", items: [["text", "Text and paragraphs"], ["units", "Units"], ["lists", "Lists"], ["tables", "Tables"], ["headers-footers", "Headers and footers"], ["components", "Components"]] },
-  { group: "Output", items: [["rendering", "Rendering"], ["placement", "Placement errors"]] },
-  { group: "Reading Word files", items: [["reading", "readDocx"], ["diagnostics", "Diagnostics"], ["codegen", "Generating JSX"]] },
-  { group: "In the browser", items: [["preview", "DocxPreview"], ["limits", "Known limits"]] },
+  {
+    group: "Getting started",
+    items: [
+      ["introduction", "Introduction"],
+      ["installation", "Installation"],
+      ["first-document", "Your first document"],
+    ],
+  },
+  {
+    group: "Writing",
+    items: [
+      ["text", "Text and paragraphs"],
+      ["units", "Units"],
+      ["lists", "Lists"],
+      ["tables", "Tables"],
+      ["headers-footers", "Headers and footers"],
+      ["components", "Components"],
+    ],
+  },
+  {
+    group: "Output",
+    items: [
+      ["rendering", "Rendering"],
+      ["placement", "Placement errors"],
+    ],
+  },
+  {
+    group: "Reading Word files",
+    items: [
+      ["reading", "readDocx"],
+      ["diagnostics", "Diagnostics"],
+      ["codegen", "Generating JSX"],
+    ],
+  },
+  {
+    group: "In the browser",
+    items: [
+      ["preview", "DocxPreview"],
+      ["limits", "Known limits"],
+    ],
+  },
 ];
 
 function useCurrentSection(ids: readonly string[]): string {
@@ -78,20 +114,29 @@ function Docs() {
           <p>
             react-docx is a React renderer for <a href="https://docx.js.org">docx.js</a>. You describe a document with
             components such as <code>&lt;Paragraph&gt;</code> and <code>&lt;TextRun&gt;</code>, and react-docx turns
-            them into a <code>.docx</code> file. Each component takes the options of the docx.js class of the same
-            name as its props, so nothing is renamed or converted.
+            them into a <code>.docx</code> file. Each component takes the options of the docx.js class of the same name
+            as its props, so nothing is renamed or converted.
           </p>
           <p>
-            It also works the other way: it reads an existing Word file into the same document tree, prints that tree
-            as a React component, and draws it as HTML. The package has four entry points:
+            It also works the other way: it reads an existing Word file into the same document tree, prints that tree as
+            a React component, and draws it as HTML. The package has four entry points:
           </p>
           <Table
             head={["Import", "What it gives you"]}
             rows={[
-              [<code>@react-docx/core</code>, "The components, renderToBuffer, renderToBlob, renderToBase64 and renderToTree"],
-              [<code>@react-docx/core/reader</code>, "readDocx: a .docx file to a document tree, in Node or the browser"],
+              [
+                <code>@react-docx/core</code>,
+                "The components, renderToBuffer, renderToBlob, renderToBase64 and renderToTree",
+              ],
+              [
+                <code>@react-docx/core/reader</code>,
+                "readDocx: a .docx file to a document tree, in Node or the browser",
+              ],
               [<code>@react-docx/core/codegen</code>, "printJsx: a document tree to the source of a React component"],
-              [<code>@react-docx/core/html</code>, "DocxPreview: a document tree drawn as HTML, without loading docx.js"],
+              [
+                <code>@react-docx/core/html</code>,
+                "DocxPreview: a document tree drawn as HTML, without loading docx.js",
+              ],
             ]}
           />
         </Section>
@@ -99,16 +144,16 @@ function Docs() {
         <Section id="installation" title="Installation">
           <CodeBlock code="pnpm add @react-docx/core docx react" language="sh" />
           <p>
-            <code>react</code> (18.2 or later, including 19) and <code>docx</code> (9.5 or later) are peer
-            dependencies, so your project chooses their versions. TypeScript types ship with the package.
+            <code>react</code> (18.2 or later, including 19) and <code>docx</code> (9.5 or later) are peer dependencies,
+            so your project chooses their versions. TypeScript types ship with the package.
           </p>
         </Section>
 
         <Section id="first-document" title="Your first document">
           <p>
             A document is a <code>&lt;Document&gt;</code> holding one or more <code>&lt;Section&gt;</code>s, which hold
-            paragraphs and tables. Every example on this page is rendered live, and the download button writes the
-            real <code>.docx</code> in your browser.
+            paragraphs and tables. Every example on this page is rendered live, and the download button writes the real{" "}
+            <code>.docx</code> in your browser.
           </p>
           <Example component={Hello} source={helloSource} file="Hello.tsx" stacked />
           <p>To write it to disk in Node, render it to a buffer:</p>
@@ -125,8 +170,8 @@ writeFileSync("hello.docx", await renderToBuffer(<Hello />));`}
         <Section id="text" title="Text and paragraphs">
           <p>
             A <code>&lt;Paragraph&gt;</code> holds runs of text. Alignment, spacing, indents and borders go on the
-            paragraph; font, size, colour, bold and the like go on each <code>&lt;TextRun&gt;</code>. Hooks, context
-            and your own components work as they do in any React app.
+            paragraph; font, size, colour, bold and the like go on each <code>&lt;TextRun&gt;</code>. Hooks, context and
+            your own components work as they do in any React app.
           </p>
           <Example component={Formatting} source={formattingSource} file="Formatting.tsx" stacked />
         </Section>
@@ -137,7 +182,11 @@ writeFileSync("hello.docx", await renderToBuffer(<Hello />));`}
             head={["Value", "Unit", "Example"]}
             rows={[
               ["Font size", "Half-points", <code>size={"{24}"} is 12pt</code>],
-              ["Spacing, indents, margins, page size", "Twips: 1/20 pt, 1440 per inch", <code>indent={"{{ left: 720 }}"} is ½ inch</code>],
+              [
+                "Spacing, indents, margins, page size",
+                "Twips: 1/20 pt, 1440 per inch",
+                <code>indent={"{{ left: 720 }}"} is ½ inch</code>,
+              ],
               ["Colour", "Hex, without #", <code>color="2F5BD3"</code>],
               ["Borders", "Eighths of a point", <code>size: 4 is ½pt</code>],
               ["Image size", "Pixels", <code>transformation={"{{ width: 120, height: 80 }}"}</code>],
@@ -166,10 +215,10 @@ writeFileSync("hello.docx", await renderToBuffer(<Hello />));`}
 
         <Section id="tables" title="Tables">
           <p>
-            Tables are <code>&lt;Table&gt;</code>, <code>&lt;TableRow&gt;</code> and <code>&lt;TableCell&gt;</code>,
-            and a cell holds paragraphs. Widths take a <code>type</code>: <code>"dxa"</code> for twips or{" "}
-            <code>"pct"</code> for a percentage. This one is 6.5 inches, the width of a Letter page inside 1-inch margins.
-            Merge cells with <code>columnSpan</code> and <code>rowSpan</code>.
+            Tables are <code>&lt;Table&gt;</code>, <code>&lt;TableRow&gt;</code> and <code>&lt;TableCell&gt;</code>, and
+            a cell holds paragraphs. Widths take a <code>type</code>: <code>"dxa"</code> for twips or <code>"pct"</code>{" "}
+            for a percentage. This one is 6.5 inches, the width of a Letter page inside 1-inch margins. Merge cells with{" "}
+            <code>columnSpan</code> and <code>rowSpan</code>.
           </p>
           <Example component={StatusTable} source={tableSource} file="StatusTable.tsx" stacked />
         </Section>
@@ -206,10 +255,16 @@ writeFileSync("hello.docx", await renderToBuffer(<Hello />));`}
               ["Blocks", "Paragraph, Table, TableRow, TableCell, List, ListItem, TableOfContents, Textbox"],
               ["Runs", "TextRun, ImageRun, SymbolRun, Math, MathRun"],
               ["Links and anchors", "ExternalHyperlink, InternalHyperlink, Bookmark, PageReference"],
-              ["Breaks and spacing", "Break, PageBreak, ColumnBreak, Tab, PositionalTab, CarriageReturn, SoftHyphen, NoBreakHyphen"],
+              [
+                "Breaks and spacing",
+                "Break, PageBreak, ColumnBreak, Tab, PositionalTab, CarriageReturn, SoftHyphen, NoBreakHyphen",
+              ],
               ["Notes and comments", "Footnote, Comment, CommentRangeStart, CommentRangeEnd, CommentReference"],
               ["Tracked changes", "InsertedTextRun, DeletedTextRun"],
-              ["Fields", "SimpleField, SimpleMailMergeField, SequentialIdentifier, DayShort, DayLong, MonthShort, MonthLong, YearShort, YearLong"],
+              [
+                "Fields",
+                "SimpleField, SimpleMailMergeField, SequentialIdentifier, DayShort, DayLong, MonthShort, MonthLong, YearShort, YearLong",
+              ],
               ["Form controls", "CheckBox"],
               ["Anything else", "RawXml"],
             ]}
@@ -223,10 +278,22 @@ writeFileSync("hello.docx", await renderToBuffer(<Hello />));`}
           <Table
             head={["Function", "Returns", "Use it for"]}
             rows={[
-              [<code>renderToBuffer</code>, <code>Promise&lt;Buffer&gt;</code>, "Writing files or HTTP responses in Node"],
+              [
+                <code>renderToBuffer</code>,
+                <code>Promise&lt;Buffer&gt;</code>,
+                "Writing files or HTTP responses in Node",
+              ],
               [<code>renderToBlob</code>, <code>Promise&lt;Blob&gt;</code>, "Downloads in the browser"],
-              [<code>renderToBase64</code>, <code>Promise&lt;string&gt;</code>, "APIs that take base64, in Node or the browser"],
-              [<code>renderToTree</code>, <code>DocumentNode</code>, "The document as plain data, for DocxPreview or tests"],
+              [
+                <code>renderToBase64</code>,
+                <code>Promise&lt;string&gt;</code>,
+                "APIs that take base64, in Node or the browser",
+              ],
+              [
+                <code>renderToTree</code>,
+                <code>DocumentNode</code>,
+                "The document as plain data, for DocxPreview or tests",
+              ],
             ]}
           />
           <CodeBlock
@@ -241,12 +308,14 @@ link.click();`}
 
         <Section id="placement" title="Placement errors">
           <p>
-            Every element must sit where Word allows it. When one does not, rendering throws a{" "}
-            <code>TreeError</code> that names its place in the document. Most often an inline element such as a{" "}
-            <code>TextRun</code> or <code>PageBreak</code> sits directly in a section, header or cell, when it belongs in
-            a paragraph:
+            Every element must sit where Word allows it. When one does not, rendering throws a <code>TreeError</code>{" "}
+            that names its place in the document. Most often an inline element such as a <code>TextRun</code> or{" "}
+            <code>PageBreak</code> sits directly in a section, header or cell, when it belongs in a paragraph:
           </p>
-          <CodeBlock code="Document > Section[0] > PageBreak[0]: <PageBreak> is not allowed in <Section>" language="sh" />
+          <CodeBlock
+            code="Document > Section[0] > PageBreak[0]: <PageBreak> is not allowed in <Section>"
+            language="sh"
+          />
           <p>
             A prop value that docx.js would write into a file Word cannot open throws the same way: a{" "}
             <code>SymbolRun</code> <code>char</code> that is not four hex digits such as <code>"F071"</code>, an{" "}
@@ -274,8 +343,8 @@ const { document, diagnostics } = readDocx(readFileSync("resume.docx"));
 writeFileSync("resume.rewritten.docx", await renderToBuffer(document));`}
           />
           <p>
-            Bytes that are not a Word file throw <code>NotADocxError</code>. The first write can normalise a file
-            saved by Word; reading and writing again after that gives the same document every time.
+            Bytes that are not a Word file throw <code>NotADocxError</code>. The first write can normalise a file saved
+            by Word; reading and writing again after that gives the same document every time.
           </p>
         </Section>
 
@@ -287,10 +356,19 @@ writeFileSync("resume.rewritten.docx", await renderToBuffer(document));`}
           <Table
             head={["Kind", "Meaning"]}
             rows={[
-              [<code>dropped</code>, "docx.js cannot write it, so it is gone after a write. A cropped image comes back uncropped, for example."],
-              [<code>raw</code>, "Kept verbatim as a RawXml element. It is written back exactly, but cannot be edited as props."],
+              [
+                <code>dropped</code>,
+                "docx.js cannot write it, so it is gone after a write. A cropped image comes back uncropped, for example.",
+              ],
+              [
+                <code>raw</code>,
+                "Kept verbatim as a RawXml element. It is written back exactly, but cannot be edited as props.",
+              ],
               [<code>resolved</code>, "A theme reference, such as a theme colour, replaced with its literal value."],
-              [<code>ignored</code>, "Editing noise, such as revision ids and spell-check marks, counted by element name."],
+              [
+                <code>ignored</code>,
+                "Editing noise, such as revision ids and spell-check marks, counted by element name.",
+              ],
             ]}
           />
           <p>
@@ -301,8 +379,8 @@ writeFileSync("resume.rewritten.docx", await renderToBuffer(document));`}
 
         <Section id="codegen" title="Generating JSX">
           <p>
-            <code>printJsx</code> prints a tree as the source of a React component. Design a template in Word, read
-            it, and keep editing it as code: rendering the printed component gives the same tree back.
+            <code>printJsx</code> prints a tree as the source of a React component. Design a template in Word, read it,
+            and keep editing it as code: rendering the printed component gives the same tree back.
           </p>
           <CodeBlock
             title="codegen.ts"
@@ -321,9 +399,9 @@ for (const asset of assets) writeFileSync(asset.path, asset.bytes); // assets/im
 
         <Section id="preview" title="DocxPreview">
           <p>
-            <code>DocxPreview</code> draws a tree as HTML on pages of the document’s page size, with its fonts,
-            spacing, lists, tables, images, headers, footers and footnotes. It takes a tree rather than children, so
-            render your JSX to a tree first.
+            <code>DocxPreview</code> draws a tree as HTML on pages of the document’s page size, with its fonts, spacing,
+            lists, tables, images, headers, footers and footnotes. It takes a tree rather than children, so render your
+            JSX to a tree first.
           </p>
           <CodeBlock
             title="ResumePreview.tsx"
@@ -338,9 +416,9 @@ export function ResumePreview({ data }: { data: ResumeData }) {
           <ul className="docs-list">
             <li>
               A page ends at a page break, before a section that is not continuous and before a paragraph with{" "}
-              <code>pageBreakBefore</code>, and
-              where Word ended it when it last saved the file. In a browser the preview also measures each page and
-              moves what does not fit to the next one; rendered on a server, a page that overflows grows instead.
+              <code>pageBreakBefore</code>, and where Word ended it when it last saved the file. In a browser the
+              preview also measures each page and moves what does not fit to the next one; rendered on a server, a page
+              that overflows grows instead.
             </li>
             <li>Every style is inline, so it needs no stylesheet. It forwards its ref and any div props.</li>
             <li>
@@ -361,15 +439,17 @@ export function ResumePreview({ data }: { data: ResumeData }) {
         <Section id="limits" title="Known limits">
           <ul className="docs-list">
             <li>
-              Lines and pages break where the browser’s text layout puts them, so a page can end a few lines earlier
-              or later than in Word.
+              Lines and pages break where the browser’s text layout puts them, so a page can end a few lines earlier or
+              later than in Word.
             </li>
             <li>Fonts are the browser’s. A font the document names but the viewer lacks falls back to another.</li>
             <li>
               docx.js always writes table borders, so a table that relied on its table style can gain thin borders when
               read and written back.
             </li>
-            <li>Embedded fonts, image cropping and a few drawing effects are dropped on a write, and listed as such.</li>
+            <li>
+              Embedded fonts, image cropping and a few drawing effects are dropped on a write, and listed as such.
+            </li>
           </ul>
         </Section>
       </article>

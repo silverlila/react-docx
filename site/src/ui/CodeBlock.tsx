@@ -32,7 +32,9 @@ export function Code({ code, language = "tsx" }: { code: string; language?: "tsx
         {language === "sh"
           ? text
           : highlight(text).map((token, i) =>
-              token.kind === "plain" ? token.text : (
+              token.kind === "plain" ? (
+                token.text
+              ) : (
                 <span key={i} className={`tok-${token.kind}`}>
                   {token.text}
                 </span>

@@ -1,12 +1,5 @@
 import type { ReactElement } from "react";
-import {
-  AlignmentType,
-  BorderStyle,
-  HeadingLevel,
-  PageNumber,
-  ShadingType,
-  WidthType,
-} from "docx";
+import { AlignmentType, BorderStyle, HeadingLevel, PageNumber, ShadingType, WidthType } from "docx";
 import {
   Bookmark,
   Break,

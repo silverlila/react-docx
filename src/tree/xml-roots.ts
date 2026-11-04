@@ -71,7 +71,7 @@ function referenceProblem(text: string): XmlRoots | null {
 
 function decodeCharacterReferences(text: string): string {
   return text.replace(CHARACTER_REFERENCE, (_, decimal: string | undefined, hex: string | undefined) =>
-    String.fromCodePoint(decimal !== undefined ? parseInt(decimal, 10) : parseInt(hex ?? "", 16))
+    String.fromCodePoint(decimal !== undefined ? parseInt(decimal, 10) : parseInt(hex ?? "", 16)),
   );
 }
 
@@ -135,7 +135,8 @@ export function xmlRoots(xml: string): XmlRoots {
       if (end === -1) return malformed(`${skipped.open} is never closed`);
       if (parent === undefined && !skipped.topLevel) return malformed(`${skipped.open} stands outside an element`);
       const data = xml.slice(lt + skipped.open.length, end);
-      if (skipped.open === "<!--" && (data.includes("--") || data.endsWith("-"))) return malformed("a comment holds --");
+      if (skipped.open === "<!--" && (data.includes("--") || data.endsWith("-")))
+        return malformed("a comment holds --");
       if (skipped.open === "<![CDATA[" && parent !== undefined && xmlTrim(data) !== "") parent.text ??= xmlTrim(data);
       i = end + skipped.close.length;
       continue;

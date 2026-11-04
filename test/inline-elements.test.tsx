@@ -49,13 +49,13 @@ const changeAttributes = 'w:id="1" w:author="A" w:date="2026-01-01T00:00:00Z"';
 describe("tracked changes", () => {
   test("<InsertedTextRun> with string children writes a w:ins around a run of w:t", async () => {
     expect(await bodyXml(<InsertedTextRun {...change}>ins</InsertedTextRun>)).toBe(
-      `<w:p><w:ins ${changeAttributes}><w:r><w:t xml:space="preserve">ins</w:t></w:r></w:ins></w:p>`
+      `<w:p><w:ins ${changeAttributes}><w:r><w:t xml:space="preserve">ins</w:t></w:r></w:ins></w:p>`,
     );
   });
 
   test("<DeletedTextRun> with string children writes a w:del around a run of w:delText", async () => {
     expect(await bodyXml(<DeletedTextRun {...change}>del</DeletedTextRun>)).toBe(
-      `<w:p><w:del ${changeAttributes}><w:r><w:delText xml:space="preserve">del</w:delText></w:r></w:del></w:p>`
+      `<w:p><w:del ${changeAttributes}><w:r><w:delText xml:space="preserve">del</w:delText></w:r></w:del></w:p>`,
     );
   });
 
@@ -65,7 +65,7 @@ describe("tracked changes", () => {
         '<w:delText xml:space="preserve">Section </w:delText>' +
         '<w:fldChar w:fldCharType="begin"/><w:delInstrText xml:space="preserve">SECTION</w:delInstrText>' +
         '<w:fldChar w:fldCharType="separate"/><w:fldChar w:fldCharType="end"/>' +
-        "</w:r></w:del></w:p>"
+        "</w:r></w:del></w:p>",
     );
   });
 
@@ -89,7 +89,7 @@ describe("tracked changes", () => {
         "<w:p>" +
           `<w:del ${changeAttributes}><w:r><w:delText xml:space="preserve">a</w:delText></w:r></w:del>` +
           `<w:del ${changeAttributes}><w:r><w:br/><w:delText xml:space="preserve">b</w:delText></w:r></w:del>` +
-          "</w:p>"
+          "</w:p>",
       );
     });
   });
@@ -102,19 +102,19 @@ describe("inline elements", () => {
 
   test("<SimpleField> writes w:fldSimple with its instruction and cached value", async () => {
     expect(await bodyXml(<SimpleField instruction="AUTHOR" cachedValue="Ada" />)).toBe(
-      '<w:p><w:fldSimple w:instr="AUTHOR"><w:r><w:t xml:space="preserve">Ada</w:t></w:r></w:fldSimple></w:p>'
+      '<w:p><w:fldSimple w:instr="AUTHOR"><w:r><w:t xml:space="preserve">Ada</w:t></w:r></w:fldSimple></w:p>',
     );
   });
 
   test("<SimpleMailMergeField> writes a MERGEFIELD whose cached text is docx.js's «Name»", async () => {
     expect(await bodyXml(<SimpleMailMergeField fieldName="Name" />)).toBe(
-      '<w:p><w:fldSimple w:instr=" MERGEFIELD Name "><w:r><w:t xml:space="preserve">«Name»</w:t></w:r></w:fldSimple></w:p>'
+      '<w:p><w:fldSimple w:instr=" MERGEFIELD Name "><w:r><w:t xml:space="preserve">«Name»</w:t></w:r></w:fldSimple></w:p>',
     );
   });
 
   test("<SequentialIdentifier> writes a SEQ field", async () => {
     expect(await bodyXml(<SequentialIdentifier identifier="Figure" />)).toContain(
-      '<w:instrText xml:space="preserve">SEQ Figure</w:instrText>'
+      '<w:instrText xml:space="preserve">SEQ Figure</w:instrText>',
     );
   });
 
@@ -122,7 +122,7 @@ describe("inline elements", () => {
     expect(await bodyXml(<PageReference bookmarkId="bm" hyperlink />)).toBe(
       '<w:p><w:r><w:fldChar w:fldCharType="begin" w:dirty="true"/>' +
         '<w:instrText xml:space="preserve">PAGEREF bm \\h</w:instrText>' +
-        '<w:fldChar w:fldCharType="end"/></w:r></w:p>'
+        '<w:fldChar w:fldCharType="end"/></w:r></w:p>',
     );
   });
 
@@ -151,13 +151,16 @@ describe("run content", () => {
     ["YearLong", () => <YearLong />, "<w:yearLong/>"],
   ];
 
-  test.each(RUN_CONTENT)("<%s/> directly in a Paragraph is written inside a run of its own", async (_, element, xml) => {
-    expect(await bodyXml(element())).toBe(`<w:p><w:r>${xml}</w:r></w:p>`);
-  });
+  test.each(RUN_CONTENT)(
+    "<%s/> directly in a Paragraph is written inside a run of its own",
+    async (_, element, xml) => {
+      expect(await bodyXml(element())).toBe(`<w:p><w:r>${xml}</w:r></w:p>`);
+    },
+  );
 
   test.each(RUN_CONTENT)("<%s/> inside a TextRun is written in that run", async (_, element, xml) => {
     expect(await bodyXml(<TextRun>a{element()}b</TextRun>)).toBe(
-      `<w:p><w:r><w:t xml:space="preserve">a</w:t>${xml}<w:t xml:space="preserve">b</w:t></w:r></w:p>`
+      `<w:p><w:r><w:t xml:space="preserve">a</w:t>${xml}<w:t xml:space="preserve">b</w:t></w:r></w:p>`,
     );
   });
 });

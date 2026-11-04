@@ -28,7 +28,7 @@ export function previewHtml(tree: DocumentNode, title: string): string {
       <body style={BODY_STYLE}>
         <DocxPreview document={tree} />
       </body>
-    </html>
+    </html>,
   );
   return `<!doctype html>${page}`;
 }
@@ -69,6 +69,6 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(p
     (error: unknown) => {
       console.error(error);
       process.exit(1);
-    }
+    },
   );
 }

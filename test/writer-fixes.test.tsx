@@ -52,13 +52,13 @@ describe("writer fixes", () => {
           <TextRun>
             a<Tab />b
           </TextRun>
-        </Paragraph>
-      )
+        </Paragraph>,
+      ),
     );
     const paragraph = paragraphWithText(xml, "a");
     expect(/<w:r>(?:(?!<\/w:r>).)*<w:r>/.test(paragraph)).toBe(false);
     expect(paragraph).toContain(
-      '<w:r><w:t xml:space="preserve">a</w:t><w:tab/><w:t xml:space="preserve">b</w:t></w:r>'
+      '<w:r><w:t xml:space="preserve">a</w:t><w:tab/><w:t xml:space="preserve">b</w:t></w:r>',
     );
   });
 
@@ -67,8 +67,8 @@ describe("writer fixes", () => {
       body(
         <Paragraph key="p">
           <Math text="x+1" />
-        </Paragraph>
-      )
+        </Paragraph>,
+      ),
     );
     expect(xml).toContain("<m:oMath><m:r><m:t>x+1</m:t></m:r></m:oMath>");
   });
@@ -78,8 +78,8 @@ describe("writer fixes", () => {
       body(
         <Paragraph key="p">
           <SymbolRun char="F071" symbolfont="Symbol" bold />
-        </Paragraph>
-      )
+        </Paragraph>,
+      ),
     );
     expect(xml).toContain('<w:r><w:rPr><w:b/><w:bCs/></w:rPr><w:sym w:char="F071" w:font="Symbol"/></w:r>');
   });
@@ -93,8 +93,8 @@ describe("writer fixes", () => {
           </List>,
           <List key="2" type="numbered">
             <ListItem>second</ListItem>
-          </List>
-        )
+          </List>,
+        ),
       );
       const [first] = numIds(paragraphWithText(xml, "first"));
       const [second] = numIds(paragraphWithText(xml, "second"));
@@ -111,8 +111,8 @@ describe("writer fixes", () => {
             <List type="numbered">
               <ListItem>b</ListItem>
             </List>
-          </List>
-        )
+          </List>,
+        ),
       );
       expect(paragraphWithText(xml, "a")).toContain('<w:ilvl w:val="0"/>');
       expect(paragraphWithText(xml, "b")).toContain('<w:ilvl w:val="1"/>');
@@ -124,16 +124,16 @@ describe("writer fixes", () => {
         body(
           <List key="l" type="numbered">
             <ListItem>a</ListItem>
-          </List>
-        )
+          </List>,
+        ),
       );
       const [numId] = numIds(paragraphWithText(written["word/document.xml"], "a"));
       const numbering = written["word/numbering.xml"];
       const abstractId = numbering.match(
-        new RegExp(`<w:num w:numId="${numId}"><w:abstractNumId w:val="(\\d+)"/>`)
+        new RegExp(`<w:num w:numId="${numId}"><w:abstractNumId w:val="(\\d+)"/>`),
       )?.[1];
       const abstract = numbering.match(
-        new RegExp(`<w:abstractNum w:abstractNumId="${abstractId}"[^>]*>.*?</w:abstractNum>`)
+        new RegExp(`<w:abstractNum w:abstractNumId="${abstractId}"[^>]*>.*?</w:abstractNum>`),
       )?.[0];
       expect(abstract).toContain('<w:lvl w:ilvl="1"');
       expect(abstract).toContain('<w:numFmt w:val="decimal"/>');
@@ -145,8 +145,8 @@ describe("writer fixes", () => {
       body(
         <Paragraph key="p" heading={HeadingLevel.HEADING_1} style="Heading1">
           <TextRun text="heading" />
-        </Paragraph>
-      )
+        </Paragraph>,
+      ),
     );
     expect(paragraphWithText(xml, "heading").match(/<w:pStyle /g)).toHaveLength(1);
   });
@@ -163,7 +163,7 @@ describe("writer fixes", () => {
         <Section>
           <Paragraph heading={HeadingLevel.HEADING_1}>red heading</Paragraph>
         </Section>
-      </Document>
+      </Document>,
     );
     const styles = written["word/styles.xml"];
     expect(styles.match(/w:styleId="Heading1"/g)).toHaveLength(1);

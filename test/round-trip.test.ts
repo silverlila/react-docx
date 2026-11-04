@@ -133,7 +133,11 @@ const LOSSES: Readonly<Record<string, readonly { kind: string; element: string }
   ],
 };
 
-type TreeNode = { readonly type: string; readonly props: Record<string, unknown>; readonly children: readonly (TreeNode | string)[] };
+type TreeNode = {
+  readonly type: string;
+  readonly props: Record<string, unknown>;
+  readonly children: readonly (TreeNode | string)[];
+};
 
 function imagesOf(node: TreeNode | string): TreeNode[] {
   if (typeof node === "string") return [];
@@ -168,7 +172,9 @@ describe("Word-shaped input is stable after one write", () => {
 describe("what the round trip found in the reader", () => {
   test("a picture rotated by rot=31905, which docx.js writes back as 31904.999999999996, keeps its rotation", async () => {
     const { t3 } = await twoWrites(fixture("objects"));
-    const rotations = imagesOf(t3 as TreeNode).map((image) => (image.props.transformation as { rotation?: number }).rotation);
+    const rotations = imagesOf(t3 as TreeNode).map(
+      (image) => (image.props.transformation as { rotation?: number }).rotation,
+    );
     expect(rotations).toEqual([undefined, 0.53175, undefined, undefined]);
   });
 
@@ -187,11 +193,15 @@ const REAL_FILES = realFiles();
 const REAL_FILE_TIMEOUT_MS = 30_000;
 
 describe.skipIf(REAL_FILES.length === 0)("real files are stable after one write", () => {
-  test.each(REAL_FILES.map((f) => [f.name, f] as const))("%s", async (name, { bytes }) => {
-    console.info(name, JSON.stringify(pairs(readDocx(bytes).diagnostics)));
-    const { t2, t3 } = await twoWrites(bytes);
-    expect(t3).toEqual(t2);
-  }, REAL_FILE_TIMEOUT_MS);
+  test.each(REAL_FILES.map((f) => [f.name, f] as const))(
+    "%s",
+    async (name, { bytes }) => {
+      console.info(name, JSON.stringify(pairs(readDocx(bytes).diagnostics)));
+      const { t2, t3 } = await twoWrites(bytes);
+      expect(t3).toEqual(t2);
+    },
+    REAL_FILE_TIMEOUT_MS,
+  );
 });
 
 describe("writing what the reader read never fails", () => {

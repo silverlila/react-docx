@@ -59,12 +59,7 @@ const BasicExample = () => (
 
       <Paragraph spacing={{ after: 100 }}>
         <TextRun text="• Combined: " />
-        <TextRun
-          text="bold, italic, and colored"
-          bold={true}
-          italics={true}
-          color="E53E3E"
-        />
+        <TextRun text="bold, italic, and colored" bold={true} italics={true} color="E53E3E" />
       </Paragraph>
 
       {/* Line breaks */}
@@ -82,12 +77,7 @@ const BasicExample = () => (
 
       {/* Footer */}
       <Paragraph spacing={{ before: 300 }}>
-        <TextRun
-          text="Generated with React-DOCX"
-          size={20}
-          color="666666"
-          italics={true}
-        />
+        <TextRun text="Generated with React-DOCX" size={20} color="666666" italics={true} />
       </Paragraph>
       <Paragraph text="another test"></Paragraph>
 

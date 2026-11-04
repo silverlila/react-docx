@@ -2,8 +2,21 @@ export type TokenKind = "plain" | "comment" | "string" | "keyword" | "tag" | "at
 export type Token = { readonly kind: TokenKind; readonly text: string };
 
 const KEYWORDS = new Set([
-  "import", "from", "export", "default", "const", "let", "var", "return", "function", "async", "await",
-  "new", "type", "typeof", "readonly",
+  "import",
+  "from",
+  "export",
+  "default",
+  "const",
+  "let",
+  "var",
+  "return",
+  "function",
+  "async",
+  "await",
+  "new",
+  "type",
+  "typeof",
+  "readonly",
 ]);
 const LITERALS = new Set(["true", "false", "null", "undefined"]);
 const DECLARES = new Set(["const", "let", "var", "type"]);

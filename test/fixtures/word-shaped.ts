@@ -21,7 +21,7 @@ const SETTINGS = part(
   "w:settings",
   '<w:zoom w:percent="100"/><w:proofState w:spelling="clean" w:grammar="clean"/><w:defaultTabStop w:val="720"/>' +
     '<w:characterSpacingControl w:val="doNotCompress"/><w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat>' +
-    '<w:rsids><w:rsidRoot w:val="00A13B2C"/><w:rsid w:val="00A13B2C"/></w:rsids>'
+    '<w:rsids><w:rsidRoot w:val="00A13B2C"/><w:rsid w:val="00A13B2C"/></w:rsids>',
 );
 
 const LATENT_STYLES =
@@ -72,7 +72,10 @@ const wordDocument = ({ body, styles: extraStyles = "", sectPr = SECT_PR, ...res
   });
 
 const sectPrWith = (references: string, after = ""): string =>
-  SECT_PR.replace('<w:sectPr w:rsidR="00A13B2C">', `<w:sectPr w:rsidR="00A13B2C">${references}`).replace("<w:docGrid", `${after}<w:docGrid`);
+  SECT_PR.replace('<w:sectPr w:rsidR="00A13B2C">', `<w:sectPr w:rsidR="00A13B2C">${references}`).replace(
+    "<w:docGrid",
+    `${after}<w:docGrid`,
+  );
 
 const HEADING_STYLES =
   '<w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:link w:val="Heading1Char"/><w:uiPriority w:val="9"/><w:qFormat/>' +
@@ -89,8 +92,11 @@ const HEADING_STYLES =
   '<w:tblPr><w:tblBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/>' +
   '<w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:insideH w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:insideV w:val="single" w:sz="4" w:space="0" w:color="auto"/></w:tblBorders></w:tblPr></w:style>';
 
-const NONE_BORDERS = ["top", "left", "bottom", "right", "insideH", "insideV"].map((side) => `<w:${side} w:val="none" w:sz="0" w:space="0" w:color="auto"/>`).join("");
-const TABLE_LOOK = '<w:tblLook w:val="04A0" w:firstRow="1" w:lastRow="0" w:firstColumn="1" w:lastColumn="0" w:noHBand="0" w:noVBand="1"/>';
+const NONE_BORDERS = ["top", "left", "bottom", "right", "insideH", "insideV"]
+  .map((side) => `<w:${side} w:val="none" w:sz="0" w:space="0" w:color="auto"/>`)
+  .join("");
+const TABLE_LOOK =
+  '<w:tblLook w:val="04A0" w:firstRow="1" w:lastRow="0" w:firstColumn="1" w:lastColumn="0" w:noHBand="0" w:noVBand="1"/>';
 const cell = (width: number, text: string): string =>
   `<w:tc><w:tcPr><w:tcW w:w="${width}" w:type="dxa"/></w:tcPr>${p(r(text), '<w:spacing w:after="0"/>')}</w:tc>`;
 const row = (...cells: string[]): string => `<w:tr w:rsidR="00A13B2C" w:rsidTr="00A13B2C">${cells.join("")}</w:tr>`;
@@ -117,27 +123,35 @@ const resume = wordDocument({
   body:
     styled("Title", r("Ada Lovelace")) +
     p(`<w:proofErr w:type="spellStart"/>${r("Analyst")}<w:proofErr w:type="spellEnd"/>${r(", London")}${GO_BACK}`) +
-    p(`<w:hyperlink r:id="rIdLink" w:history="1">${r("ada.example.com", '<w:rStyle w:val="Hyperlink"/>')}</w:hyperlink>`) +
-    table(`<w:tblW w:w="0" w:type="auto"/><w:tblBorders>${NONE_BORDERS}</w:tblBorders>`, [row(cell(4675, "Email"), cell(4675, "ada@example.com"))]) +
+    p(
+      `<w:hyperlink r:id="rIdLink" w:history="1">${r("ada.example.com", '<w:rStyle w:val="Hyperlink"/>')}</w:hyperlink>`,
+    ) +
+    table(`<w:tblW w:w="0" w:type="auto"/><w:tblBorders>${NONE_BORDERS}</w:tblBorders>`, [
+      row(cell(4675, "Email"), cell(4675, "ada@example.com")),
+    ]) +
     styled("Heading1", r("Experience")) +
-    table('<w:tblStyle w:val="TableGrid"/><w:tblW w:w="0" w:type="auto"/>', [row(cell(4675, "1842"), cell(4675, "Notes on the Engine"))]) +
+    table('<w:tblStyle w:val="TableGrid"/><w:tblW w:w="0" w:type="auto"/>', [
+      row(cell(4675, "1842"), cell(4675, "Notes on the Engine")),
+    ]) +
     listItem(1, "Mathematics") +
     listItem(1, "Poetry") +
     styled("Heading1", `<w:r><w:lastRenderedPageBreak/><w:t>Steps</w:t></w:r>`) +
     listItem(2, "Read") +
     listItem(2, "Annotate") +
     listItem(3, "Again from one"),
-  sectPr: sectPrWith('<w:headerReference w:type="default" r:id="rIdHeader"/><w:footerReference w:type="default" r:id="rIdFooter"/>'),
+  sectPr: sectPrWith(
+    '<w:headerReference w:type="default" r:id="rIdHeader"/><w:footerReference w:type="default" r:id="rIdFooter"/>',
+  ),
   styles: HEADING_STYLES,
-    numbering: NUMBERING,
-    rels:
-      `<Relationship Id="rIdLink" Type="${OFFICE_RELS}/hyperlink" Target="https://ada.example.com/" TargetMode="External"/>` +
-      `<Relationship Id="rIdHeader" Type="${OFFICE_RELS}/header" Target="header1.xml"/>` +
-      `<Relationship Id="rIdFooter" Type="${OFFICE_RELS}/footer" Target="footer1.xml"/>`,
-    parts: {
-      "word/header1.xml": part("w:hdr", p(r("Page ") + field("PAGE", "1"), '<w:jc w:val="right"/>')),
-      "word/footer1.xml": part("w:ftr", p(r("of ") + field("NUMPAGES", "1"))),
-    },
+  numbering: NUMBERING,
+  rels:
+    `<Relationship Id="rIdLink" Type="${OFFICE_RELS}/hyperlink" Target="https://ada.example.com/" TargetMode="External"/>` +
+    `<Relationship Id="rIdHeader" Type="${OFFICE_RELS}/header" Target="header1.xml"/>` +
+    `<Relationship Id="rIdFooter" Type="${OFFICE_RELS}/footer" Target="footer1.xml"/>`,
+  parts: {
+    "word/header1.xml": part("w:hdr", p(r("Page ") + field("PAGE", "1"), '<w:jc w:val="right"/>')),
+    "word/footer1.xml": part("w:ftr", p(r("of ") + field("NUMPAGES", "1"))),
+  },
 });
 
 const formatting = wordDocument({
@@ -148,7 +162,7 @@ const formatting = wordDocument({
       r("spaced", '<w:spacing w:val="20"/>') +
       r("marked", '<w:highlight w:val="yellow"/>') +
       r("changed", `<w:b/><w:rPrChange w:id="1" w:author="Ada" w:date="${DATE}"><w:rPr><w:i/></w:rPr></w:rPrChange>`) +
-      GO_BACK
+      GO_BACK,
   ),
 });
 
@@ -167,20 +181,32 @@ const footnoteReference = (id: number): string =>
 const notes = wordDocument({
   body:
     p(r("First claim.") + footnoteReference(1) + r(" Second claim.") + footnoteReference(2)) +
-    p('<w:commentRangeStart w:id="0"/>' + r("Two ") + r("runs", "<w:b/>") + '<w:commentRangeEnd w:id="0"/>' + '<w:r><w:rPr><w:rStyle w:val="CommentReference"/></w:rPr><w:commentReference w:id="0"/></w:r>') +
+    p(
+      '<w:commentRangeStart w:id="0"/>' +
+        r("Two ") +
+        r("runs", "<w:b/>") +
+        '<w:commentRangeEnd w:id="0"/>' +
+        '<w:r><w:rPr><w:rStyle w:val="CommentReference"/></w:rPr><w:commentReference w:id="0"/></w:r>',
+    ) +
     p(
       r("Kept ") +
         `<w:ins w:id="1" w:author="Ada" w:date="${DATE}"><w:r><w:t xml:space="preserve">added </w:t></w:r></w:ins>` +
         `<w:del w:id="2" w:author="Ada" w:date="${DATE}"><w:r><w:delText>removed</w:delText></w:r></w:del>` +
-        GO_BACK
+        GO_BACK,
     ),
   styles: FOOTNOTE_STYLES,
-    footnotes: SEPARATORS + footnote(1, "Note one.") + footnote(2, "Note two."),
-  comments: `<w:comment w:id="0" w:author="Ada" w:date="${DATE}" w:initials="AL">${p('<w:r><w:annotationRef/></w:r>' + r("Check this."))}</w:comment>`,
+  footnotes: SEPARATORS + footnote(1, "Note one.") + footnote(2, "Note two."),
+  comments: `<w:comment w:id="0" w:author="Ada" w:date="${DATE}" w:initials="AL">${p("<w:r><w:annotationRef/></w:r>" + r("Check this."))}</w:comment>`,
 });
 
-const LANDSCAPE_SECT_PR = SECT_PR.replace('<w:pgSz w:w="12240" w:h="15840"/>', '<w:pgSz w:w="15840" w:h="12240" w:orient="landscape"/>');
-const PORTRAIT_SECT_PR = sectPrWith('<w:headerReference w:type="first" r:id="rIdFirst"/><w:headerReference w:type="default" r:id="rIdDefault"/>', "<w:titlePg/>");
+const LANDSCAPE_SECT_PR = SECT_PR.replace(
+  '<w:pgSz w:w="12240" w:h="15840"/>',
+  '<w:pgSz w:w="15840" w:h="12240" w:orient="landscape"/>',
+);
+const PORTRAIT_SECT_PR = sectPrWith(
+  '<w:headerReference w:type="first" r:id="rIdFirst"/><w:headerReference w:type="default" r:id="rIdDefault"/>',
+  "<w:titlePg/>",
+);
 
 const sections = wordDocument({
   body: p(r("Portrait") + GO_BACK) + p(r("End of portrait"), PORTRAIT_SECT_PR) + p(r("Landscape")),
@@ -224,10 +250,13 @@ const objects = wordDocument({
     p(contentControl + GO_BACK) +
     p(r("Half is ") + fraction),
   rels:
-      `<Relationship Id="rIdImage" Type="${OFFICE_RELS}/image" Target="media/image1.png"/>` +
-      `<Relationship Id="rIdChart" Type="${OFFICE_RELS}/chart" Target="charts/chart1.xml"/>`,
-    media: { "word/media/image1.png": PNG_1PX },
-  parts: { "word/charts/chart1.xml": '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"/>' },
+    `<Relationship Id="rIdImage" Type="${OFFICE_RELS}/image" Target="media/image1.png"/>` +
+    `<Relationship Id="rIdChart" Type="${OFFICE_RELS}/chart" Target="charts/chart1.xml"/>`,
+  media: { "word/media/image1.png": PNG_1PX },
+  parts: {
+    "word/charts/chart1.xml":
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"/>',
+  },
 });
 
 export const WORD_SHAPED: readonly { name: string; bytes: Uint8Array }[] = [

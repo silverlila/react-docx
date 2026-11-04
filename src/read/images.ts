@@ -29,7 +29,12 @@ type Outline = NonNullable<docx.IImageOptions["outline"]>;
 type Position<R, A> = { readonly relative?: R; readonly align?: A; readonly offset?: number };
 
 type DrawingRead =
-  | { readonly kind: "image"; readonly props: ImageProps; readonly media: readonly string[]; readonly notes: readonly Note[] }
+  | {
+      readonly kind: "image";
+      readonly props: ImageProps;
+      readonly media: readonly string[];
+      readonly notes: readonly Note[];
+    }
   | { readonly kind: "refused"; readonly notes: readonly Note[] };
 
 const PICTURE_URI = "http://schemas.openxmlformats.org/drawingml/2006/picture";
@@ -39,14 +44,51 @@ const DEFAULT_OUTLINE_WIDTH = 9525;
 const CROP = "crop is not expressible; image kept uncropped";
 const VML_LENGTH = /^(-?[0-9]+(?:\.[0-9]+)?)(pt|in|cm|mm|pc|px)?$/;
 
-const RASTER_TYPES: Readonly<Record<string, Raster["type"]>> = { png: "png", jpg: "jpg", jpeg: "jpg", gif: "gif", bmp: "bmp" };
-const PX_PER_UNIT: Readonly<Record<string, number>> = { pt: 96 / 72, in: 96, cm: 96 / 2.54, mm: 96 / 25.4, pc: 16, px: 1 };
+const RASTER_TYPES: Readonly<Record<string, Raster["type"]>> = {
+  png: "png",
+  jpg: "jpg",
+  jpeg: "jpg",
+  gif: "gif",
+  bmp: "bmp",
+};
+const PX_PER_UNIT: Readonly<Record<string, number>> = {
+  pt: 96 / 72,
+  in: 96,
+  cm: 96 / 2.54,
+  mm: 96 / 25.4,
+  pc: 16,
+  px: 1,
+};
 
-const HORIZONTAL_FROM = ["character", "column", "insideMargin", "leftMargin", "margin", "outsideMargin", "page", "rightMargin"] as const satisfies readonly ValueOf<typeof docx.HorizontalPositionRelativeFrom>[];
-const HORIZONTAL_ALIGN = ["center", "inside", "left", "outside", "right"] as const satisfies readonly ValueOf<typeof docx.HorizontalPositionAlign>[];
-const VERTICAL_FROM = ["bottomMargin", "insideMargin", "line", "margin", "outsideMargin", "page", "paragraph", "topMargin"] as const satisfies readonly ValueOf<typeof docx.VerticalPositionRelativeFrom>[];
-const VERTICAL_ALIGN = ["bottom", "center", "inside", "outside", "top"] as const satisfies readonly ValueOf<typeof docx.VerticalPositionAlign>[];
-const WRAP_SIDES = ["bothSides", "left", "right", "largest"] as const satisfies readonly ValueOf<typeof docx.TextWrappingSide>[];
+const HORIZONTAL_FROM = [
+  "character",
+  "column",
+  "insideMargin",
+  "leftMargin",
+  "margin",
+  "outsideMargin",
+  "page",
+  "rightMargin",
+] as const satisfies readonly ValueOf<typeof docx.HorizontalPositionRelativeFrom>[];
+const HORIZONTAL_ALIGN = ["center", "inside", "left", "outside", "right"] as const satisfies readonly ValueOf<
+  typeof docx.HorizontalPositionAlign
+>[];
+const VERTICAL_FROM = [
+  "bottomMargin",
+  "insideMargin",
+  "line",
+  "margin",
+  "outsideMargin",
+  "page",
+  "paragraph",
+  "topMargin",
+] as const satisfies readonly ValueOf<typeof docx.VerticalPositionRelativeFrom>[];
+const VERTICAL_ALIGN = ["bottom", "center", "inside", "outside", "top"] as const satisfies readonly ValueOf<
+  typeof docx.VerticalPositionAlign
+>[];
+const WRAP_SIDES = ["bothSides", "left", "right", "largest"] as const satisfies readonly ValueOf<
+  typeof docx.TextWrappingSide
+>[];
 const WRAP_TYPES = {
   "wp:wrapNone": 0,
   "wp:wrapSquare": 1,
@@ -66,7 +108,12 @@ const MARGINS = [
   ["distL", "left"],
   ["distR", "right"],
 ] as const;
-const ANCHOR_ATTRIBUTES = new Set<string>(["simplePos", "relativeHeight", ...ANCHOR_FLAGS.map(([name]) => name), ...MARGINS.map(([name]) => name)]);
+const ANCHOR_ATTRIBUTES = new Set<string>([
+  "simplePos",
+  "relativeHeight",
+  ...ANCHOR_FLAGS.map(([name]) => name),
+  ...MARGINS.map(([name]) => name),
+]);
 
 const INLINE_PARTS = ["wp:extent", "wp:effectExtent", "wp:docPr", "wp:cNvGraphicFramePr", "a:graphic"];
 const CONTAINER_PARTS: Readonly<Record<string, ReadonlySet<string>>> = {
@@ -84,7 +131,13 @@ function wholeAt(el: XmlElement | null, name: string): number | null {
   return value !== null && INTEGER.test(value) ? Number(value) : null;
 }
 
-function mediaOf(relId: string | null, element: string, ctx: ReadContext, notes: Note[], media: string[]): { path: string; data: Uint8Array } | null {
+function mediaOf(
+  relId: string | null,
+  element: string,
+  ctx: ReadContext,
+  notes: Note[],
+  media: string[],
+): { path: string; data: Uint8Array } | null {
   if (relId === null) {
     notes.push(dropped(element, "the picture is not embedded (a linked file), which docx.js cannot write"));
     return null;
@@ -103,7 +156,13 @@ function mediaOf(relId: string | null, element: string, ctx: ReadContext, notes:
   return { path: rel.target, data };
 }
 
-function rasterOf(relId: string | null, element: string, ctx: ReadContext, notes: Note[], media: string[]): Raster | null {
+function rasterOf(
+  relId: string | null,
+  element: string,
+  ctx: ReadContext,
+  notes: Note[],
+  media: string[],
+): Raster | null {
   const part = mediaOf(relId, element, ctx, notes, media);
   if (part === null) return null;
   const extension = part.path.slice(part.path.lastIndexOf(".") + 1).toLowerCase();
@@ -117,7 +176,8 @@ function rasterOf(relId: string | null, element: string, ctx: ReadContext, notes
 function pictureOf(blipFill: XmlElement | null, ctx: ReadContext, notes: Note[], media: string[]): Picture | null {
   for (const child of elementsOf(blipFill)) {
     if (!BLIP_FILL_PARTS.has(child.name)) notes.push(dropped(child.name, NO_OPTION));
-    else if (child.name === "a:srcRect" && Object.values(child.attributes).some((value) => value !== "0")) notes.push(dropped(child.name, CROP));
+    else if (child.name === "a:srcRect" && Object.values(child.attributes).some((value) => value !== "0"))
+      notes.push(dropped(child.name, CROP));
   }
   const blip = childNamed(blipFill, "a:blip");
   let svg: { data: Uint8Array } | null = null;
@@ -215,17 +275,19 @@ function positionOf<R extends string, A extends string>(
   el: XmlElement | null,
   from: readonly R[],
   aligns: readonly A[],
-  notes: Note[]
+  notes: Note[],
 ): Position<R, A> {
   const name = el?.name ?? "wp:positionH/V";
   const relativeFrom = attrOf(el, "relativeFrom");
   let relative: R | undefined;
   if (relativeFrom !== null && isOneOf(from, relativeFrom)) relative = relativeFrom;
-  else if (relativeFrom !== null) notes.push(dropped(name, `relativeFrom="${relativeFrom}" is not a value docx.js accepts`));
+  else if (relativeFrom !== null)
+    notes.push(dropped(name, `relativeFrom="${relativeFrom}" is not a value docx.js accepts`));
   const at = relative === undefined ? {} : { relative };
   const align = childNamed(el, "wp:align");
   const offset = childNamed(el, "wp:posOffset");
-  for (const child of elementsOf(el)) if (child !== align && child !== offset) notes.push(dropped(child.name, NO_OPTION));
+  for (const child of elementsOf(el))
+    if (child !== align && child !== offset) notes.push(dropped(child.name, NO_OPTION));
   const alignText = align === null ? null : textOf(align);
   if (alignText !== null && isOneOf(aligns, alignText)) return { ...at, align: alignText };
   const offsetText = offset === null ? null : textOf(offset);
@@ -238,8 +300,11 @@ function wrapOf(anchor: XmlElement, notes: Note[]): Floating["wrap"] | undefined
   for (const el of elementsOf(anchor)) {
     if (el.name === "wp:wrapSquare") {
       const side = attrOf(el, "wrapText");
-      if (side !== null && !isOneOf(WRAP_SIDES, side)) notes.push(dropped(el.name, `wrapText="${side}" is not a value docx.js accepts`));
-      return side !== null && isOneOf(WRAP_SIDES, side) ? { type: WRAP_TYPES[el.name], side } : { type: WRAP_TYPES[el.name] };
+      if (side !== null && !isOneOf(WRAP_SIDES, side))
+        notes.push(dropped(el.name, `wrapText="${side}" is not a value docx.js accepts`));
+      return side !== null && isOneOf(WRAP_SIDES, side)
+        ? { type: WRAP_TYPES[el.name], side }
+        : { type: WRAP_TYPES[el.name] };
     }
     if (el.name === "wp:wrapTight") {
       const side = attrOf(el, "wrapText");
@@ -261,9 +326,11 @@ function floatingOf(anchor: XmlElement, height: number, notes: Note[]): Floating
   const margins = Object.fromEntries(MARGINS.map(([attribute, key]) => [key, wholeAt(anchor, attribute) ?? 0]));
   if (Object.values(margins).some((value) => value !== 0)) options.margins = margins;
   const relativeHeight = wholeAt(anchor, "relativeHeight");
-  if (relativeHeight === 0) notes.push(dropped("wp:anchor", 'relativeHeight="0": docx.js writes the picture height instead'));
+  if (relativeHeight === 0)
+    notes.push(dropped("wp:anchor", 'relativeHeight="0": docx.js writes the picture height instead'));
   else if (relativeHeight !== null && relativeHeight !== height) options.zIndex = relativeHeight;
-  if (isOnValue(attrOf(anchor, "simplePos") ?? "0")) notes.push(dropped("wp:anchor", 'simplePos="1": docx.js positions by wp:positionH and wp:positionV only'));
+  if (isOnValue(attrOf(anchor, "simplePos") ?? "0"))
+    notes.push(dropped("wp:anchor", 'simplePos="1": docx.js positions by wp:positionH and wp:positionV only'));
   const wrap = wrapOf(anchor, notes);
   if (wrap !== undefined) options.wrap = wrap;
   return {
@@ -345,7 +412,12 @@ export function parseVmlImage(pict: XmlElement, ctx: ReadContext): DrawingRead |
   const media: string[] = [];
   const raster = rasterOf(attrOf(imagedata, "r:id"), imagedata.name, ctx, notes, media);
   if (raster === null) return { kind: "refused", notes };
-  return { kind: "image", props: { ...raster, transformation: { width, height } }, media, notes: [resolved("w:pict", "VML image converted to DrawingML"), ...notes] };
+  return {
+    kind: "image",
+    props: { ...raster, transformation: { width, height } },
+    media,
+    notes: [resolved("w:pict", "VML image converted to DrawingML"), ...notes],
+  };
 }
 
 export function readPicture(read: DrawingRead, runProps: RunOptions, ctx: ReadContext): AuthorNode | null {
@@ -357,4 +429,3 @@ export function readPicture(read: DrawingRead, runProps: RunOptions, ctx: ReadCo
   }
   return { type: "ImageRun", props: read.props, children: [] };
 }
-

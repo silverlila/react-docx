@@ -14,11 +14,7 @@ const RANDOM_REL_ID = /rId[a-z0-9_-]{20,}/g;
 const VML_SHAPE_ID = /(?<=<v:shape id=")[^"]+/g;
 
 function isComparedPart(name: string): boolean {
-  return (
-    name === "[Content_Types].xml" ||
-    /^word\/.+\.xml$/.test(name) ||
-    /^word\/_rels\/[^/]+\.rels$/.test(name)
-  );
+  return name === "[Content_Types].xml" || /^word\/.+\.xml$/.test(name) || /^word\/_rels\/[^/]+\.rels$/.test(name);
 }
 
 function scanOrder(names: string[]): string[] {

@@ -20,12 +20,5 @@
     "noEmit": false
   },
   "include": ["src/**/*"],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "**/*.test.ts",
-    "**/*.test.tsx",
-    "tsup.config.ts",
-    "*.config.*"
-  ]
+  "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.test.tsx", "tsup.config.ts", "*.config.*"]
 }

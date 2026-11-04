@@ -7,13 +7,18 @@ import { readDocx, type Diagnostic } from "../src/read/index";
 import { CASES } from "./support/cases";
 import { docx, part, type FixtureParts } from "./support/docx-fixture";
 
-type TreeNode = { readonly type: string; readonly props: Record<string, unknown>; readonly children: readonly (TreeNode | string)[] };
+type TreeNode = {
+  readonly type: string;
+  readonly props: Record<string, unknown>;
+  readonly children: readonly (TreeNode | string)[];
+};
 
 const FOOTER = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer";
 const HEADER = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/header";
 const DATE = "2026-01-01T00:00:00Z";
 
-const rel = (id: string, type: string, target: string): string => `<Relationship Id="${id}" Type="${type}" Target="${target}"/>`;
+const rel = (id: string, type: string, target: string): string =>
+  `<Relationship Id="${id}" Type="${type}" Target="${target}"/>`;
 const run = (text: string): string => `<w:r><w:t>${text}</w:t></w:r>`;
 const lvl = (ilvl: number, format: string, text: string, inside = ""): string =>
   `<w:lvl w:ilvl="${ilvl}"><w:start w:val="1"/><w:numFmt w:val="${format}"/><w:lvlText w:val="${text}"/>${inside}</w:lvl>`;
@@ -25,7 +30,11 @@ const read = (parts: FixtureParts) => readDocx(docx(parts));
 const documentOf = (parts: FixtureParts) => tree(read(parts).document);
 const blocksOf = (parts: FixtureParts) => tree(documentOf(parts).children[0]).children as TreeNode[];
 
-const node = (type: string, props: Record<string, unknown> = {}, children: readonly (TreeNode | string)[] = []): TreeNode => ({
+const node = (
+  type: string,
+  props: Record<string, unknown> = {},
+  children: readonly (TreeNode | string)[] = [],
+): TreeNode => ({
   type,
   props,
   children,
@@ -98,12 +107,17 @@ describe("lists", () => {
 
   test("a w:lvlOverride on level 2 is dropped and the paragraph keeps the list", () => {
     const { document, diagnostics } = read({ body: item("4", 0, "a"), numbering: NUMBERING });
-    expect(numberingOf(tree(tree(document).children[0]).children[0] as TreeNode)).toMatchObject({ reference: "list-1" });
+    expect(numberingOf(tree(tree(document).children[0]).children[0] as TreeNode)).toMatchObject({
+      reference: "list-1",
+    });
     expect(located(diagnostics, "dropped", "w:lvlOverride")).toHaveLength(1);
   });
 
   test('numId "0" is numbering: false, and an unknown numId is dropped', () => {
-    const { document, diagnostics } = read({ body: item("0", 0, "off") + item("99", 0, "unknown"), numbering: NUMBERING });
+    const { document, diagnostics } = read({
+      body: item("0", 0, "off") + item("99", 0, "unknown"),
+      numbering: NUMBERING,
+    });
     const [off, unknown] = tree(tree(document).children[0]).children as TreeNode[];
     expect(off.props).toEqual({ numbering: false });
     expect(unknown.props).toEqual({});
@@ -124,11 +138,16 @@ describe("lists", () => {
       '<w:style w:type="paragraph" w:styleId="Bulleted"><w:name w:val="Bulleted"/>' +
       '<w:pPr><w:numPr><w:numId w:val="2"/></w:numPr></w:pPr></w:style>';
     const first = readDocx(docx({ body: item("1", 0, "a"), numbering: NUMBERING, styles }));
-    const style = { id: "Bulleted", name: "Bulleted", paragraph: { numbering: { reference: "list-2", level: 0, instance: 0, custom: true } } };
+    const style = {
+      id: "Bulleted",
+      name: "Bulleted",
+      paragraph: { numbering: { reference: "list-2", level: 0, instance: 0, custom: true } },
+    };
     expect(tree(first.document).props.styles).toEqual({ paragraphStyles: [style] });
     const second = readDocx(await renderToBuffer(first.document));
     expect(tree(second.document).props.styles).toMatchObject({ paragraphStyles: [style] });
-    const references = (document: unknown) => (tree(document).props.numbering as { config: { reference: string }[] }).config.map((c) => c.reference);
+    const references = (document: unknown) =>
+      (tree(document).props.numbering as { config: { reference: string }[] }).config.map((c) => c.reference);
     expect(references(second.document)).toEqual(["list-1", "list-2"]);
   });
 });
@@ -223,7 +242,8 @@ const SEPARATORS =
   '<w:footnote w:type="continuationSeparator" w:id="0"><w:p><w:r><w:continuationSeparator/></w:r></w:p></w:footnote>';
 const footnote = (id: string, inside: string): string => `<w:footnote w:id="${id}">${inside}</w:footnote>`;
 const NOTE_MARK = '<w:r><w:rPr><w:rStyle w:val="FootnoteReference"/></w:rPr><w:footnoteRef/></w:r>';
-const reference = (id: string): string => `<w:r><w:rPr><w:rStyle w:val="FootnoteReference"/></w:rPr><w:footnoteReference w:id="${id}"/></w:r>`;
+const reference = (id: string): string =>
+  `<w:r><w:rPr><w:rStyle w:val="FootnoteReference"/></w:rPr><w:footnoteReference w:id="${id}"/></w:r>`;
 
 describe("footnotes", () => {
   const NOTE = SEPARATORS + footnote("1", `<w:p>${NOTE_MARK}${run("note")}</w:p>`);
@@ -234,7 +254,7 @@ describe("footnotes", () => {
       footnotes: NOTE,
     });
     expect(tree(tree(document).children[0]).children[0]).toEqual(
-      node("Paragraph", {}, [text("a"), node("Footnote", {}, [paragraph("note")]), text("b")])
+      node("Paragraph", {}, [text("a"), node("Footnote", {}, [paragraph("note")]), text("b")]),
     );
     expect(ignoredCount(diagnostics, "w:footnoteRef")).toBe(1);
     expect(ignoredCount(diagnostics, "w:footnote")).toBe(2);
@@ -260,13 +280,18 @@ describe("footnotes", () => {
       expect.objectContaining({ part: "word/footer1.xml" }),
     ]);
     expect(located(diagnostics, "dropped", "w:footnote")).toEqual([
-      expect.objectContaining({ detail: "footnote 1 is never referenced, and docx.js writes only referenced footnotes" }),
+      expect.objectContaining({
+        detail: "footnote 1 is never referenced, and docx.js writes only referenced footnotes",
+      }),
     ]);
   });
 
   test("a footnote holding only a table gets an empty Paragraph first, and renderToBuffer accepts it", async () => {
     const table = `<w:tbl><w:tr><w:tc><w:p>${run("cell")}</w:p></w:tc></w:tr></w:tbl>`;
-    const { document, diagnostics } = read({ body: `<w:p>${reference("1")}</w:p>`, footnotes: SEPARATORS + footnote("1", table) });
+    const { document, diagnostics } = read({
+      body: `<w:p>${reference("1")}</w:p>`,
+      footnotes: SEPARATORS + footnote("1", table),
+    });
     const read1 = findAll(tree(document), "Footnote")[0];
     expect(read1.children.map((child) => (child as TreeNode).type)).toEqual(["Paragraph", "Table"]);
     expect(read1.children[0]).toEqual(node("Paragraph"));
@@ -282,7 +307,9 @@ describe("footnotes", () => {
       body: `<w:p>${reference("1")}</w:p>`,
       footnotes: SEPARATORS + footnote("1", `<w:p>${NOTE_MARK}${run("first")}</w:p>${sdt}`),
     });
-    expect(findAll(tree(document), "Footnote")).toEqual([node("Footnote", {}, [paragraph("first"), paragraph("kept")])]);
+    expect(findAll(tree(document), "Footnote")).toEqual([
+      node("Footnote", {}, [paragraph("first"), paragraph("kept")]),
+    ]);
     expect(located(diagnostics, "dropped", "w:sdt")).toHaveLength(1);
     expect(findAll(tree(document), "RawXml")).toEqual([]);
   });
@@ -313,11 +340,13 @@ describe("comments", () => {
         text("y"),
         node("CommentRangeEnd", { id: 1 }),
         node("TextRun", {}, [node("CommentReference", { id: 1 })]),
-      ])
+      ]),
     );
     expect(comments).toEqual([
       node("Comment", { id: 0, author: "A", date: new Date(DATE) }, [paragraph("first")]),
-      node("Comment", { id: 1, author: "B", initials: "BB", date: new Date("2026-02-01T00:00:00Z") }, [paragraph("second")]),
+      node("Comment", { id: 1, author: "B", initials: "BB", date: new Date("2026-02-01T00:00:00Z") }, [
+        paragraph("second"),
+      ]),
       node("Comment", { id: 2, author: "C" }, [paragraph("undated")]),
     ]);
     expect(comments[0].props.date).toBeInstanceOf(Date);
@@ -343,7 +372,9 @@ describe("tracked changes", () => {
   const tracked = { author: "A", date: DATE };
 
   test("a w:ins with two runs gives two InsertedTextRuns with the change's ordinal id and their own properties", () => {
-    const [p] = blocksOf({ body: `<w:p>${change("w:ins", "40", `<w:r><w:rPr><w:b/></w:rPr><w:t>one</w:t></w:r>${run("two")}`)}</w:p>` });
+    const [p] = blocksOf({
+      body: `<w:p>${change("w:ins", "40", `<w:r><w:rPr><w:b/></w:rPr><w:t>one</w:t></w:r>${run("two")}`)}</w:p>`,
+    });
     expect(p.children).toEqual([
       node("InsertedTextRun", { id: 1, ...tracked, bold: true }, ["one"]),
       node("InsertedTextRun", { id: 1, ...tracked }, ["two"]),
@@ -354,7 +385,10 @@ describe("tracked changes", () => {
     const [p] = blocksOf({
       body: `<w:p>${change("w:ins", "7", run("in"))}${change("w:del", "8", "<w:r><w:delText>gone</w:delText></w:r>")}</w:p>`,
     });
-    expect(p.children).toEqual([node("InsertedTextRun", { id: 1, ...tracked }, ["in"]), node("DeletedTextRun", { id: 2, ...tracked }, ["gone"])]);
+    expect(p.children).toEqual([
+      node("InsertedTextRun", { id: 1, ...tracked }, ["in"]),
+      node("DeletedTextRun", { id: 2, ...tracked }, ["gone"]),
+    ]);
   });
 
   test("w:moveTo is an InsertedTextRun with a resolved diagnostic, and the move range marks are ignored", () => {
@@ -362,9 +396,11 @@ describe("tracked changes", () => {
       body: `<w:p><w:moveToRangeStart w:id="1" w:name="move1"/>${change("w:moveTo", "2", run("moved"))}<w:moveToRangeEnd w:id="1"/></w:p>`,
     });
     expect(tree(tree(document).children[0]).children[0]).toEqual(
-      node("Paragraph", {}, [node("InsertedTextRun", { id: 1, ...tracked }, ["moved"])])
+      node("Paragraph", {}, [node("InsertedTextRun", { id: 1, ...tracked }, ["moved"])]),
     );
-    expect(located(diagnostics, "resolved", "w:moveTo")).toEqual([expect.objectContaining({ detail: "move shown as insert/delete" })]);
+    expect(located(diagnostics, "resolved", "w:moveTo")).toEqual([
+      expect.objectContaining({ detail: "move shown as insert/delete" }),
+    ]);
     expect(ignoredCount(diagnostics, "w:moveToRangeStart")).toBe(1);
   });
 
@@ -373,25 +409,27 @@ describe("tracked changes", () => {
       body: `<w:p>${change("w:ins", "3", `<w:hyperlink w:anchor="top">${run("link")}</w:hyperlink>`)}</w:p>`,
     });
     expect(tree(tree(document).children[0]).children[0]).toEqual(
-      node("Paragraph", {}, [node("InternalHyperlink", { anchor: "top" }, [text("link")])])
+      node("Paragraph", {}, [node("InternalHyperlink", { anchor: "top" }, [text("link")])]),
     );
     expect(located(diagnostics, "dropped", "w:ins")).toHaveLength(1);
   });
 
-  test.each([PageNumber.CURRENT, PageNumber.TOTAL_PAGES, PageNumber.TOTAL_PAGES_IN_SECTION, PageNumber.CURRENT_SECTION])(
-    "a deleted %s page number reads back as a PageNumber in a DeletedTextRun",
-    async (field) => {
-      const element = h(
-        Document,
-        null,
-        h(Section, null, h(Paragraph, null, h(DeletedTextRun, { id: 1, author: "A", date: DATE }, field)))
-      );
-      const { document } = readDocx(await renderToBuffer(element));
-      expect(tree(tree(document).children[0]).children[0]).toEqual(
-        node("Paragraph", {}, [node("DeletedTextRun", { id: 1, ...tracked }, [node("PageNumber", { field })])])
-      );
-    }
-  );
+  test.each([
+    PageNumber.CURRENT,
+    PageNumber.TOTAL_PAGES,
+    PageNumber.TOTAL_PAGES_IN_SECTION,
+    PageNumber.CURRENT_SECTION,
+  ])("a deleted %s page number reads back as a PageNumber in a DeletedTextRun", async (field) => {
+    const element = h(
+      Document,
+      null,
+      h(Section, null, h(Paragraph, null, h(DeletedTextRun, { id: 1, author: "A", date: DATE }, field))),
+    );
+    const { document } = readDocx(await renderToBuffer(element));
+    expect(tree(tree(document).children[0]).children[0]).toEqual(
+      node("Paragraph", {}, [node("DeletedTextRun", { id: 1, ...tracked }, [node("PageNumber", { field })])]),
+    );
+  });
 });
 
 describe("phase-1 cases", () => {
@@ -413,23 +451,25 @@ describe("phase-1 cases", () => {
     });
   }
 
-  test.each(CASES.filter((c) => c.name === "bug-lists" || c.name === "notes-and-blocks").map((c) => [c.name, c.element] as const))(
-    "%s reads back with the footnotes, comments and lists renderToTree gives",
-    async (_name, element) => {
-      const expected = tree(renderToTree(element));
-      const actual = tree(readDocx(await renderToBuffer(element)).document);
-      const compared = [...findAll(expected, "Footnote"), ...findAll(expected, "Comment"), ...listed(expected)];
-      expect(compared.length).toBeGreaterThan(0);
-      expect(findAll(actual, "Footnote")).toEqual(findAll(expected, "Footnote"));
-      expect(findAll(actual, "Comment")).toEqual(findAll(expected, "Comment"));
-      expect(listShape(actual)).toEqual(listShape(expected));
-      expect(listed(actual).every(({ reference }) => /^list-\d+$/.test(reference))).toBe(true);
-    }
-  );
+  test.each(
+    CASES.filter((c) => c.name === "bug-lists" || c.name === "notes-and-blocks").map(
+      (c) => [c.name, c.element] as const,
+    ),
+  )("%s reads back with the footnotes, comments and lists renderToTree gives", async (_name, element) => {
+    const expected = tree(renderToTree(element));
+    const actual = tree(readDocx(await renderToBuffer(element)).document);
+    const compared = [...findAll(expected, "Footnote"), ...findAll(expected, "Comment"), ...listed(expected)];
+    expect(compared.length).toBeGreaterThan(0);
+    expect(findAll(actual, "Footnote")).toEqual(findAll(expected, "Footnote"));
+    expect(findAll(actual, "Comment")).toEqual(findAll(expected, "Comment"));
+    expect(listShape(actual)).toEqual(listShape(expected));
+    expect(listed(actual).every(({ reference }) => /^list-\d+$/.test(reference))).toBe(true);
+  });
 });
 
 describe("styles whose id docx.js gives a built-in style of the other type", () => {
-  const STRONG = '<w:style w:type="character" w:styleId="Strong"><w:name w:val="Strong"/><w:rPr><w:b/></w:rPr></w:style>';
+  const STRONG =
+    '<w:style w:type="character" w:styleId="Strong"><w:name w:val="Strong"/><w:rPr><w:b/></w:rPr></w:style>';
   const body = '<w:p><w:r><w:rPr><w:rStyle w:val="Strong"/></w:rPr><w:t>bold</w:t></w:r></w:p>';
 
   test("Word's character style Strong reads under a fresh id, its references follow it, and it round-trips", async () => {
@@ -447,7 +487,9 @@ describe("styles whose id docx.js gives a built-in style of the other type", () 
       '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:next w:val="Strong"/><w:link w:val="Strong"/></w:style>' +
       '<w:style w:type="table" w:styleId="Grid"><w:name w:val="Grid"/><w:basedOn w:val="Strong"/>' +
       '<w:tblStylePr w:type="firstRow"><w:pPr><w:pStyle w:val="Strong"/></w:pPr><w:rPr><w:rStyle w:val="Strong"/></w:rPr></w:tblStylePr></w:style>';
-    const styles = tree(readDocx(docx({ body, styles: STRONG + raw })).document).props.styles as { importedStyles?: string[] };
+    const styles = tree(readDocx(docx({ body, styles: STRONG + raw })).document).props.styles as {
+      importedStyles?: string[];
+    };
     const imported = (styles.importedStyles ?? []).join();
     expect(imported.match(/w:val="StrongChar"/g)).toHaveLength(5);
     expect(imported).not.toContain('w:val="Strong"');
@@ -462,13 +504,21 @@ describe("a table without its own borders", () => {
     '<w:style w:type="table" w:styleId="Lines"><w:name w:val="Lines"/><w:basedOn w:val="TableNormal"/><w:tblPr><w:tblBorders>' +
     '<w:top w:val="single" w:sz="8" w:color="4472C4"/><w:insideH w:val="single" w:sz="4" w:color="4472C4"/></w:tblBorders></w:tblPr></w:style>';
   const bordersOf = (tblPr: string) =>
-    findAll(tree(readDocx(docx({ body: TABLE(tblPr), styles: STYLES })).document), "Table")[0].props.borders as Record<string, { style: string }>;
+    findAll(tree(readDocx(docx({ body: TABLE(tblPr), styles: STYLES })).document), "Table")[0].props.borders as Record<
+      string,
+      { style: string }
+    >;
 
   test("reads its table style's borders, and none for the sides the style leaves out, as Word draws it", () => {
     const borders = bordersOf('<w:tblStyle w:val="Lines"/>');
     expect(borders.top).toMatchObject({ style: "single", size: 8, color: "4472C4" });
     expect(borders.insideHorizontal).toMatchObject({ style: "single", size: 4 });
-    expect([borders.left, borders.bottom, borders.right, borders.insideVertical].map((b) => b.style)).toEqual(["none", "none", "none", "none"]);
+    expect([borders.left, borders.bottom, borders.right, borders.insideVertical].map((b) => b.style)).toEqual([
+      "none",
+      "none",
+      "none",
+      "none",
+    ]);
   });
 
   test("without a style it has the default table style's borders: none", () => {
@@ -476,32 +526,44 @@ describe("a table without its own borders", () => {
   });
 
   test("its own sides win over the style's", () => {
-    expect(bordersOf('<w:tblStyle w:val="Lines"/><w:tblBorders><w:top w:val="double" w:sz="4"/></w:tblBorders>').top).toMatchObject({ style: "double" });
+    expect(
+      bordersOf('<w:tblStyle w:val="Lines"/><w:tblBorders><w:top w:val="double" w:sz="4"/></w:tblBorders>').top,
+    ).toMatchObject({ style: "double" });
   });
 });
 
 describe("review fixes: reader", () => {
   test("a field kept verbatim names a renamed style by its fresh id", () => {
-    const styles = '<w:style w:type="character" w:styleId="Strong"><w:name w:val="Strong"/><w:rPr><w:b/></w:rPr></w:style>';
+    const styles =
+      '<w:style w:type="character" w:styleId="Strong"><w:name w:val="Strong"/><w:rPr><w:b/></w:rPr></w:style>';
     const strong = (inner: string) => `<w:r><w:rPr><w:rStyle w:val="Strong"/></w:rPr>${inner}</w:r>`;
     const complex =
-      strong('<w:fldChar w:fldCharType="begin"/>') + strong('<w:instrText xml:space="preserve"> DATE </w:instrText>') +
-      strong('<w:fldChar w:fldCharType="separate"/>') + strong("<w:t>today</w:t>") + strong('<w:fldChar w:fldCharType="end"/>');
+      strong('<w:fldChar w:fldCharType="begin"/>') +
+      strong('<w:instrText xml:space="preserve"> DATE </w:instrText>') +
+      strong('<w:fldChar w:fldCharType="separate"/>') +
+      strong("<w:t>today</w:t>") +
+      strong('<w:fldChar w:fldCharType="end"/>');
     const simple = `<w:fldSimple w:instr=" DATE ">${strong("<w:t>today</w:t>")}</w:fldSimple>`;
-    const raw = findAll(tree(readDocx(docx({ body: `<w:p>${complex}</w:p><w:p>${simple}</w:p>`, styles })).document), "RawXml").map((n) => String(n.props.xml));
+    const raw = findAll(
+      tree(readDocx(docx({ body: `<w:p>${complex}</w:p><w:p>${simple}</w:p>`, styles })).document),
+      "RawXml",
+    ).map((n) => String(n.props.xml));
     expect(raw).toHaveLength(2);
     expect(raw.every((xml) => xml.includes('w:val="StrongChar"') && !xml.includes('w:val="Strong"'))).toBe(true);
   });
 
   test("a w:sym whose char is not four hex digits is kept as raw XML, not read as a SymbolRun", () => {
-    const body = '<w:p><w:r><w:sym w:font="Wingdings" w:char="★"/></w:r><w:r><w:sym w:font="Symbol" w:char="F071"/></w:r></w:p>';
+    const body =
+      '<w:p><w:r><w:sym w:font="Wingdings" w:char="★"/></w:r><w:r><w:sym w:font="Symbol" w:char="F071"/></w:r></w:p>';
     const document = tree(readDocx(docx({ body })).document);
     expect(findAll(document, "SymbolRun").map((s) => s.props.char)).toEqual(["F071"]);
     expect(findAll(document, "RawXml").map((r) => r.props.xml)).toEqual(['<w:sym w:font="Wingdings" w:char="★"/>']);
   });
   test("a renamed style is renamed in XML kept verbatim too", () => {
-    const styles = '<w:style w:type="character" w:styleId="Strong"><w:name w:val="Strong"/><w:rPr><w:b/></w:rPr></w:style>';
-    const body = '<w:p><w:sdt><w:sdtPr><w:alias w:val="x"/></w:sdtPr><w:sdtContent><w:r><w:rPr><w:rStyle w:val="Strong"/></w:rPr><w:t>b</w:t></w:r></w:sdtContent></w:sdt></w:p>';
+    const styles =
+      '<w:style w:type="character" w:styleId="Strong"><w:name w:val="Strong"/><w:rPr><w:b/></w:rPr></w:style>';
+    const body =
+      '<w:p><w:sdt><w:sdtPr><w:alias w:val="x"/></w:sdtPr><w:sdtContent><w:r><w:rPr><w:rStyle w:val="Strong"/></w:rPr><w:t>b</w:t></w:r></w:sdtContent></w:sdt></w:p>';
     const raw = findAll(tree(readDocx(docx({ body, styles })).document), "RawXml").map((n) => String(n.props.xml));
     expect(raw.join()).toContain('w:val="StrongChar"');
     expect(raw.join()).not.toContain('w:val="Strong"');

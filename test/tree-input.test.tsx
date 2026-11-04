@@ -57,8 +57,10 @@ test("a state update that reorders keyed children renders them in the new order,
       <Section>
         <Reordered />
       </Section>
-    </Document>
+    </Document>,
   );
   const texts = tree.children[0].children.map((paragraph) => JSON.stringify(paragraph.children));
-  expect(texts).toEqual(["d", "c", "x", "a"].map((text) => JSON.stringify([{ type: "TextRun", props: {}, children: [text] }])));
+  expect(texts).toEqual(
+    ["d", "c", "x", "a"].map((text) => JSON.stringify([{ type: "TextRun", props: {}, children: [text] }])),
+  );
 });

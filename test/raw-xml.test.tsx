@@ -35,13 +35,25 @@ describe("RawXml is written verbatim", () => {
 
   test("in an inline position, keeping the spaces of its text", async () => {
     const run = '<w:r><w:t xml:space="preserve"> sp a </w:t></w:r>';
-    const xml = await documentXml(body(<Paragraph key="p"><RawXml xml={run} /></Paragraph>));
+    const xml = await documentXml(
+      body(
+        <Paragraph key="p">
+          <RawXml xml={run} />
+        </Paragraph>,
+      ),
+    );
     expect(xml).toContain(`<w:p>${run}</w:p>`);
   });
 
   test("a whitespace-only text keeps its space", async () => {
     const run = '<w:r><w:t xml:space="preserve"> </w:t></w:r>';
-    const xml = await documentXml(body(<Paragraph key="p"><RawXml xml={run} /></Paragraph>));
+    const xml = await documentXml(
+      body(
+        <Paragraph key="p">
+          <RawXml xml={run} />
+        </Paragraph>,
+      ),
+    );
     expect(xml).toContain(`<w:p>${run}</w:p>`);
   });
 
@@ -53,29 +65,59 @@ describe("RawXml is written verbatim", () => {
 
   test("CDATA is written as escaped text", async () => {
     const run = "<w:r><w:t>x<![CDATA[ <a> & b ]]></w:t></w:r>";
-    const xml = await documentXml(body(<Paragraph key="p"><RawXml xml={run} /></Paragraph>));
+    const xml = await documentXml(
+      body(
+        <Paragraph key="p">
+          <RawXml xml={run} />
+        </Paragraph>,
+      ),
+    );
     expect(xml).toContain("<w:p><w:r><w:t>x &lt;a&gt; &amp; b </w:t></w:r></w:p>");
   });
 
   test("a comment or processing instruction inside text is dropped, and the text around it kept", async () => {
     const run = "<w:r><w:t>a<!--c-->b<?p?>c<![CDATA[d]]></w:t></w:r>";
-    const xml = await documentXml(body(<Paragraph key="p"><RawXml xml={run} /></Paragraph>));
+    const xml = await documentXml(
+      body(
+        <Paragraph key="p">
+          <RawXml xml={run} />
+        </Paragraph>,
+      ),
+    );
     expect(xml).toContain("<w:p><w:r><w:t>abcd</w:t></w:r></w:p>");
   });
 
   test("whitespace written as CDATA or a character reference between elements is dropped, not the elements", async () => {
     const run = "<w:r><w:t>a</w:t><![CDATA[ ]]>&#32;<w:tab/></w:r>";
-    const xml = await documentXml(body(<Paragraph key="p"><RawXml xml={run} /></Paragraph>));
+    const xml = await documentXml(
+      body(
+        <Paragraph key="p">
+          <RawXml xml={run} />
+        </Paragraph>,
+      ),
+    );
     expect(xml).toContain("<w:p><w:r><w:t>a</w:t><w:tab/></w:r></w:p>");
   });
 
   test("a space after an element is dropped, not the element", async () => {
-    const xml = await documentXml(body(<Paragraph key="p"><RawXml xml="<w:r><w:t>x</w:t> </w:r>" /></Paragraph>));
+    const xml = await documentXml(
+      body(
+        <Paragraph key="p">
+          <RawXml xml="<w:r><w:t>x</w:t> </w:r>" />
+        </Paragraph>,
+      ),
+    );
     expect(xml).toContain("<w:p><w:r><w:t>x</w:t></w:r></w:p>");
   });
 
   test("a space between two elements is dropped, and both elements kept", async () => {
-    const xml = await documentXml(body(<Paragraph key="p"><RawXml xml="<w:r><w:t>x</w:t> <w:tab/></w:r>" /></Paragraph>));
+    const xml = await documentXml(
+      body(
+        <Paragraph key="p">
+          <RawXml xml="<w:r><w:t>x</w:t> <w:tab/></w:r>" />
+        </Paragraph>,
+      ),
+    );
     expect(xml).toContain("<w:p><w:r><w:t>x</w:t><w:tab/></w:r></w:p>");
   });
 
@@ -88,8 +130,8 @@ describe("RawXml is written verbatim", () => {
           <TextRun>
             x<RawXml xml={field} />
           </TextRun>
-        </Paragraph>
-      )
+        </Paragraph>,
+      ),
     );
     expect(xml).toContain(`<w:p><w:r><w:t xml:space="preserve">x</w:t>${field}</w:r></w:p>`);
   });
@@ -105,8 +147,8 @@ describe("RawXml is written verbatim", () => {
               <Paragraph>end</Paragraph>
             </TableCell>
           </TableRow>
-        </Table>
-      )
+        </Table>,
+      ),
     );
     expect(xml).toContain(`<w:tc>${raw}<w:p><w:r><w:t xml:space="preserve">end</w:t></w:r></w:p></w:tc>`);
   });
@@ -119,7 +161,7 @@ describe("styles.importedStyles", () => {
       <Document styles={{ importedStyles: [tableGrid] }}>
         <Section />
       </Document>,
-      "word/styles.xml"
+      "word/styles.xml",
     );
     expect(styles).toContain(tableGrid);
     expect(styles).toContain('w:styleId="Heading1"');
@@ -131,7 +173,7 @@ describe("unsafe RawXml is rejected with a TreeError", () => {
   async function rejection(element: ReactElement): Promise<TreeError> {
     const error = await renderToBuffer(element).then(
       () => undefined,
-      (thrown: unknown) => thrown
+      (thrown: unknown) => thrown,
     );
     if (error instanceof TreeError) return error;
     throw new Error(`expected a TreeError, got ${String(error)}`);
@@ -139,14 +181,28 @@ describe("unsafe RawXml is rejected with a TreeError", () => {
 
   test("a relationship reference", async () => {
     const drawing = '<w:r><w:drawing><a:blip r:embed="rId5"/></w:drawing></w:r>';
-    const error = await rejection(body(<Paragraph key="p"><RawXml xml={drawing} /></Paragraph>));
+    const error = await rejection(
+      body(
+        <Paragraph key="p">
+          <RawXml xml={drawing} />
+        </Paragraph>,
+      ),
+    );
     expect(error.path).toEqual(["Document", "Section[0]", "Paragraph[0]", "RawXml[0]"]);
     expect(error.message).toContain("RawXml cannot carry relationship references (r:id, r:embed, …)");
   });
 
   test("a root that does not belong in its slot", async () => {
-    const error = await rejection(body(<Paragraph key="p"><RawXml xml="<w:p/>" /></Paragraph>));
-    expect(error.message).toBe("Document > Section[0] > Paragraph[0] > RawXml[0]: RawXml <w:p> is not allowed in <Paragraph>");
+    const error = await rejection(
+      body(
+        <Paragraph key="p">
+          <RawXml xml="<w:p/>" />
+        </Paragraph>,
+      ),
+    );
+    expect(error.message).toBe(
+      "Document > Section[0] > Paragraph[0] > RawXml[0]: RawXml <w:p> is not allowed in <Paragraph>",
+    );
   });
 
   test("a TableCell whose last child is RawXml", async () => {
@@ -158,10 +214,12 @@ describe("unsafe RawXml is rejected with a TreeError", () => {
               <RawXml xml="<w:p/>" />
             </TableCell>
           </TableRow>
-        </Table>
-      )
+        </Table>,
+      ),
     );
-    expect(error.message).toBe("Document > Section[0] > Table[0] > TableRow[0] > TableCell[0]: A TableCell must end with a <Paragraph>");
+    expect(error.message).toBe(
+      "Document > Section[0] > Table[0] > TableRow[0] > TableCell[0]: A TableCell must end with a <Paragraph>",
+    );
   });
 
   test("an imported style whose id docx.js already defines", async () => {
@@ -169,7 +227,7 @@ describe("unsafe RawXml is rejected with a TreeError", () => {
     const error = await rejection(
       <Document styles={{ importedStyles: [heading] }}>
         <Section />
-      </Document>
+      </Document>,
     );
     expect(error.message).toBe('Document: styles.importedStyles[0] defines style "Heading1", which is already defined');
   });

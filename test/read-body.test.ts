@@ -16,7 +16,11 @@ import { readDocx, type Diagnostic } from "../src/read/index";
 import { CASES } from "./support/cases";
 import { docx, part } from "./support/docx-fixture";
 
-type TreeNode = { readonly type: string; readonly props: Record<string, unknown>; readonly children: readonly (TreeNode | string)[] };
+type TreeNode = {
+  readonly type: string;
+  readonly props: Record<string, unknown>;
+  readonly children: readonly (TreeNode | string)[];
+};
 
 const OFFICE_RELS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 const HYPERLINK = `${OFFICE_RELS}/hyperlink`;
@@ -39,7 +43,11 @@ const blocks = (bytes: Uint8Array) => sections(bytes)[0].children as TreeNode[];
 const firstParagraph = (body: string) => blocks(docx({ body }))[0];
 const diagnosticsOf = (bytes: Uint8Array): readonly Diagnostic[] => readDocx(bytes).diagnostics;
 
-const node = (type: string, props: Record<string, unknown> = {}, children: readonly (TreeNode | string)[] = []): TreeNode => ({
+const node = (
+  type: string,
+  props: Record<string, unknown> = {},
+  children: readonly (TreeNode | string)[] = [],
+): TreeNode => ({
   type,
   props,
   children,
@@ -84,7 +92,9 @@ describe("fields", () => {
 
   test("NUMPAGES with \\* MERGEFORMAT is TOTAL_PAGES", () => {
     const body = `<w:p>${fldChar("begin")}${instr(" NUMPAGES  \\* MERGEFORMAT ")}${fldChar("separate")}${run("9")}${fldChar("end")}</w:p>`;
-    expect(firstParagraph(body).children).toEqual([node("TextRun", {}, [node("PageNumber", { field: "TOTAL_PAGES" })])]);
+    expect(firstParagraph(body).children).toEqual([
+      node("TextRun", {}, [node("PageNumber", { field: "TOTAL_PAGES" })]),
+    ]);
   });
 
   test("a DATE field becomes one inline RawXml holding all its runs, with a raw diagnostic", () => {
@@ -92,15 +102,31 @@ describe("fields", () => {
     const bytes = docx({ body: `<w:p>${field}</w:p>` });
     expect(blocks(bytes)[0].children).toEqual([node("RawXml", { xml: field })]);
     expect(diagnosticsOf(bytes)).toContainEqual(
-      expect.objectContaining({ kind: "raw", part: "word/document.xml", at: [0, 0], element: "w:fldChar" })
+      expect.objectContaining({ kind: "raw", part: "word/document.xml", at: [0, 0], element: "w:fldChar" }),
     );
   });
 
   test.each<[string, ReactElement, TreeNode]>([
-    ["SimpleField with a cached value", h(SimpleField, { instruction: "AUTHOR", cachedValue: "Ada" }), node("SimpleField", { instruction: "AUTHOR", cachedValue: "Ada" })],
-    ["SimpleField without one", h(SimpleField, { instruction: "AUTHOR" }), node("SimpleField", { instruction: "AUTHOR" })],
-    ["SimpleMailMergeField", h(SimpleMailMergeField, { fieldName: "First" }), node("SimpleMailMergeField", { fieldName: "First" })],
-    ["SequentialIdentifier", h(SequentialIdentifier, { identifier: "Figure" }), node("SequentialIdentifier", { identifier: "Figure" })],
+    [
+      "SimpleField with a cached value",
+      h(SimpleField, { instruction: "AUTHOR", cachedValue: "Ada" }),
+      node("SimpleField", { instruction: "AUTHOR", cachedValue: "Ada" }),
+    ],
+    [
+      "SimpleField without one",
+      h(SimpleField, { instruction: "AUTHOR" }),
+      node("SimpleField", { instruction: "AUTHOR" }),
+    ],
+    [
+      "SimpleMailMergeField",
+      h(SimpleMailMergeField, { fieldName: "First" }),
+      node("SimpleMailMergeField", { fieldName: "First" }),
+    ],
+    [
+      "SequentialIdentifier",
+      h(SequentialIdentifier, { identifier: "Figure" }),
+      node("SequentialIdentifier", { identifier: "Figure" }),
+    ],
     [
       "PageReference",
       h(PageReference, { bookmarkId: "b1", hyperlink: true, useRelativePosition: true }),
@@ -115,7 +141,9 @@ describe("fields", () => {
   test("TableOfContents reads back from docx.js output with the props it was written with", async () => {
     const toc = h(TableOfContents, { alias: "Contents", headingStyleRange: "1-3", hyperlink: true });
     const bytes = await renderToBuffer(h(Document, {}, h(Section, {}, toc)));
-    expect(blocks(bytes)).toEqual([node("TableOfContents", { alias: "Contents", headingStyleRange: "1-3", hyperlink: true })]);
+    expect(blocks(bytes)).toEqual([
+      node("TableOfContents", { alias: "Contents", headingStyleRange: "1-3", hyperlink: true }),
+    ]);
   });
 
   test("a PAGEREF with a cached page number stays RawXml", () => {
@@ -135,10 +163,17 @@ describe("fields", () => {
     const field = (result: string) =>
       `<w:p>${fldChar("begin")}${instr(" DATE ")}${fldChar("separate")}${result}${fldChar("end")}</w:p>`;
     const fieldCodeDropped = (element: string) =>
-      expect.objectContaining({ kind: "dropped", at: [0, 0], element: "w:fldChar", detail: expect.stringContaining(`<${element}>`) });
+      expect.objectContaining({
+        kind: "dropped",
+        at: [0, 0],
+        element: "w:fldChar",
+        detail: expect.stringContaining(`<${element}>`),
+      });
 
     test("permStart and permEnd around the result text: the text is kept, the permission marks ignored", () => {
-      const bytes = docx({ body: field(`<w:permStart w:id="0" w:edGrp="everyone"/>${run("3 Nov")}<w:permEnd w:id="0"/>`) });
+      const bytes = docx({
+        body: field(`<w:permStart w:id="0" w:edGrp="everyone"/>${run("3 Nov")}<w:permEnd w:id="0"/>`),
+      });
       expect(blocks(bytes)[0].children).toEqual([node("TextRun", {}, ["3 Nov"])]);
       expect(diagnosticsOf(bytes)).toContainEqual(fieldCodeDropped("w:permStart"));
     });
@@ -164,7 +199,7 @@ describe("fields", () => {
     });
     expect(blocks(bytes)).toEqual([node("Paragraph", {}, [node("TextRun", {}, ["Entry"])]), node("Paragraph")]);
     expect(diagnosticsOf(bytes)).toContainEqual(
-      expect.objectContaining({ kind: "dropped", at: [0, 0], element: "w:fldChar" })
+      expect.objectContaining({ kind: "dropped", at: [0, 0], element: "w:fldChar" }),
     );
   });
 });
@@ -202,14 +237,16 @@ describe("hyperlinks", () => {
 
 describe("bookmarks", () => {
   test("a bookmark opening and closing in one paragraph is a Bookmark named by w:name", () => {
-    const p = firstParagraph(`<w:p><w:bookmarkStart w:id="7" w:name="intro"/>${run("text")}<w:bookmarkEnd w:id="7"/></w:p>`);
+    const p = firstParagraph(
+      `<w:p><w:bookmarkStart w:id="7" w:name="intro"/>${run("text")}<w:bookmarkEnd w:id="7"/></w:p>`,
+    );
     expect(p.children).toEqual([node("Bookmark", { id: "intro" }, [node("TextRun", {}, ["text"])])]);
   });
 
   test("bookmarks nested with the same w:id, as docx.js writes them, read back nested", () => {
     const p = firstParagraph(
       `<w:p><w:bookmarkStart w:name="outer" w:id="1"/>${run("a")}<w:bookmarkStart w:name="inner" w:id="1"/>${run("b")}` +
-        '<w:bookmarkEnd w:id="1"/><w:bookmarkEnd w:id="1"/></w:p>'
+        '<w:bookmarkEnd w:id="1"/><w:bookmarkEnd w:id="1"/></w:p>',
     );
     expect(p.children).toEqual([
       node("Bookmark", { id: "outer" }, [
@@ -220,7 +257,9 @@ describe("bookmarks", () => {
   });
 
   test("a bookmark spanning paragraphs becomes two RawXml with its id moved to 100001", () => {
-    const bytes = docx({ body: `<w:p><w:bookmarkStart w:id="0" w:name="span"/>${run("a")}</w:p><w:p>${run("b")}<w:bookmarkEnd w:id="0"/></w:p>` });
+    const bytes = docx({
+      body: `<w:p><w:bookmarkStart w:id="0" w:name="span"/>${run("a")}</w:p><w:p>${run("b")}<w:bookmarkEnd w:id="0"/></w:p>`,
+    });
     const [first, second] = blocks(bytes);
     expect(first.children[0]).toEqual(node("RawXml", { xml: '<w:bookmarkStart w:id="100001" w:name="span"/>' }));
     expect(second.children[1]).toEqual(node("RawXml", { xml: '<w:bookmarkEnd w:id="100001"/>' }));
@@ -228,7 +267,9 @@ describe("bookmarks", () => {
 
   test("a bookmark ending inside a field kept as RawXml has both halves moved to the same id", () => {
     const fieldTail = `${fldChar("begin")}${instr(" DATE ")}${fldChar("separate")}${run("3 Nov")}`;
-    const p = firstParagraph(`<w:p><w:bookmarkStart w:id="7" w:name="bm"/>${fieldTail}<w:bookmarkEnd w:id="7"/>${fldChar("end")}</w:p>`);
+    const p = firstParagraph(
+      `<w:p><w:bookmarkStart w:id="7" w:name="bm"/>${fieldTail}<w:bookmarkEnd w:id="7"/>${fldChar("end")}</w:p>`,
+    );
     expect(p.children).toEqual([
       node("RawXml", { xml: '<w:bookmarkStart w:id="100001" w:name="bm"/>' }),
       node("RawXml", { xml: `${fieldTail}<w:bookmarkEnd w:id="100001"/>${fldChar("end")}` }),
@@ -236,7 +277,9 @@ describe("bookmarks", () => {
   });
 
   test("Word's _GoBack bookmark is ignored", () => {
-    const bytes = docx({ body: `<w:p>${run("a")}<w:bookmarkStart w:id="0" w:name="_GoBack"/><w:bookmarkEnd w:id="0"/></w:p>` });
+    const bytes = docx({
+      body: `<w:p>${run("a")}<w:bookmarkStart w:id="0" w:name="_GoBack"/><w:bookmarkEnd w:id="0"/></w:p>`,
+    });
     expect(blocks(bytes)[0].children).toEqual([node("TextRun", {}, ["a"])]);
     expect(diagnosticsOf(bytes)).toEqual([{ kind: "ignored", element: "_GoBack", count: 1 }]);
   });
@@ -258,8 +301,9 @@ describe("tables", () => {
 
   test("a cell ending in a table gets an empty Paragraph after it", () => {
     const inner = `<w:tbl><w:tr><w:tc><w:p/></w:tc></w:tr></w:tbl>`;
-    const cell = (blocks(docx({ body: `<w:tbl><w:tr><w:tc>${inner}</w:tc></w:tr></w:tbl>` }))[0].children[0] as TreeNode)
-      .children[0] as TreeNode;
+    const cell = (
+      blocks(docx({ body: `<w:tbl><w:tr><w:tc>${inner}</w:tc></w:tr></w:tbl>` }))[0].children[0] as TreeNode
+    ).children[0] as TreeNode;
     expect(cell.children.map((child) => (child as TreeNode).type)).toEqual(["Table", "Paragraph"]);
   });
 });
@@ -289,7 +333,8 @@ describe("sections", () => {
       body:
         `<w:p>${run("body")}</w:p><w:sectPr><w:headerReference w:type="default" r:id="rIdH1"/>` +
         '<w:headerReference w:type="first" r:id="rIdH2"/><w:footerReference w:type="default" r:id="rIdF1"/><w:titlePg/></w:sectPr>',
-      rels: rel("rIdH1", HEADER, "header1.xml") + rel("rIdH2", HEADER, "header2.xml") + rel("rIdF1", FOOTER, "footer1.xml"),
+      rels:
+        rel("rIdH1", HEADER, "header1.xml") + rel("rIdH2", HEADER, "header2.xml") + rel("rIdF1", FOOTER, "footer1.xml"),
       parts: {
         "word/header1.xml": part("w:hdr", `<w:p>${run("every page")}</w:p>`),
         "word/header2.xml": part("w:hdr", `<w:p>${run("first page")}</w:p>`),
@@ -321,7 +366,7 @@ describe("document properties and settings", () => {
         defaultTabStop: 720,
         features: { updateFields: true, trackRevisions: true },
       },
-      h(Section, {}, h(Paragraph, {}, "x"))
+      h(Section, {}, h(Paragraph, {}, "x")),
     );
     const bytes = await renderToBuffer(document);
     const { styles: _styles, ...props } = tree(readDocx(bytes).document).props;
@@ -344,7 +389,7 @@ describe("document properties and settings", () => {
   test("a part no reader reads is reported dropped by its path", () => {
     const bytes = docx({ body: "<w:p/>", parts: { "word/endnotes.xml": part("w:endnotes", "") } });
     expect(diagnosticsOf(bytes)).toContainEqual(
-      expect.objectContaining({ kind: "dropped", part: "word/endnotes.xml", at: null, element: "word/endnotes.xml" })
+      expect.objectContaining({ kind: "dropped", part: "word/endnotes.xml", at: null, element: "word/endnotes.xml" }),
     );
   });
 });
@@ -354,16 +399,21 @@ describe("styles", () => {
     '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style>' +
     '<w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:basedOn w:val="Normal"/><w:rPr><w:b/></w:rPr></w:style>' +
     '<w:style w:type="paragraph" w:customStyle="1" w:styleId="MyStyle"><w:name w:val="My Style"/></w:style>';
-  const read = () => tree(readDocx(docx({ body: `<w:p><w:pPr><w:pStyle w:val="MyStyle"/></w:pPr>${run("x")}</w:p>`, styles })).document);
+  const read = () =>
+    tree(readDocx(docx({ body: `<w:p><w:pPr><w:pStyle w:val="MyStyle"/></w:pPr>${run("x")}</w:p>`, styles })).document);
 
   test("Word's default style Normal is kept raw in importedStyles", () => {
     expect(read().props.styles).toMatchObject({
-      importedStyles: ['<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style>'],
+      importedStyles: [
+        '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style>',
+      ],
     });
   });
 
   test("Heading1 lands in styles.default.heading1 through canonicalize", () => {
-    expect(read().props.styles).toMatchObject({ default: { heading1: { name: "heading 1", basedOn: "Normal", run: { bold: true } } } });
+    expect(read().props.styles).toMatchObject({
+      default: { heading1: { name: "heading 1", basedOn: "Normal", run: { bold: true } } },
+    });
   });
 
   test("a custom style stays in paragraphStyles and the paragraph keeps its style id", () => {
@@ -392,7 +442,9 @@ describe("the generic fallback", () => {
       rels: rel("rId1", HYPERLINK, "https://example.com", true),
     });
     expect(blocks(bytes)).toEqual([
-      node("Paragraph", {}, [node("ExternalHyperlink", { link: "https://example.com" }, [node("TextRun", {}, ["link"])])]),
+      node("Paragraph", {}, [
+        node("ExternalHyperlink", { link: "https://example.com" }, [node("TextRun", {}, ["link"])]),
+      ]),
     ]);
     expect(diagnosticsOf(bytes)).toContainEqual(expect.objectContaining({ kind: "dropped", element: "w:sdt" }));
   });
@@ -406,11 +458,17 @@ describe("the generic fallback", () => {
   });
 
   test("w:rsid attributes produce no diagnostic", () => {
-    expect(diagnosticsOf(docx({ body: `<w:p w:rsidR="00A1" w:rsidRDefault="00B2"><w:r w:rsidRPr="00C3"><w:t>x</w:t></w:r></w:p>` }))).toEqual([]);
+    expect(
+      diagnosticsOf(
+        docx({ body: `<w:p w:rsidR="00A1" w:rsidRDefault="00B2"><w:r w:rsidRPr="00C3"><w:t>x</w:t></w:r></w:p>` }),
+      ),
+    ).toEqual([]);
   });
 
   test("w:proofErr is counted ignored", () => {
-    const bytes = docx({ body: `<w:p><w:proofErr w:type="spellStart"/>${run("teh")}<w:proofErr w:type="spellEnd"/></w:p>` });
+    const bytes = docx({
+      body: `<w:p><w:proofErr w:type="spellStart"/>${run("teh")}<w:proofErr w:type="spellEnd"/></w:p>`,
+    });
     expect(diagnosticsOf(bytes)).toEqual([{ kind: "ignored", element: "w:proofErr", count: 2 }]);
   });
 });

@@ -42,7 +42,9 @@ const firstRow = (table: XmlElement | null) => childNamed(table, "w:tr");
 const xmlOf = (el: XmlElement | null): string => (el === null ? "" : serializeXml(el));
 
 export async function runPropertiesXml(options: RunOptions): Promise<string> {
-  const paragraph = await firstParagraph(new docx.Paragraph({ children: [new docx.TextRun({ ...options, text: "x" })] }));
+  const paragraph = await firstParagraph(
+    new docx.Paragraph({ children: [new docx.TextRun({ ...options, text: "x" })] }),
+  );
   return xmlOf(childNamed(childNamed(paragraph, "w:r"), "w:rPr"));
 }
 

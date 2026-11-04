@@ -94,7 +94,8 @@ function runItems(elements: readonly XmlElement[], walk: Walk): RunItem[] {
       case "w:sym": {
         const char = attrOf(el, "w:char");
         const font = attrOf(el, "w:font");
-        if (char !== null && SYMBOL_CHAR.test(char)) items.push(node("SymbolRun", { char, ...(font === null ? {} : { symbolfont: font }) }));
+        if (char !== null && SYMBOL_CHAR.test(char))
+          items.push(node("SymbolRun", { char, ...(font === null ? {} : { symbolfont: font }) }));
         break;
       }
       default:
@@ -113,7 +114,10 @@ function run(r: XmlElement, walk: Walk): InlineNode[] {
     content = [];
   };
   for (const item of runItems(elementsOf(r), walk)) {
-    if (typeof item === "string" || (item.type !== "PageBreak" && item.type !== "ColumnBreak" && item.type !== "SymbolRun")) {
+    if (
+      typeof item === "string" ||
+      (item.type !== "PageBreak" && item.type !== "ColumnBreak" && item.type !== "SymbolRun")
+    ) {
       content.push(item);
       continue;
     }
@@ -171,7 +175,9 @@ function rows(elements: readonly XmlElement[], walk: Walk): Node<"TableRow">[] {
 }
 
 function cellsOf(elements: readonly XmlElement[], walk: Walk): Node<"TableCell">[] {
-  return elements.flatMap((el) => (el.name === "w:tc" ? [cell(el, walk)] : WRAPPERS.has(el.name) ? cellsOf(wrapped(el), walk) : []));
+  return elements.flatMap((el) =>
+    el.name === "w:tc" ? [cell(el, walk)] : WRAPPERS.has(el.name) ? cellsOf(wrapped(el), walk) : [],
+  );
 }
 
 function blocks(elements: readonly XmlElement[], walk: Walk): BlockNode[] {

@@ -77,7 +77,6 @@ const TEXT_DIRECTIONS: readonly ValueOf<typeof docx.TextDirection>[] = ["btLr", 
 const PERCENT = /^-?[0-9]+(\.[0-9]+)?%$/;
 const FIFTIETHS_PER_PERCENT = 50;
 
-
 function measureAt(el: XmlElement, type: WidthType, notes: Note[]): Measure | null {
   const value = requiredAttr(el, "w:w", notes);
   if (value === null) return null;
@@ -264,7 +263,10 @@ function readGrid(tblGrid: XmlElement | null, notes: Note[]): number[] | null {
 const TABLE_SIDES = ["top", "left", "bottom", "right", "insideHorizontal", "insideVertical"] as const;
 const NO_BORDER: docx.IBorderOptions = { style: "none", size: 0, color: "auto" };
 
-export function tableStyleBorders(styles: XmlElement | null, env: CodecEnv): ReadonlyMap<string, docx.ITableBordersOptions> {
+export function tableStyleBorders(
+  styles: XmlElement | null,
+  env: CodecEnv,
+): ReadonlyMap<string, docx.ITableBordersOptions> {
   const own = new Map<string, { basedOn: string | null; borders: docx.ITableBordersOptions }>();
   let defaultId: string | null = null;
   for (const style of elementsOf(styles)) {
@@ -296,7 +298,11 @@ function withStyleBorders(options: Draft<TableOptions>, env: CodecEnv, notes: No
   const borders: Draft<docx.ITableBordersOptions> = {};
   for (const side of TABLE_SIDES) borders[side] = own[side] ?? style[side] ?? NO_BORDER;
   options.borders = borders;
-  notes.push({ fate: "resolved", element: "w:tblBorders", detail: "sides the table does not give are its table style's, or none" });
+  notes.push({
+    fate: "resolved",
+    element: "w:tblBorders",
+    detail: "sides the table does not give are its table style's, or none",
+  });
 }
 
 export function readTableProperties(tbl: XmlElement, env: CodecEnv): CodecResult<TableOptions> {

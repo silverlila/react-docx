@@ -74,7 +74,10 @@ function matchingEnd(items: readonly Item[], begin: number): number | null {
   return null;
 }
 
-export function fieldSpans(items: readonly Item[]): { readonly spans: Map<number, number>; readonly unclosed: Set<number> } {
+export function fieldSpans(items: readonly Item[]): {
+  readonly spans: Map<number, number>;
+  readonly unclosed: Set<number>;
+} {
   const spans = new Map<number, number>();
   const unclosed = new Set<number>();
   for (let i = 0; i < items.length; i++) {
@@ -118,10 +121,16 @@ function rawRunsOf(span: readonly Item[]): XmlElement[] {
   return out;
 }
 
-function writerShapedField(instruction: string, span: readonly Item[], separate: number | null, result: readonly Item[]): AuthorNode | null {
+function writerShapedField(
+  instruction: string,
+  span: readonly Item[],
+  separate: number | null,
+  result: readonly Item[],
+): AuthorNode | null {
   if (span.some((item) => item.kind === "element" || hasRunProperties(item.run))) return null;
   const seq = SEQ.exec(instruction);
-  if (seq !== null && separate !== null && result.length === 0) return node("SequentialIdentifier", { identifier: seq[1] });
+  if (seq !== null && separate !== null && result.length === 0)
+    return node("SequentialIdentifier", { identifier: seq[1] });
   const pageRef = PAGEREF.exec(instruction);
   if (pageRef === null || separate !== null) return null;
   return node("PageReference", {
@@ -189,11 +198,16 @@ const DEFAULT_UNCHECKED = { value: "2610", font: "MS Gothic" };
 
 export const isCheckBox = (sdt: XmlElement): boolean => childNamed(childNamed(sdt, "w:sdtPr"), "w14:checkbox") !== null;
 
-function symbolState(el: XmlElement, defaults: typeof DEFAULT_CHECKED, notes: Note[]): docx.ICheckboxSymbolProperties | null {
+function symbolState(
+  el: XmlElement,
+  defaults: typeof DEFAULT_CHECKED,
+  notes: Note[],
+): docx.ICheckboxSymbolProperties | null {
   const state: Mutable<docx.ICheckboxSymbolProperties> = {};
   const value = attrOf(el, "w14:val");
   const font = attrOf(el, "w14:font");
-  if (value !== null && !SYMBOL_CHAR.test(value)) notes.push(dropped(el.name, `w14:val="${value}" is not a 4-digit hex symbol`));
+  if (value !== null && !SYMBOL_CHAR.test(value))
+    notes.push(dropped(el.name, `w14:val="${value}" is not a 4-digit hex symbol`));
   else if (value !== null && value.toUpperCase() !== defaults.value) state.value = value;
   if (font !== null && font !== defaults.font) state.font = font;
   return Object.keys(state).length === 0 ? null : state;
@@ -312,7 +326,10 @@ export function readTableOfContents(sdt: XmlElement): AuthorNode | null {
   const begin = onlyRun(first);
   const end = onlyRun(last);
   if (begin === null || end === null) return null;
-  if (fldChars(begin).join(" ") !== "fldChar:begin w:instrText fldChar:separate" || fldChars(end).join(" ") !== "fldChar:end") {
+  if (
+    fldChars(begin).join(" ") !== "fldChar:begin w:instrText fldChar:separate" ||
+    fldChars(end).join(" ") !== "fldChar:end"
+  ) {
     return null;
   }
   const options = tocOptions(textOf(elementsOf(begin)[1]));

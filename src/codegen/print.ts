@@ -138,14 +138,17 @@ function printElement(node: Node, indent: number, assets: AssetMap): string {
 function openTag(type: string, attributes: [string, unknown][], indent: number): { open: string; stacked: boolean } {
   const flat = `<${type}${attributes.map(([name, value]) => ` ${attribute(name, value, flatValue)}`).join("")}`;
   if (fits(`${flat}>`, indent)) return { open: flat, stacked: false };
-  if (attributes.length === 1) return { open: `<${type} ${brokenAttribute(attributes[0], indent, indent + type.length + 2)}`, stacked: false };
+  if (attributes.length === 1)
+    return { open: `<${type} ${brokenAttribute(attributes[0], indent, indent + type.length + 2)}`, stacked: false };
   const inner = indent + 2;
   const lines = attributes.map((entry) => `\n${pad(inner)}${brokenAttribute(entry, inner, inner)}`);
   return { open: `<${type}${lines.join("")}\n${pad(indent)}`, stacked: true };
 }
 
 function flatElement(node: Node, assets: AssetMap): string {
-  const open = `<${node.type}${attributesOf(node, assets).map(([name, value]) => ` ${attribute(name, value, flatValue)}`).join("")}`;
+  const open = `<${node.type}${attributesOf(node, assets)
+    .map(([name, value]) => ` ${attribute(name, value, flatValue)}`)
+    .join("")}`;
   if (node.children.length === 0) return `${open} />`;
   return `${open}>${node.children.map((child) => flatChild(child, assets)).join("")}</${node.type}>`;
 }
@@ -187,7 +190,8 @@ function codeProps(node: Node, assets: AssetMap): object {
     }
     case "ImageRun": {
       const fallback = fallbackOf(node.props);
-      const printed = fallback === undefined ? {} : { fallback: { ...fallback, data: readAsset(fallback.data, assets) } };
+      const printed =
+        fallback === undefined ? {} : { fallback: { ...fallback, data: readAsset(fallback.data, assets) } };
       return { ...node.props, data: readAsset(node.props.data, assets), ...printed };
     }
     case "RawXml":

@@ -101,7 +101,7 @@ function footnoteBodies(ctx: BuildCtx) {
     ctx.footnotes.map((footnote, i) => [
       i + 1,
       { children: asChildren<docx.Paragraph>(buildAll(footnote.children, ctx)) },
-    ])
+    ]),
   );
 }
 
@@ -146,7 +146,7 @@ type RunChildren = { readonly children?: NonNullable<docx.IRunOptions["children"
 function buildRun<P, R>(
   Run: new (options: NoInfer<P> & RunChildren) => R,
   { props, children }: { readonly props: P; readonly children: readonly RunChild[] },
-  ctx: BuildCtx
+  ctx: BuildCtx,
 ): R {
   const built = children.map((child) => (typeof child === "string" ? child : build(child, ctx)));
   return new Run({ ...props, children: built.length === 0 ? undefined : inPlace(built) });
@@ -166,7 +166,7 @@ function buildDeletedRun(node: Node<"DeletedTextRun">, ctx: BuildCtx): docx.Dele
   const children = node.children.map((child) =>
     typeof child === "object" && child.type === "PageNumber" && child.props.field === docx.PageNumber.CURRENT_SECTION
       ? DELETED_SECTION_FIELD
-      : child
+      : child,
   );
   return buildRun(docx.DeletedTextRun, { props: node.props, children }, ctx);
 }
@@ -182,8 +182,7 @@ const BUILD: { readonly [K in Kind]: (node: Node<K>, ctx: BuildCtx) => Built[K] 
   TextRun: (node, ctx) => buildRun(docx.TextRun, node, ctx),
   Table: ({ props, children }, ctx) => new docx.Table({ ...props, rows: buildAll(children, ctx) }),
   TableRow: ({ props, children }, ctx) => new docx.TableRow({ ...props, children: buildAll(children, ctx) }),
-  TableCell: ({ props, children }, ctx) =>
-    new docx.TableCell({ ...props, children: inPlace(buildAll(children, ctx)) }),
+  TableCell: ({ props, children }, ctx) => new docx.TableCell({ ...props, children: inPlace(buildAll(children, ctx)) }),
   Tab: () => new docx.Tab(),
   PageNumber: ({ props }) => props.field,
   ImageRun: ({ props }) => new docx.ImageRun(props),
@@ -225,4 +224,3 @@ const BUILD: { readonly [K in Kind]: (node: Node<K>, ctx: BuildCtx) => Built[K] 
   YearShort: () => new docx.YearShort(),
   YearLong: () => new docx.YearLong(),
 };
-

@@ -73,11 +73,19 @@ export function readNotesParts(ctx: ReadContext): NotesReader {
     footnote(id, at) {
       const footnote = footnotes.get(id);
       if (footnote === undefined) {
-        at.report({ kind: "dropped", element: "w:footnoteReference", detail: `footnote ${id} is not in ${footnotesPart}` });
+        at.report({
+          kind: "dropped",
+          element: "w:footnoteReference",
+          detail: `footnote ${id} is not in ${footnotesPart}`,
+        });
         return null;
       }
       if (referenced.has(id)) {
-        at.report({ kind: "resolved", element: "w:footnoteReference", detail: `footnote ${id} referenced twice; content duplicated` });
+        at.report({
+          kind: "resolved",
+          element: "w:footnoteReference",
+          detail: `footnote ${id} referenced twice; content duplicated`,
+        });
       }
       referenced.add(id);
       return withoutMarkRun(footnote, "w:footnoteRef", ctx);
@@ -87,13 +95,21 @@ export function readNotesParts(ctx: ReadContext): NotesReader {
     },
     comments() {
       return [...comments]
-        .map(([id, comment]) => ({ id: commentOrdinal(id), comment, content: withoutMarkRun(comment, "w:annotationRef", ctx) }))
+        .map(([id, comment]) => ({
+          id: commentOrdinal(id),
+          comment,
+          content: withoutMarkRun(comment, "w:annotationRef", ctx),
+        }))
         .sort((a, b) => a.id - b.id);
     },
     reportUnreferenced() {
       for (const id of footnotes.keys()) {
         if (referenced.has(id)) continue;
-        footnotesHere.report({ kind: "dropped", element: "w:footnote", detail: `footnote ${id} is never referenced, and docx.js writes only referenced footnotes` });
+        footnotesHere.report({
+          kind: "dropped",
+          element: "w:footnote",
+          detail: `footnote ${id} is never referenced, and docx.js writes only referenced footnotes`,
+        });
       }
     },
   };

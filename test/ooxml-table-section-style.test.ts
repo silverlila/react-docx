@@ -208,9 +208,9 @@ describe("readTableProperties", () => {
   test("reads the column widths from w:tblGrid, beside w:tblPr", () => {
     const read = readTableProperties(
       parseXml(
-        '<w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/></w:tblPr><w:tblGrid><w:gridCol w:w="2880"/><w:gridCol w:w="5760"/></w:tblGrid></w:tbl>'
+        '<w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/></w:tblPr><w:tblGrid><w:gridCol w:w="2880"/><w:gridCol w:w="5760"/></w:tblGrid></w:tbl>',
       ),
-      EMPTY_ENV
+      EMPTY_ENV,
     );
     expect(read.options).toEqual({ style: "TableGrid", columnWidths: [2880, 5760] });
     expect(read.notes).toEqual([]);
@@ -219,9 +219,9 @@ describe("readTableProperties", () => {
   test("drops w:tblLook, which docx.js has no option for", () => {
     const read = readTableProperties(
       parseXml(
-        '<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/><w:tblLook w:val="04A0" w:firstRow="1"/></w:tblPr></w:tbl>'
+        '<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/><w:tblLook w:val="04A0" w:firstRow="1"/></w:tblPr></w:tbl>',
       ),
-      EMPTY_ENV
+      EMPTY_ENV,
     );
     expect(read.options).toEqual({ width: { size: 0, type: "auto" } });
     expect(read.notes).toEqual([{ fate: "dropped", element: "w:tblLook", detail: expect.any(String) }]);
@@ -230,7 +230,7 @@ describe("readTableProperties", () => {
   test("reads Word's pct width, in fiftieths of a percent, as a percentage", () => {
     const read = readTableProperties(
       parseXml('<w:tbl><w:tblPr><w:tblW w:w="2500" w:type="pct"/></w:tblPr></w:tbl>'),
-      EMPTY_ENV
+      EMPTY_ENV,
     );
     expect(read.options).toEqual({ width: { size: "50%", type: "pct" } });
   });
@@ -238,9 +238,9 @@ describe("readTableProperties", () => {
   test("reads Word's w:tblOverlap beside w:tblpPr into the float", () => {
     const read = readTableProperties(
       parseXml(
-        '<w:tbl><w:tblPr><w:tblpPr w:horzAnchor="page" w:tblpX="500"/><w:tblOverlap w:val="never"/></w:tblPr></w:tbl>'
+        '<w:tbl><w:tblPr><w:tblpPr w:horzAnchor="page" w:tblpX="500"/><w:tblOverlap w:val="never"/></w:tblPr></w:tbl>',
       ),
-      EMPTY_ENV
+      EMPTY_ENV,
     );
     expect(read.options).toEqual({
       float: { horizontalAnchor: "page", absoluteHorizontalPosition: 500, overlap: "never" },
@@ -253,7 +253,7 @@ describe("readCellProperties", () => {
   test("reads a w:vMerge with no w:val as a continuation", () => {
     const read = readCellProperties(
       parseXml('<w:tcPr><w:tcW w:w="2880" w:type="dxa"/><w:vMerge/></w:tcPr>'),
-      EMPTY_ENV
+      EMPTY_ENV,
     );
     expect(read.options).toEqual({ width: { size: 2880, type: "dxa" }, verticalMerge: "continue" });
     expect(read.notes).toEqual([]);
@@ -304,7 +304,7 @@ describe("readSectionProperties", () => {
   test("reads a landscape page size as docx.js's portrait width and height", () => {
     const read = readSectionProperties(
       parseXml('<w:sectPr><w:pgSz w:w="16838" w:h="11906" w:orient="landscape"/></w:sectPr>'),
-      EMPTY_ENV
+      EMPTY_ENV,
     );
     expect(read.options).toEqual({
       properties: { page: { size: { width: 11906, height: 16838, orientation: "landscape" } } },
@@ -320,9 +320,9 @@ describe("readSectionProperties", () => {
   test("drops each w:col, because docx.js needs Column instances for them", () => {
     const read = readSectionProperties(
       parseXml(
-        '<w:sectPr><w:cols w:num="2" w:equalWidth="0"><w:col w:w="3000" w:space="720"/><w:col w:w="5000"/></w:cols></w:sectPr>'
+        '<w:sectPr><w:cols w:num="2" w:equalWidth="0"><w:col w:w="3000" w:space="720"/><w:col w:w="5000"/></w:cols></w:sectPr>',
       ),
-      EMPTY_ENV
+      EMPTY_ENV,
     );
     expect(read.options).toEqual({ properties: { column: { count: 2, equalWidth: false } } });
     expect(read.notes.map((note) => [note.fate, note.element])).toEqual([
@@ -336,9 +336,9 @@ describe("readLevel", () => {
   test("reads a Word bullet level, ignoring the tentative attribute", () => {
     const read = readLevel(
       parseXml(
-        '<w:lvl w:ilvl="1" w:tplc="04090003" w:tentative="1"><w:start w:val="1"/><w:numFmt w:val="bullet"/><w:lvlText w:val="o"/><w:lvlJc w:val="left"/><w:pPr><w:ind w:left="1440" w:hanging="360"/></w:pPr><w:rPr><w:rFonts w:ascii="Courier New" w:hAnsi="Courier New" w:cs="Courier New" w:hint="default"/></w:rPr></w:lvl>'
+        '<w:lvl w:ilvl="1" w:tplc="04090003" w:tentative="1"><w:start w:val="1"/><w:numFmt w:val="bullet"/><w:lvlText w:val="o"/><w:lvlJc w:val="left"/><w:pPr><w:ind w:left="1440" w:hanging="360"/></w:pPr><w:rPr><w:rFonts w:ascii="Courier New" w:hAnsi="Courier New" w:cs="Courier New" w:hint="default"/></w:rPr></w:lvl>',
       ),
-      EMPTY_ENV
+      EMPTY_ENV,
     );
     expect(read.options).toEqual({
       level: 1,
@@ -377,9 +377,9 @@ describe("readStyle", () => {
   test("drops a raw style that carries an r: reference", () => {
     const read = readStyle(
       parseXml(
-        '<w:style w:type="numbering" w:styleId="Bullets"><w:name w:val="Bullets"/><w:pPr><w:numPr><w:numId r:id="rId1"/></w:numPr></w:pPr></w:style>'
+        '<w:style w:type="numbering" w:styleId="Bullets"><w:name w:val="Bullets"/><w:pPr><w:numPr><w:numId r:id="rId1"/></w:numPr></w:pPr></w:style>',
       ),
-      EMPTY_ENV
+      EMPTY_ENV,
     );
     expect(read).toEqual({ kind: "dropped", because: expect.stringContaining("r:") });
   });
@@ -387,7 +387,7 @@ describe("readStyle", () => {
   test("drops a raw style whose text stands beside child elements, which docx.js cannot write", () => {
     const read = readStyle(
       parseXml('<w:style w:type="table" w:styleId="T">text<w:name w:val="T"/></w:style>'),
-      EMPTY_ENV
+      EMPTY_ENV,
     );
     expect(read).toEqual({ kind: "dropped", because: expect.stringContaining("mixes text") });
   });
@@ -395,9 +395,9 @@ describe("readStyle", () => {
   test("returns a paragraph style's w:numPr beside its options", () => {
     const read = readStyle(
       parseXml(
-        '<w:style w:type="paragraph" w:styleId="ListBullet"><w:name w:val="List Bullet"/><w:basedOn w:val="Normal"/><w:pPr><w:numPr><w:numId w:val="4"/></w:numPr><w:ind w:left="360"/></w:pPr></w:style>'
+        '<w:style w:type="paragraph" w:styleId="ListBullet"><w:name w:val="List Bullet"/><w:basedOn w:val="Normal"/><w:pPr><w:numPr><w:numId w:val="4"/></w:numPr><w:ind w:left="360"/></w:pPr></w:style>',
       ),
-      EMPTY_ENV
+      EMPTY_ENV,
     );
     expect(read).toEqual({
       kind: "paragraph",
@@ -412,9 +412,9 @@ describe("readDocDefaults", () => {
   test("reads Word's document defaults into run and paragraph", () => {
     const read = readDocDefaults(
       parseXml(
-        '<w:docDefaults><w:rPrDefault><w:rPr><w:sz w:val="22"/><w:lang w:val="en-US"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="160" w:line="259" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>'
+        '<w:docDefaults><w:rPrDefault><w:rPr><w:sz w:val="22"/><w:lang w:val="en-US"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="160" w:line="259" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>',
       ),
-      EMPTY_ENV
+      EMPTY_ENV,
     );
     expect(read.options).toEqual({
       run: { size: 22, language: { value: "en-US" } },

@@ -139,14 +139,12 @@ const THEME_FONTS = new Map<string, readonly [keyof ThemeFonts, keyof ThemeFontS
   ["minorBidi", ["minor", "complex"]],
 ]);
 
-
 const to = <K extends keyof RunOptions>(key: K, read: ValueReader<NonNullable<Draft<RunOptions>[K]>>) =>
   mapTo<RunOptions, K>(key, read);
 
 const offIsWritable = (key: RunFlag): boolean => !WRITTEN_ONLY_WHEN_ON.includes(key);
 
 const flag = (key: RunFlag) => to(key, onOff(offIsWritable(key)));
-
 
 const nonZero =
   (read: ValueReader<number>): ValueReader<number> =>
@@ -287,7 +285,12 @@ const RPR_FATES: FateTable<RunOptions> = {
   "w:rPrChange": to("revision", readRevision),
 };
 
-function twinOption<V>(main: V | undefined, twin: V | undefined, element: string, notes: Note[]): V | false | undefined {
+function twinOption<V>(
+  main: V | undefined,
+  twin: V | undefined,
+  element: string,
+  notes: Note[],
+): V | false | undefined {
   if (twin === undefined || twin === main) return undefined;
   if (twin) return twin;
   notes.push(dropped(element, EXPLICIT_OFF));
@@ -313,7 +316,7 @@ export function readRunProperties(rPr: XmlElement | null, env: CodecEnv): CodecR
   settle(
     options,
     "highlightComplexScript",
-    twinOption(options.highlight, options.highlightComplexScript, "w:highlightCs", notes)
+    twinOption(options.highlight, options.highlightComplexScript, "w:highlightCs", notes),
   );
   if (options.smallCaps !== undefined && options.allCaps !== undefined) {
     notes.push(dropped("w:caps", "docx.js writes w:caps only when smallCaps is unset"));

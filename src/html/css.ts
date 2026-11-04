@@ -39,7 +39,10 @@ export const pt = (n: number): string => `${n}pt`;
 const SCRIPT_SCALE = 0.65;
 
 function textDecoration(r: ComputedRun): CSSProperties {
-  const lines = [...(r.underline === null ? [] : ["underline"]), ...(r.strike || r.doubleStrike ? ["line-through"] : [])];
+  const lines = [
+    ...(r.underline === null ? [] : ["underline"]),
+    ...(r.strike || r.doubleStrike ? ["line-through"] : []),
+  ];
   if (lines.length === 0) return { textDecorationLine: "none" };
   const style =
     r.underline !== null && isOwnKey(UNDERLINE_STYLES, r.underline)
@@ -80,7 +83,10 @@ function lineHeight(p: ComputedParagraph): CSSProperties["lineHeight"] {
   return line.kind === "multiple" ? line.value * lineHeightOf(p.markRun.fontFamily) : pt(line.pt);
 }
 
-const spacing = (p: ComputedParagraph): CSSProperties => ({ paddingTop: pt(p.spaceBeforePt), paddingBottom: pt(p.spaceAfterPt) });
+const spacing = (p: ComputedParagraph): CSSProperties => ({
+  paddingTop: pt(p.spaceBeforePt),
+  paddingBottom: pt(p.spaceAfterPt),
+});
 
 export function paragraphStyle(p: ComputedParagraph): CSSProperties {
   const { top, bottom, left, right } = p.borders;

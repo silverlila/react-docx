@@ -80,7 +80,12 @@ export function decimalFormats(levels: readonly docx.ILevelsOptions[], level: nu
     .filter((format) => !isOwnKey(NUMBER_FORMATS, format));
 }
 
-export function markerText(levels: readonly docx.ILevelsOptions[], counters: Counters, key: string, level: number): string {
+export function markerText(
+  levels: readonly docx.ILevelsOptions[],
+  counters: Counters,
+  key: string,
+  level: number,
+): string {
   const startOf = (n: number): number => levelOf(levels, n)?.start ?? 1;
   const counts = counters.get(key) ?? [];
   counts[level] = counts[level] === undefined ? startOf(level) : counts[level] + 1;

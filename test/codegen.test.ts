@@ -62,9 +62,13 @@ const REAL_FILES = realFiles();
 const REAL_FILE_TIMEOUT_MS = 30_000;
 
 describe.skipIf(REAL_FILES.length === 0)("a printed real file renders the tree it was printed from", () => {
-  test.each(REAL_FILES.map((f, i) => [f.name, i, f] as const))("%s", async (_name, i, { bytes }) => {
-    await roundTrips(`real-${i}`, readDocx(bytes).document);
-  }, REAL_FILE_TIMEOUT_MS);
+  test.each(REAL_FILES.map((f, i) => [f.name, i, f] as const))(
+    "%s",
+    async (_name, i, { bytes }) => {
+      await roundTrips(`real-${i}`, readDocx(bytes).document);
+    },
+    REAL_FILE_TIMEOUT_MS,
+  );
 });
 
 describe("printing rules", () => {
@@ -95,7 +99,9 @@ describe("printing rules", () => {
   });
 
   test("a false boolean prints as an expression", () => {
-    expect(printJsx(paragraph(n("TextRun", { bold: false }, "x"))).source).toContain("<TextRun bold={false}>x</TextRun>");
+    expect(printJsx(paragraph(n("TextRun", { bold: false }, "x"))).source).toContain(
+      "<TextRun bold={false}>x</TextRun>",
+    );
   });
 
   test.each([
@@ -122,7 +128,7 @@ describe("printing rules", () => {
     const xml = '<w:p><w:r><w:t xml:space="preserve">a `b` ${x} \\n</w:t></w:r></w:p>';
     const tree = doc(n("RawXml", { xml }));
     expect(printJsx(tree).source).toContain(
-      '<RawXml xml={`<w:p><w:r><w:t xml:space="preserve">a \\`b\\` \\${x} \\\\n</w:t></w:r></w:p>`} />'
+      '<RawXml xml={`<w:p><w:r><w:t xml:space="preserve">a \\`b\\` \\${x} \\\\n</w:t></w:r></w:p>`} />',
     );
     await roundTrips("rule-raw-xml", tree);
   });
@@ -147,16 +153,20 @@ describe("printing rules", () => {
         "          >",
         "            x",
         "          </TextRun>",
-      ].join("\n")
+      ].join("\n"),
     );
     for (const line of source.split("\n")) expect(line.length).toBeLessThanOrEqual(100);
   });
 
   test("styles and numbering are hoisted to consts and referenced by name", () => {
     const styles = { paragraphStyles: [{ id: "MyStyle", name: "My Style", run: { bold: true } }] };
-    const tree = canonicalize(n("Document", { title: "T", styles }, n("Section", {}, n("Paragraph", { style: "MyStyle" }))));
+    const tree = canonicalize(
+      n("Document", { title: "T", styles }, n("Section", {}, n("Paragraph", { style: "MyStyle" }))),
+    );
     const { source } = printJsx(tree);
-    expect(source).toContain('const styles = { paragraphStyles: [{ id: "MyStyle", name: "My Style", run: { bold: true } }] };');
+    expect(source).toContain(
+      'const styles = { paragraphStyles: [{ id: "MyStyle", name: "My Style", run: { bold: true } }] };',
+    );
     expect(source).toContain('<Document title="T" styles={styles}>');
     expect(source).not.toContain("const numbering");
   });
@@ -172,14 +182,21 @@ describe("printing rules", () => {
     const printed = printJsx(tree);
     expect(printed.assets.map((asset) => asset.path)).toEqual(["assets/image1.png"]);
     expect(printed.assets[0].bytes).toEqual(PNG_1PX);
-    expect(printed.source.match(/readFileSync\(new URL\("\.\/assets\/image1\.png", import\.meta\.url\)\)/g)).toHaveLength(2);
+    expect(
+      printed.source.match(/readFileSync\(new URL\("\.\/assets\/image1\.png", import\.meta\.url\)\)/g),
+    ).toHaveLength(2);
     await roundTrips("rule-shared-asset", tree);
   });
 
   test("an SVG and its raster fallback are separate assets, numbered in document order", () => {
     const svg = new TextEncoder().encode("<svg/>");
     const tree = paragraph(
-      n("ImageRun", { type: "svg", data: svg, fallback: { type: "png", data: PNG_1PX }, transformation: { width: 1, height: 1 } })
+      n("ImageRun", {
+        type: "svg",
+        data: svg,
+        fallback: { type: "png", data: PNG_1PX },
+        transformation: { width: 1, height: 1 },
+      }),
     );
     expect(printJsx(tree).assets.map((asset) => asset.path)).toEqual(["assets/image1.svg", "assets/image2.png"]);
   });
@@ -193,7 +210,11 @@ describe("printing rules", () => {
       transformation: { width: 1, height: 1 },
     };
     const tree = renderToTree(
-      createElement(Document, null, createElement(Section, null, createElement(Paragraph, null, createElement(ImageRun, image))))
+      createElement(
+        Document,
+        null,
+        createElement(Section, null, createElement(Paragraph, null, createElement(ImageRun, image))),
+      ),
     );
     const printed = printJsx(tree);
     expect(printed.assets).toEqual([
@@ -215,7 +236,9 @@ describe("printing rules", () => {
 
   test("a PageNumber prints as its docx.PageNumber key", async () => {
     const tree = paragraph(n("TextRun", {}, "Page ", "CURRENT", " of ", "SECTION"));
-    expect(printJsx(tree).source).toContain('<TextRun>{"Page "}{PageNumber.CURRENT}{" of "}{PageNumber.CURRENT_SECTION}</TextRun>');
+    expect(printJsx(tree).source).toContain(
+      '<TextRun>{"Page "}{PageNumber.CURRENT}{" of "}{PageNumber.CURRENT_SECTION}</TextRun>',
+    );
     await roundTrips("rule-page-number", tree);
   });
 
@@ -225,7 +248,10 @@ describe("printing rules", () => {
 
     const numbered = printJsx(paragraph(n("TextRun", {}, "CURRENT")), { importFrom: "react-docx" }).source;
     expect(numbered.split("\n\n")[0]).toBe(
-      ['import { PageNumber } from "docx";', 'import { Document, Paragraph, Section, TextRun } from "react-docx";'].join("\n")
+      [
+        'import { PageNumber } from "docx";',
+        'import { Document, Paragraph, Section, TextRun } from "react-docx";',
+      ].join("\n"),
     );
   });
 

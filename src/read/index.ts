@@ -21,6 +21,8 @@ export function readDocx(bytes: Uint8Array | ArrayBuffer): ReadResult {
     return { document: canonicalize(root), diagnostics: diagnostics.list() };
   } catch (error) {
     if (!(error instanceof TreeError)) throw error;
-    throw Object.assign(new Error(`readDocx produced an invalid tree (a reader bug): ${error.message}`), { cause: error });
+    throw Object.assign(new Error(`readDocx produced an invalid tree (a reader bug): ${error.message}`), {
+      cause: error,
+    });
   }
 }

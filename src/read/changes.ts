@@ -37,7 +37,7 @@ function asLive(run: XmlElement): XmlElement {
   const children = run.children.map((child) =>
     typeof child !== "string" && isOwnKey(DELETED_AS_LIVE, child.name)
       ? { ...child, name: DELETED_AS_LIVE[child.name] }
-      : child
+      : child,
   );
   return { ...run, children };
 }

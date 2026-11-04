@@ -8,7 +8,9 @@ const RUN_PROPERTIES = new Set(["m:rPr", "w:rPr"]);
 
 const isPlainRun = (run: XmlElement): boolean =>
   run.name === "m:r" &&
-  elementsOf(run).every((child) => RUN_PROPERTIES.has(child.name) || (child.name === "m:t" && elementsOf(child).length === 0));
+  elementsOf(run).every(
+    (child) => RUN_PROPERTIES.has(child.name) || (child.name === "m:t" && elementsOf(child).length === 0),
+  );
 
 export const isPlainMath = (oMath: XmlElement): boolean => elementsOf(oMath).every(isPlainRun);
 

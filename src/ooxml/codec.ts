@@ -162,7 +162,7 @@ export const resolved = (element: string, detail: string): Note => ({ fate: "res
 export function applyFates<T>(
   el: XmlElement | null,
   table: FateTable<T>,
-  env: CodecEnv
+  env: CodecEnv,
 ): { readonly options: Draft<T>; readonly notes: Note[] } {
   const options: Draft<T> = {};
   const notes: Note[] = [];
@@ -223,7 +223,12 @@ export function wholeNumberAt(el: XmlElement, attribute: string, notes: Note[]):
   return null;
 }
 
-export function oneOfAt<V extends string>(el: XmlElement, attribute: string, values: readonly V[], notes: Note[]): V | null {
+export function oneOfAt<V extends string>(
+  el: XmlElement,
+  attribute: string,
+  values: readonly V[],
+  notes: Note[],
+): V | null {
   const value = attrOf(el, attribute);
   if (value === null) return null;
   if (isOneOf(values, value)) return value;
@@ -248,7 +253,7 @@ export const stringVal: ValueReader<string> = (el, _env, notes) => requiredAttr(
 
 export const styleRefVal: ValueReader<string> = (el, env, notes) => {
   const id = requiredAttr(el, "w:val", notes);
-  return id === null ? null : env.styleIds?.get(id) ?? id;
+  return id === null ? null : (env.styleIds?.get(id) ?? id);
 };
 
 export const wholeNumberVal: ValueReader<number> = (el, _env, notes) =>

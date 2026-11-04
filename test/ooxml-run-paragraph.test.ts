@@ -84,7 +84,13 @@ const PARAGRAPH_SAMPLES: readonly ParagraphOptions[] = [
     ],
   },
   { border: { bottom: { style: "single", size: 6, color: "auto", space: 1 } } },
-  { border: { top: { style: "double", size: 4, color: "FF0000" }, left: { style: "dotted" }, right: { style: "dashed" } } },
+  {
+    border: {
+      top: { style: "double", size: 4, color: "FF0000" },
+      left: { style: "dotted" },
+      right: { style: "dashed" },
+    },
+  },
   { shading: { type: "solid", fill: "FFFF00", color: "000000" } },
   { outlineLevel: 1 },
   {
@@ -140,7 +146,7 @@ describe("readRunProperties", () => {
   test("keeps what docx.js can write and drops a w14 property with a note", () => {
     const read = readRunProperties(
       parseXml('<w:rPr><w:b/><w:color w:val="FF0000"/><w:sz w:val="28"/><w14:ligatures w14:val="all"/></w:rPr>'),
-      EMPTY_ENV
+      EMPTY_ENV,
     );
     expect(read.options).toEqual({ bold: true, color: "FF0000", size: 28 });
     expect(read.notes).toEqual([{ fate: "dropped", element: "w14:ligatures", detail: expect.any(String) }]);
@@ -149,9 +155,9 @@ describe("readRunProperties", () => {
   test("resolves theme fonts to the theme's typefaces, one note per attribute", () => {
     const read = readRunProperties(
       parseXml(
-        '<w:rPr><w:rFonts w:asciiTheme="minorHAnsi" w:hAnsiTheme="minorHAnsi" w:eastAsiaTheme="minorEastAsia" w:cstheme="minorBidi"/></w:rPr>'
+        '<w:rPr><w:rFonts w:asciiTheme="minorHAnsi" w:hAnsiTheme="minorHAnsi" w:eastAsiaTheme="minorEastAsia" w:cstheme="minorBidi"/></w:rPr>',
       ),
-      THEMED_ENV
+      THEMED_ENV,
     );
     expect(read.options).toEqual({ font: { ascii: "Calibri", hAnsi: "Calibri", eastAsia: "MS Mincho", cs: "Arial" } });
     expect(read.notes.map((note) => note.fate)).toEqual(["resolved", "resolved", "resolved", "resolved"]);
@@ -160,7 +166,7 @@ describe("readRunProperties", () => {
   test("takes the hex Word wrote beside a theme colour, with no note", () => {
     const read = readRunProperties(
       parseXml('<w:rPr><w:color w:val="1F3864" w:themeColor="accent1" w:themeShade="80"/></w:rPr>'),
-      THEMED_ENV
+      THEMED_ENV,
     );
     expect(read.options).toEqual({ color: "1F3864" });
     expect(read.notes).toEqual([]);
@@ -175,7 +181,7 @@ describe("readRunProperties", () => {
   test("applies a theme tint: 4472C4 tinted 99 is 8FAADC", () => {
     const read = readRunProperties(
       parseXml('<w:rPr><w:color w:val="auto" w:themeColor="accent1" w:themeTint="99"/></w:rPr>'),
-      THEMED_ENV
+      THEMED_ENV,
     );
     expect(read.options).toEqual({ color: "8FAADC" });
   });
@@ -208,9 +214,9 @@ describe("readParagraphProperties", () => {
   test("returns w:numPr and w:sectPr beside the options, not in them", () => {
     const read = readParagraphProperties(
       parseXml(
-        '<w:pPr><w:pStyle w:val="ListParagraph"/><w:numPr><w:ilvl w:val="1"/><w:numId w:val="3"/></w:numPr><w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr></w:pPr>'
+        '<w:pPr><w:pStyle w:val="ListParagraph"/><w:numPr><w:ilvl w:val="1"/><w:numId w:val="3"/></w:numPr><w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr></w:pPr>',
       ),
-      EMPTY_ENV
+      EMPTY_ENV,
     );
     expect(read.options).toEqual({ style: "ListParagraph" });
     expect(read.numPr).toEqual({ numId: "3", level: 1 });

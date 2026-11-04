@@ -1,6 +1,16 @@
 /** scrollIntoView misplaces targets under CSS zoom, so scrolling to a block is computed by hand. */
 
-import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ComponentType, type KeyboardEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentType,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 import type { Diagnostic } from "@react-docx/core/reader";
 import { GITHUB_URL, mount } from "../shell";
 import { Code, CopyButton } from "../ui/CodeBlock";
@@ -105,7 +115,15 @@ function useWindowDrop(onFile: (file: File) => void): boolean {
   return dragging;
 }
 
-function FilePicker({ onOpen, children, className }: { onOpen: (file: File) => void; children: ReactNode; className: string }) {
+function FilePicker({
+  onOpen,
+  children,
+  className,
+}: {
+  onOpen: (file: File) => void;
+  children: ReactNode;
+  className: string;
+}) {
   return (
     <label className={className}>
       <input
@@ -150,8 +168,8 @@ function Landing({
             <strong>Could not read {state.name}.</strong>{" "}
             {state.bug ? (
               <>
-                The reader hit an error it should not have: <code>{state.message}</code>. The file is most likely
-                fine. <a href={`${GITHUB_URL}/issues/new`}>Report it on GitHub</a> so it can be fixed.
+                The reader hit an error it should not have: <code>{state.message}</code>. The file is most likely fine.{" "}
+                <a href={`${GITHUB_URL}/issues/new`}>Report it on GitHub</a> so it can be fixed.
               </>
             ) : (
               state.message
@@ -172,7 +190,13 @@ function Landing({
         <span>No file at hand? Try a sample written by react-docx:</span>
         <div className="samples-list">
           {SAMPLES.map((sample) => (
-            <button key={sample.name} type="button" className="btn btn-secondary btn-sm" disabled={reading} onClick={() => onSample(sample)}>
+            <button
+              key={sample.name}
+              type="button"
+              className="btn btn-secondary btn-sm"
+              disabled={reading}
+              onClick={() => onSample(sample)}
+            >
               <FileIcon />
               {sample.label}
             </button>
@@ -306,12 +330,26 @@ function TabList({
 
 const ZOOM_STEPS = [0.25, 0.33, 0.5, 0.67, 0.75, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2];
 
-function ZoomControls({ zoom, fitted, onChange }: { zoom: number; fitted: boolean; onChange: (zoom: number | null) => void }) {
+function ZoomControls({
+  zoom,
+  fitted,
+  onChange,
+}: {
+  zoom: number;
+  fitted: boolean;
+  onChange: (zoom: number | null) => void;
+}) {
   const smaller = [...ZOOM_STEPS].reverse().find((step) => step < zoom - 0.001);
   const larger = ZOOM_STEPS.find((step) => step > zoom + 0.001);
   return (
     <div className="zoom" role="group" aria-label="Zoom">
-      <button type="button" className="zoom-btn" aria-label="Zoom out" disabled={!smaller} onClick={() => onChange(smaller ?? zoom)}>
+      <button
+        type="button"
+        className="zoom-btn"
+        aria-label="Zoom out"
+        disabled={!smaller}
+        onClick={() => onChange(smaller ?? zoom)}
+      >
         <MinusIcon />
       </button>
       <button
@@ -323,7 +361,13 @@ function ZoomControls({ zoom, fitted, onChange }: { zoom: number; fitted: boolea
       >
         {Math.round(zoom * 100)}%
       </button>
-      <button type="button" className="zoom-btn" aria-label="Zoom in" disabled={!larger} onClick={() => onChange(larger ?? zoom)}>
+      <button
+        type="button"
+        className="zoom-btn"
+        aria-label="Zoom in"
+        disabled={!larger}
+        onClick={() => onChange(larger ?? zoom)}
+      >
         <PlusIcon />
       </button>
     </div>
@@ -350,7 +394,11 @@ function DownloadButtons({ file }: { file: LoadedFile }) {
 
   return (
     <>
-      <button type="button" className="btn btn-secondary btn-sm" onClick={() => downloadBlob(generated.blob, generated.name)}>
+      <button
+        type="button"
+        className="btn btn-secondary btn-sm"
+        onClick={() => downloadBlob(generated.blob, generated.name)}
+      >
         <DownloadIcon />
         {generated.name.endsWith(".zip") ? "JSX + assets" : "JSX"}
       </button>
@@ -442,7 +490,13 @@ function count(diagnostics: readonly Diagnostic[], kind: Kind): number {
   return diagnostics.reduce((sum, d) => sum + (d.kind !== kind ? 0 : d.kind === "ignored" ? d.count : 1), 0);
 }
 
-function DiagnosticsPanel({ diagnostics, onShow }: { diagnostics: readonly Diagnostic[]; onShow: (path: string) => void }) {
+function DiagnosticsPanel({
+  diagnostics,
+  onShow,
+}: {
+  diagnostics: readonly Diagnostic[];
+  onShow: (path: string) => void;
+}) {
   const [filter, setFilter] = useState<Kind | null>(null);
   const shown = filter === null ? diagnostics : diagnostics.filter((d) => d.kind === filter);
   const located = diagnostics.some((d) => d.kind !== "ignored");

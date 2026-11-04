@@ -15,7 +15,10 @@ export const node = (type: string, props: PropBag = {}, children: AuthorNode["ch
 });
 
 export class TreeError extends Error {
-  constructor(readonly path: readonly string[], message: string) {
+  constructor(
+    readonly path: readonly string[],
+    message: string,
+  ) {
     super(path.length === 0 ? message : `${path.join(" > ")}: ${message}`);
     this.name = "TreeError";
   }

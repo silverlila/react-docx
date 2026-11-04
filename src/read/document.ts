@@ -49,7 +49,10 @@ const DROPPED_PARTS: Readonly<Record<string, string>> = {
 };
 
 function withoutSectPr(p: XmlElement, pPr: XmlElement): XmlElement {
-  const properties = { ...pPr, children: pPr.children.filter((child) => typeof child === "string" || child.name !== "w:sectPr") };
+  const properties = {
+    ...pPr,
+    children: pPr.children.filter((child) => typeof child === "string" || child.name !== "w:sectPr"),
+  };
   return { ...p, children: p.children.map((child) => (child === pPr ? properties : child)) };
 }
 
@@ -84,7 +87,11 @@ function readSection(section: SectionXml, index: number, ctx: BodyContext): Auth
   const read = readSectionProperties(section.sectPr, ctx.env);
   here.notes(read.notes);
   for (const el of section.markProperties) {
-    here.report({ kind: "dropped", element: el.name, detail: "a property of the section-break paragraph, which docx.js writes itself" });
+    here.report({
+      kind: "dropped",
+      element: el.name,
+      detail: "a property of the section-break paragraph, which docx.js writes itself",
+    });
   }
   const rels = ctx.pkg.relsOf(ctx.pkg.mainPart);
   const children: AuthorNode[] = [];
@@ -95,7 +102,9 @@ function readSection(section: SectionXml, index: number, ctx: BodyContext): Auth
     const rel = rels.get(reference.relId);
     const root = rel === undefined || rel.external ? null : ctx.readPart(rel.target);
     if (rel === undefined || root?.name !== which.root || seen.has(key)) {
-      const why = seen.has(key) ? `a second ${reference.type} ${reference.kind}` : `r:id="${reference.relId}" is not a ${which.root} part`;
+      const why = seen.has(key)
+        ? `a second ${reference.type} ${reference.kind}`
+        : `r:id="${reference.relId}" is not a ${which.root} part`;
       here.report({ kind: "dropped", element: which.reference, detail: why });
       continue;
     }
@@ -116,7 +125,11 @@ function readCustomProperties(ctx: ReadContext): docx.IPropertiesOptions["custom
     const [value, ...rest] = elementsOf(property);
     if (name === null || value?.name !== "vt:lpwstr" || rest.length > 0) {
       const type = value?.name ?? "no value";
-      here.report({ kind: "dropped", element: property.name, detail: `${name ?? "(no name)"}: ${type} is not a vt:lpwstr, the only type docx.js writes` });
+      here.report({
+        kind: "dropped",
+        element: property.name,
+        detail: `${name ?? "(no name)"}: ${type} is not a vt:lpwstr, the only type docx.js writes`,
+      });
       continue;
     }
     properties.push({ name, value: textOf(value) });
@@ -169,7 +182,10 @@ function reportUnreadParts(ctx: ReadContext, consumed: ReadonlySet<string>): voi
   for (const path of ctx.pkg.paths) {
     if (consumed.has(path) || path.endsWith(".rels") || PLUMBING.includes(path)) continue;
     if (IGNORED_PARTS.includes(path)) ctx.ignore(path);
-    else ctx.within(path, []).report({ kind: "dropped", element: path, detail: DROPPED_PARTS[path] ?? "no reader reads this part" });
+    else
+      ctx
+        .within(path, [])
+        .report({ kind: "dropped", element: path, detail: DROPPED_PARTS[path] ?? "no reader reads this part" });
   }
 }
 
@@ -188,7 +204,9 @@ export function readDocumentNode(ctx: ReadContext, consumed: ReadonlySet<string>
   const body = readDocumentElement(root, ctx, props);
   const numbering = readNumberingPart(ctx);
   const bodyCtx = bodyContext(ctx, { numbering, notes: readNotesParts(ctx) });
-  const sections = splitSections(withoutGoBack(body, ctx)).map((section, index) => readSection(section, index, bodyCtx));
+  const sections = splitSections(withoutGoBack(body, ctx)).map((section, index) =>
+    readSection(section, index, bodyCtx),
+  );
   const comments = readComments(bodyCtx, sections.length);
   bodyCtx.parts.notes.reportUnreferenced();
 

@@ -8,7 +8,11 @@ import { CASES, PNG_1PX } from "./support/cases";
 import { PICTURE, docx, type FixtureParts } from "./support/docx-fixture";
 import { imageRunXml } from "./support/docx-props";
 
-type TreeNode = { readonly type: string; readonly props: Record<string, unknown>; readonly children: readonly (TreeNode | string)[] };
+type TreeNode = {
+  readonly type: string;
+  readonly props: Record<string, unknown>;
+  readonly children: readonly (TreeNode | string)[];
+};
 
 const IMAGE = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
 const PICTURE_URI = "http://schemas.openxmlformats.org/drawingml/2006/picture";
@@ -19,7 +23,11 @@ const tree = (value: unknown): TreeNode => value as TreeNode;
 const read = (parts: FixtureParts) => readDocx(docx(parts));
 const blocksOf = (parts: FixtureParts) => tree(read(parts).document).children.map(tree)[0].children.map(tree);
 
-const node = (type: string, props: Record<string, unknown> = {}, children: readonly (TreeNode | string)[] = []): TreeNode => ({
+const node = (
+  type: string,
+  props: Record<string, unknown> = {},
+  children: readonly (TreeNode | string)[] = [],
+): TreeNode => ({
   type,
   props,
   children,
@@ -43,18 +51,20 @@ const withMedia = (body: string, name = "image1.png", bytes: Uint8Array = PICTUR
   media: { [`word/media/${name}`]: bytes },
 });
 
-const graphic = (uri: string, inside: string) => `<a:graphic><a:graphicData uri="${uri}">${inside}</a:graphicData></a:graphic>`;
+const graphic = (uri: string, inside: string) =>
+  `<a:graphic><a:graphicData uri="${uri}">${inside}</a:graphicData></a:graphic>`;
 const pic = (blipFill = "") =>
   graphic(
     PICTURE_URI,
     '<pic:pic><pic:nvPicPr><pic:cNvPr id="0" name="photo.png"/><pic:cNvPicPr/></pic:nvPicPr>' +
       `<pic:blipFill><a:blip r:embed="rId5"/>${blipFill}<a:stretch><a:fillRect/></a:stretch></pic:blipFill>` +
-      '<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="952500" cy="476250"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic>'
+      '<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="952500" cy="476250"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic>',
   );
 const chart = graphic(CHART_URI, '<c:chart r:id="rId9"/>');
 const inlineDrawing = (inside: string) =>
   `<w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="952500" cy="476250"/><wp:docPr id="1" name="Picture 1"/>${inside}</wp:inline></w:drawing>`;
-const vmlPicture = '<w:pict><v:shape id="p1" style="width:72pt;height:36pt"><v:imagedata r:id="rId5"/></v:shape></w:pict>';
+const vmlPicture =
+  '<w:pict><v:shape id="p1" style="width:72pt;height:36pt"><v:imagedata r:id="rId5"/></v:shape></w:pict>';
 const textBox = (inside: string) =>
   `<w:pict><v:shape id="b1" type="#_x0000_t202" style="width:200pt;height:50pt"><v:textbox><w:txbxContent>${inside}</w:txbxContent></v:textbox></v:shape></w:pict>`;
 const p = (inside: string, pPr = "") => `<w:p>${pPr}${inside}</w:p>`;
@@ -64,8 +74,23 @@ const run = (t: string) => r(`<w:t>${t}</w:t>`);
 describe("DrawingML pictures: docx.js's output reads back to options it writes the same", () => {
   const samples: [string, IImageOptions][] = [
     ["inline", { type: "png", data: PNG_1PX, transformation: { width: 120, height: 80 } }],
-    ["rotated and flipped", { type: "png", data: PNG_1PX, transformation: { width: 120, height: 80, rotation: 90, flip: { horizontal: true } } }],
-    ["alt text", { type: "png", data: PNG_1PX, transformation: { width: 120, height: 80 }, altText: { name: "photo", description: "Ada", title: "t" } }],
+    [
+      "rotated and flipped",
+      {
+        type: "png",
+        data: PNG_1PX,
+        transformation: { width: 120, height: 80, rotation: 90, flip: { horizontal: true } },
+      },
+    ],
+    [
+      "alt text",
+      {
+        type: "png",
+        data: PNG_1PX,
+        transformation: { width: 120, height: 80 },
+        altText: { name: "photo", description: "Ada", title: "t" },
+      },
+    ],
     [
       "floating",
       {
@@ -82,8 +107,19 @@ describe("DrawingML pictures: docx.js's output reads back to options it writes t
         },
       },
     ],
-    ["svg with a png fallback", { type: "svg", data: SVG, fallback: { type: "png", data: PNG_1PX }, transformation: { width: 120, height: 80 } }],
-    ["outlined", { type: "png", data: PNG_1PX, transformation: { width: 120, height: 80 }, outline: { type: "solidFill", solidFillType: "rgb", value: "FF0000", width: 12700 } }],
+    [
+      "svg with a png fallback",
+      { type: "svg", data: SVG, fallback: { type: "png", data: PNG_1PX }, transformation: { width: 120, height: 80 } },
+    ],
+    [
+      "outlined",
+      {
+        type: "png",
+        data: PNG_1PX,
+        transformation: { width: 120, height: 80 },
+        outline: { type: "solidFill", solidFillType: "rgb", value: "FF0000", width: 12700 },
+      },
+    ],
   ];
 
   test.each(samples)("%s", async (_name, sample) => {
@@ -106,7 +142,12 @@ describe("DrawingML pictures from Word", () => {
   test("an inline picture becomes an ImageRun with its bytes, px size and alt text name", () => {
     const [paragraph] = blocksOf(withMedia(p(r(inlineDrawing(pic())))));
     expect(paragraph.children).toEqual([
-      node("ImageRun", { type: "png", data: PICTURE, transformation: { width: 100, height: 50 }, altText: { name: "Picture 1" } }),
+      node("ImageRun", {
+        type: "png",
+        data: PICTURE,
+        transformation: { width: 100, height: 50 },
+        altText: { name: "Picture 1" },
+      }),
     ]);
   });
 
@@ -121,7 +162,9 @@ describe("DrawingML pictures from Word", () => {
   test("a cropped picture comes back uncropped, with a dropped note", () => {
     const parts = withMedia(p(r(inlineDrawing(pic('<a:srcRect l="10000"/>')))));
     expect(findAll(blocksOf(parts)[0], "ImageRun")).toHaveLength(1);
-    expect(read(parts).diagnostics).toContainEqual(diagnostic("dropped", "a:srcRect", "crop is not expressible; image kept uncropped"));
+    expect(read(parts).diagnostics).toContainEqual(
+      diagnostic("dropped", "a:srcRect", "crop is not expressible; image kept uncropped"),
+    );
   });
 
   test("an .emf picture is dropped", () => {
@@ -139,19 +182,25 @@ describe("DrawingML pictures from Word", () => {
   test("a chart in mc:AlternateContent with a VML picture fallback becomes that picture", () => {
     const alternate = `<mc:AlternateContent><mc:Choice Requires="c14">${inlineDrawing(chart)}</mc:Choice><mc:Fallback>${vmlPicture}</mc:Fallback></mc:AlternateContent>`;
     const parts = withMedia(p(r(alternate)));
-    expect(blocksOf(parts)[0].children).toEqual([node("ImageRun", { type: "png", data: PICTURE, transformation: { width: 96, height: 48 } })]);
+    expect(blocksOf(parts)[0].children).toEqual([
+      node("ImageRun", { type: "png", data: PICTURE, transformation: { width: 96, height: 48 } }),
+    ]);
     expect(read(parts).diagnostics).toContainEqual(diagnostic("resolved", "mc:AlternateContent", "used Fallback"));
   });
 
   test("a picture in mc:AlternateContent's Choice is used", () => {
     const alternate = `<mc:AlternateContent><mc:Choice Requires="wps">${inlineDrawing(pic())}</mc:Choice><mc:Fallback>${vmlPicture}</mc:Fallback></mc:AlternateContent>`;
     const parts = withMedia(p(r(alternate)));
-    expect(findAll(blocksOf(parts)[0], "ImageRun").map((image) => image.props.transformation)).toEqual([{ width: 100, height: 50 }]);
+    expect(findAll(blocksOf(parts)[0], "ImageRun").map((image) => image.props.transformation)).toEqual([
+      { width: 100, height: 50 },
+    ]);
     expect(read(parts).diagnostics).toContainEqual(diagnostic("resolved", "mc:AlternateContent", "used Choice"));
   });
 
   test("mc:AlternateContent whose Choice does not map and which has no Fallback is dropped", () => {
-    const parts = withMedia(p(r(`<mc:AlternateContent><mc:Choice Requires="c14">${inlineDrawing(chart)}</mc:Choice></mc:AlternateContent>`)));
+    const parts = withMedia(
+      p(r(`<mc:AlternateContent><mc:Choice Requires="c14">${inlineDrawing(chart)}</mc:Choice></mc:AlternateContent>`)),
+    );
     expect(blocksOf(parts)[0]).toEqual(node("Paragraph"));
     expect(located(read(parts).diagnostics, "dropped", "mc:AlternateContent")).toHaveLength(1);
   });
@@ -189,8 +238,12 @@ describe("DrawingML pictures from Word", () => {
 describe("VML", () => {
   test("a VML picture becomes an ImageRun sized in px from pt, with a resolved note", () => {
     const parts = withMedia(p(r(vmlPicture)));
-    expect(blocksOf(parts)[0].children).toEqual([node("ImageRun", { type: "png", data: PICTURE, transformation: { width: 96, height: 48 } })]);
-    expect(read(parts).diagnostics).toContainEqual(diagnostic("resolved", "w:pict", "VML image converted to DrawingML"));
+    expect(blocksOf(parts)[0].children).toEqual([
+      node("ImageRun", { type: "png", data: PICTURE, transformation: { width: 96, height: 48 } }),
+    ]);
+    expect(read(parts).diagnostics).toContainEqual(
+      diagnostic("resolved", "w:pict", "VML image converted to DrawingML"),
+    );
   });
 
   test("a text box alone in its paragraph becomes a Textbox with the shape's style and its paragraphs", () => {
@@ -200,7 +253,9 @@ describe("VML", () => {
   });
 
   test("Word's text box, a wps shape with a VML fallback alone in its run, becomes a Textbox", () => {
-    const wps = inlineDrawing(graphic("http://schemas.microsoft.com/office/word/2010/wordprocessingShape", "<wps:wsp/>"));
+    const wps = inlineDrawing(
+      graphic("http://schemas.microsoft.com/office/word/2010/wordprocessingShape", "<wps:wsp/>"),
+    );
     const alternate = `<mc:AlternateContent><mc:Choice Requires="wps">${wps}</mc:Choice><mc:Fallback>${textBox(p(run("x")))}</mc:Fallback></mc:AlternateContent>`;
     const parts: FixtureParts = { body: p(r(alternate)) };
     expect(blocksOf(parts).map((block) => block.type)).toEqual(["Textbox"]);
@@ -213,7 +268,9 @@ describe("VML", () => {
     expect(box.type).toBe("Textbox");
     expect(findAll(box, "TextRun").map((r) => r.children)).toEqual([["x"]]);
     expect(paragraph).toEqual(node("Paragraph", {}, [text("before")]));
-    expect(read(parts).diagnostics).toContainEqual(diagnostic("resolved", "w:pict", "read as a Textbox before its paragraph"));
+    expect(read(parts).diagnostics).toContainEqual(
+      diagnostic("resolved", "w:pict", "read as a Textbox before its paragraph"),
+    );
     const again = readDocx(new Uint8Array(await renderToBuffer(read(parts).document)));
     expect(findAll(again.document as never, "Textbox")).toHaveLength(1);
   });
@@ -223,7 +280,10 @@ describe("VML", () => {
     const at = read(parts)
       .diagnostics.filter((d) => d.kind === "resolved" && d.element === "w:pict")
       .map((d) => ("at" in d ? d.at : null));
-    expect(at).toEqual([[0, 0], [0, 1]]);
+    expect(at).toEqual([
+      [0, 0],
+      [0, 1],
+    ]);
   });
 
   test("a text box in a table cell is dropped: Textbox stands only in a Section body", () => {
@@ -236,27 +296,39 @@ describe("VML", () => {
     const table = `<w:tbl><w:tr><w:tc>${p(run("cell"))}</w:tc></w:tr></w:tbl>`;
     const result = read({ body: p(r(textBox(p(run("kept")) + table))) });
     const [box] = tree(result.document).children.map(tree)[0].children.map(tree);
-    expect(box).toEqual(node("Textbox", { style: { width: "200pt", height: "50pt" } }, [node("Paragraph", {}, [text("kept")])]));
+    expect(box).toEqual(
+      node("Textbox", { style: { width: "200pt", height: "50pt" } }, [node("Paragraph", {}, [text("kept")])]),
+    );
     expect(result.diagnostics).toContainEqual(diagnostic("dropped", "w:tbl", "table in a text box"));
     await expect(renderToBuffer(result.document)).resolves.toBeInstanceOf(Uint8Array);
   });
 
   test("an empty text box reads as a Textbox holding one empty Paragraph", () => {
-    expect(blocksOf({ body: p(r(textBox(""))) })).toEqual([node("Textbox", { style: { width: "200pt", height: "50pt" } }, [node("Paragraph")])]);
+    expect(blocksOf({ body: p(r(textBox(""))) })).toEqual([
+      node("Textbox", { style: { width: "200pt", height: "50pt" } }, [node("Paragraph")]),
+    ]);
   });
 
   test("a text box paragraph's heading style becomes heading; any other style is dropped", () => {
-    const styled = (style: string) => ({ body: p(r(textBox(p(run("x")))), `<w:pPr><w:pStyle w:val="${style}"/></w:pPr>`) });
-    expect(blocksOf(styled("Heading2"))[0].props).toEqual({ heading: "Heading2", style: { width: "200pt", height: "50pt" } });
+    const styled = (style: string) => ({
+      body: p(r(textBox(p(run("x")))), `<w:pPr><w:pStyle w:val="${style}"/></w:pPr>`),
+    });
+    expect(blocksOf(styled("Heading2"))[0].props).toEqual({
+      heading: "Heading2",
+      style: { width: "200pt", height: "50pt" },
+    });
     expect(blocksOf(styled("MyStyle"))[0].props).toEqual({ style: { width: "200pt", height: "50pt" } });
     expect(read(styled("MyStyle")).diagnostics).toContainEqual(diagnostic("dropped", "w:pStyle", '"MyStyle"'));
   });
 
   test("a style declaration VmlShapeStyle has no value for is dropped", () => {
-    const box = '<w:pict><v:shape id="b1" style="width:100px;height:50pt;mso-fit-shape-to-text:t"><v:textbox><w:txbxContent/></v:textbox></v:shape></w:pict>';
+    const box =
+      '<w:pict><v:shape id="b1" style="width:100px;height:50pt;mso-fit-shape-to-text:t"><v:textbox><w:txbxContent/></v:textbox></v:shape></w:pict>';
     const parts: FixtureParts = { body: p(r(box)) };
     expect(blocksOf(parts)[0].props).toEqual({ style: { height: "50pt" } });
-    expect(located(read(parts).diagnostics, "dropped", "v:shape").map((d) => (d.kind === "ignored" ? "" : d.detail))).toEqual([
+    expect(
+      located(read(parts).diagnostics, "dropped", "v:shape").map((d) => (d.kind === "ignored" ? "" : d.detail)),
+    ).toEqual([
       "style width:100px: docx.js's text box style has no value for it",
       "style mso-fit-shape-to-text:t: docx.js's text box style has no value for it",
     ]);
@@ -287,12 +359,16 @@ describe("VML", () => {
   });
 
   test("a text box's lengths with a leading-dot fraction or a sign read as written", () => {
-    const box = '<w:pict><v:shape id="b1" style="position:absolute;width:.5in;height:+36pt;margin-left:-.25in"><v:textbox><w:txbxContent/></v:textbox></v:shape></w:pict>';
-    expect(blocksOf({ body: p(r(box)) })[0].props).toEqual({ style: { position: "absolute", width: ".5in", height: "+36pt", marginLeft: "-.25in" } });
+    const box =
+      '<w:pict><v:shape id="b1" style="position:absolute;width:.5in;height:+36pt;margin-left:-.25in"><v:textbox><w:txbxContent/></v:textbox></v:shape></w:pict>';
+    expect(blocksOf({ body: p(r(box)) })[0].props).toEqual({
+      style: { position: "absolute", width: ".5in", height: "+36pt", marginLeft: "-.25in" },
+    });
   });
 
   test("w:object (an OLE object) is dropped", () => {
-    const object = '<w:object><v:shape id="o1" style="width:72pt;height:36pt"><v:imagedata r:id="rId5"/></v:shape><o:OLEObject r:id="rId6"/></w:object>';
+    const object =
+      '<w:object><v:shape id="o1" style="width:72pt;height:36pt"><v:imagedata r:id="rId5"/></v:shape><o:OLEObject r:id="rId6"/></w:object>';
     const parts = withMedia(p(r(object)));
     expect(blocksOf(parts)[0]).toEqual(node("Paragraph"));
     expect(located(read(parts).diagnostics, "dropped", "w:object")).toHaveLength(1);
@@ -301,14 +377,18 @@ describe("VML", () => {
 
 describe("math", () => {
   test("plain m:oMath becomes Math with one MathRun per m:r, and run properties are dropped", () => {
-    const math = '<m:oMath><m:r><m:t>x</m:t></m:r><m:r><w:rPr><w:rFonts w:ascii="Cambria Math"/></w:rPr><m:t>+1</m:t></m:r></m:oMath>';
+    const math =
+      '<m:oMath><m:r><m:t>x</m:t></m:r><m:r><w:rPr><w:rFonts w:ascii="Cambria Math"/></w:rPr><m:t>+1</m:t></m:r></m:oMath>';
     const parts: FixtureParts = { body: p(math) };
-    expect(blocksOf(parts)[0].children).toEqual([node("Math", {}, [node("MathRun", {}, ["x"]), node("MathRun", {}, ["+1"])])]);
+    expect(blocksOf(parts)[0].children).toEqual([
+      node("Math", {}, [node("MathRun", {}, ["x"]), node("MathRun", {}, ["+1"])]),
+    ]);
     expect(located(read(parts).diagnostics, "dropped", "w:rPr")).toHaveLength(1);
   });
 
   test("m:oMath with a fraction stays inline RawXml", () => {
-    const math = "<m:oMath><m:f><m:num><m:r><m:t>1</m:t></m:r></m:num><m:den><m:r><m:t>2</m:t></m:r></m:den></m:f></m:oMath>";
+    const math =
+      "<m:oMath><m:f><m:num><m:r><m:t>1</m:t></m:r></m:num><m:den><m:r><m:t>2</m:t></m:r></m:den></m:f></m:oMath>";
     const parts: FixtureParts = { body: p(math) };
     expect(blocksOf(parts)[0].children).toEqual([node("RawXml", { xml: math })]);
     expect(located(read(parts).diagnostics, "raw", "m:oMath")).toHaveLength(1);

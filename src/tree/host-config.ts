@@ -107,7 +107,7 @@ export const hostConfig18 = {
     _updatePayload: unknown,
     _type: string,
     _oldProps: HostProps,
-    newProps: HostProps
+    newProps: HostProps,
   ): void {
     instance.props = ownProps(newProps);
   },

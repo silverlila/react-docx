@@ -21,7 +21,12 @@ function level(type: ListType, n: number): Level {
     type === "NumberedList"
       ? { format: NUMBERED_FORMATS[n % 3], text: `%${n + 1}.` }
       : { format: "bullet" as const, text: BULLET_SYMBOLS[n % 3] };
-  return { level: n, ...marker, alignment: "left", style: { paragraph: { indent: { left: 720 * (n + 1), hanging: 360 } } } };
+  return {
+    level: n,
+    ...marker,
+    alignment: "left",
+    style: { paragraph: { indent: { left: 720 * (n + 1), hanging: 360 } } },
+  };
 }
 
 function defaultLevels(type: ListType): Level[] {
@@ -95,7 +100,10 @@ function definitionAt(type: ListType, start: number, configured: ListLevels): De
   const reference = start === 0 ? type : `${type}@${start}`;
   const own = configured.get(reference);
   if (own !== undefined) {
-    return { config: { reference, levels: own }, missing: (level) => `numbering ${reference} defines no level ${level}` };
+    return {
+      config: { reference, levels: own },
+      missing: (level) => `numbering ${reference} defines no level ${level}`,
+    };
   }
   const base = configured.get(type) ?? defaultLevels(type);
   const unusable = new Map<number, string>();
@@ -105,10 +113,14 @@ function definitionAt(type: ListType, start: number, configured: ListLevels): De
     const enclosing = shown.find((s) => s < start);
     if (enclosing !== undefined) {
       const marker = `numbering ${type} level ${l.level} marker "${l.text}"`;
-      unusable.set(l.level - start, `${marker} shows the number of level ${enclosing}, which belongs to the enclosing list here`);
+      unusable.set(
+        l.level - start,
+        `${marker} shows the number of level ${enclosing}, which belongs to the enclosing list here`,
+      );
       continue;
     }
-    const text = l.text === undefined ? {} : { text: l.text.replace(LEVEL_NUMBER, (_, n: string) => `%${Number(n) - start}`) };
+    const text =
+      l.text === undefined ? {} : { text: l.text.replace(LEVEL_NUMBER, (_, n: string) => `%${Number(n) - start}`) };
     moved.push({ ...l, level: l.level - start, ...text });
   }
   return {
@@ -117,7 +129,12 @@ function definitionAt(type: ListType, start: number, configured: ListLevels): De
   };
 }
 
-function nestingOf(list: AuthorNode, path: readonly string[], parent: Nesting | undefined, context: ListContext): Nesting {
+function nestingOf(
+  list: AuthorNode,
+  path: readonly string[],
+  parent: Nesting | undefined,
+  context: ListContext,
+): Nesting {
   const type = listType(list, path);
   const depth = parent === undefined ? 0 : parent.depth + 1;
   if (parent !== undefined && type === parent.type) {
@@ -129,7 +146,12 @@ function nestingOf(list: AuthorNode, path: readonly string[], parent: Nesting | 
   return { type, depth, definition, numbering };
 }
 
-export function listEntries(list: AuthorNode, path: readonly string[], context: ListContext, parent?: Nesting): ListEntry[] {
+export function listEntries(
+  list: AuthorNode,
+  path: readonly string[],
+  context: ListContext,
+  parent?: Nesting,
+): ListEntry[] {
   if (list.props.level !== undefined) {
     throw new TreeError(path, "List.level was removed; nest <List> instead");
   }
@@ -138,7 +160,10 @@ export function listEntries(list: AuthorNode, path: readonly string[], context: 
   }
   const first = list.children[0];
   if (typeof first === "object" && first.type === "List") {
-    throw new TreeError([...path, "List[0]"], "A <List> must start with a <ListItem>, the item its numbering restarts at");
+    throw new TreeError(
+      [...path, "List[0]"],
+      "A <List> must start with a <ListItem>, the item its numbering restarts at",
+    );
   }
   const nesting = nestingOf(list, path, parent, context);
   const entries: ListEntry[] = [];

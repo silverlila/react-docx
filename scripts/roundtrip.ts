@@ -29,7 +29,12 @@ function topElements(diagnostics: readonly Diagnostic[], kind: "dropped" | "raw"
 
 function summary(name: string, dir: string, diagnostics: readonly Diagnostic[]): string {
   const counts = countsByKind(diagnostics);
-  const lines = [`${name} → ${dir}`, `  ${Object.entries(counts).map(([kind, n]) => `${kind} ${n}`).join(" · ")}`];
+  const lines = [
+    `${name} → ${dir}`,
+    `  ${Object.entries(counts)
+      .map(([kind, n]) => `${kind} ${n}`)
+      .join(" · ")}`,
+  ];
   for (const kind of ["dropped", "raw"] as const) {
     const top = topElements(diagnostics, kind);
     if (top.length === 0) continue;
@@ -70,7 +75,9 @@ function hasSoffice(): boolean {
 function toPdf(files: readonly string[], dir: string, profile: string): void {
   const flag = `-env:UserInstallation=${pathToFileURL(profile).href}`;
   try {
-    execFileSync("soffice", [flag, "--headless", "--convert-to", "pdf", "--outdir", dir, ...files], { stdio: "ignore" });
+    execFileSync("soffice", [flag, "--headless", "--convert-to", "pdf", "--outdir", dir, ...files], {
+      stdio: "ignore",
+    });
   } catch (error) {
     console.error(`  soffice failed on ${files.join(", ")}: ${error instanceof Error ? error.message : String(error)}`);
     return;
@@ -126,5 +133,5 @@ main(process.argv.slice(2)).then(
   (error: unknown) => {
     console.error(error);
     process.exit(1);
-  }
+  },
 );

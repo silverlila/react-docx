@@ -79,7 +79,8 @@ const oneOf = (values: readonly string[]): StyleRule => ({
 const NUMBER: StyleRule = { expected: "a number", test: (value) => typeof value === "number" };
 const LENGTH: StyleRule = {
   expected: `"auto", a number or a measure such as "2in"`,
-  test: (value) => value === "auto" || typeof value === "number" || (typeof value === "string" && VML_MEASURE.test(value)),
+  test: (value) =>
+    value === "auto" || typeof value === "number" || (typeof value === "string" && VML_MEASURE.test(value)),
 };
 
 const TEXTBOX_STYLE = {
@@ -171,7 +172,9 @@ export function canonicalize(root: AuthorNode): DocumentNode {
   });
   assertCommentIdsResolve(state);
   const props =
-    state.listDefinitions.size > 0 ? withListNumbering(document.props, numbering, state.listDefinitions) : document.props;
+    state.listDefinitions.size > 0
+      ? withListNumbering(document.props, numbering, state.listDefinitions)
+      : document.props;
   return { ...document, props } as DocumentNode;
 }
 
@@ -192,7 +195,7 @@ function canonicalNode(
   node: AuthorNode,
   content: readonly IndexedChild[],
   path: readonly string[],
-  context: Context
+  context: Context,
 ): Built {
   const rule = CHILD_RULES[kind];
   rule?.beforeChildren?.(content, path, context);
@@ -234,7 +237,7 @@ function textNotAllowed(parent: Parent): TreeError {
 function canonicalChildren(
   parent: Parent<UnsplitKind>,
   content: readonly IndexedChild[],
-  context: Context
+  context: Context,
 ): (Built | string)[] {
   switch (ELEMENTS[parent.kind].content) {
     case "block":
@@ -266,7 +269,7 @@ function wrappedBlockChildren(parent: Parent, content: readonly IndexedChild[], 
   return looseRuns(parent.kind, content).flatMap((group) =>
     group.loose
       ? [canonicalNode("Paragraph", LOOSE_PARAGRAPH, group.content, parent.path, context)]
-      : blockChildren(parent, group.content, context)
+      : blockChildren(parent, group.content, context),
   );
 }
 
@@ -408,7 +411,7 @@ function runs(kind: RunKind, node: AuthorNode, path: readonly string[], context:
     }
   }
   return segmentsAtBreaks(items).flatMap((segment, i) =>
-    segmentRuns(kind, segmentProps(props, segment, i === 0), segment)
+    segmentRuns(kind, segmentProps(props, segment, i === 0), segment),
   );
 }
 
@@ -418,7 +421,7 @@ function isLiteral(item: SegmentItem): item is Literal {
 
 function segmentRuns(kind: RunKind, props: PropBag, segment: Segment): Built[] {
   const content = mergeStrings(segment.content).map((item) =>
-    typeof item === "string" && isProtected(item) ? { literal: item } : item
+    typeof item === "string" && isProtected(item) ? { literal: item } : item,
   );
   const chunks: (Literal | (Built | string)[])[] = [];
   for (const item of content) {
@@ -471,7 +474,7 @@ function assertFragment({ xml, label, allowedRoots, where }: Fragment, path: rea
   if (scanned.kind === "relationship") {
     throw new TreeError(
       path,
-      `${label} cannot carry relationship references (r:id, r:embed, …): docx.js cannot write their targets`
+      `${label} cannot carry relationship references (r:id, r:embed, …): docx.js cannot write their targets`,
     );
   }
   if (scanned.roots.length === 0) throw new TreeError(path, `${label} must contain at least one element`);
@@ -483,7 +486,8 @@ function assertRawXmlFits(parent: Parent, node: AuthorNode, path: readonly strin
   const { xml } = node.props;
   if (typeof xml !== "string") throw new TreeError(path, `RawXml xml must be a string, got ${typeof xml}`);
   const slot = ELEMENTS[parent.kind].content;
-  if (slot !== "block" && slot !== "inline" && slot !== "run") throw new TreeError(path, `<RawXml> is not allowed in <${parent.name}>`);
+  if (slot !== "block" && slot !== "inline" && slot !== "run")
+    throw new TreeError(path, `<RawXml> is not allowed in <${parent.name}>`);
   const allowedRoots = RAW_XML_ROOTS[slot];
   assertFragment({ xml, label: "RawXml", allowedRoots, where: `<${parent.name}>` }, path);
 }
@@ -597,7 +601,10 @@ function imageProps(props: PropBag, path: readonly string[]): PropBag {
     throw new TreeError(path, `ImageRun type must be one of ${quotedList(IMAGE_TYPES)}, got ${described(type)}`);
   }
   if (type === "svg" && fallback === undefined) {
-    throw new TreeError(path, `An svg ImageRun needs a fallback: { type: one of ${quotedList(RASTER_IMAGE_TYPES)}, data }`);
+    throw new TreeError(
+      path,
+      `An svg ImageRun needs a fallback: { type: one of ${quotedList(RASTER_IMAGE_TYPES)}, data }`,
+    );
   }
   const image = { ...props, data: bytes(props.data, path) };
   return fallback === undefined ? omit(image, "fallback") : { ...image, fallback: rasterFallback(fallback, path) };
@@ -608,7 +615,10 @@ function rasterFallback(fallback: unknown, path: readonly string[]): PropBag {
     throw new TreeError(path, `ImageRun fallback must be { type, data } of a raster image, got ${described(fallback)}`);
   }
   if (!isOneOf(RASTER_IMAGE_TYPES, fallback.type)) {
-    throw new TreeError(path, `ImageRun fallback type must be one of ${quotedList(RASTER_IMAGE_TYPES)}, got ${described(fallback.type)}`);
+    throw new TreeError(
+      path,
+      `ImageRun fallback type must be one of ${quotedList(RASTER_IMAGE_TYPES)}, got ${described(fallback.type)}`,
+    );
   }
   return { ...fallback, data: bytes(fallback.data, path) };
 }
@@ -683,7 +693,7 @@ function styleIds(entries: unknown): string[] {
 function partitionStyles(
   list: StyleList,
   entries: unknown,
-  path: readonly string[]
+  path: readonly string[],
 ): { custom: unknown[]; defaults: Record<string, unknown> } {
   const authored = entries ?? [];
   if (!Array.isArray(authored)) throw new TreeError(path, `styles.${list} must be an array`);
@@ -717,7 +727,7 @@ function listParagraphs(list: AuthorNode, path: readonly string[], context: Cont
 function withListNumbering(
   props: PropBag,
   config: readonly ListEntry["definition"][],
-  used: ReadonlyMap<string, ListEntry["definition"]>
+  used: ReadonlyMap<string, ListEntry["definition"]>,
 ): PropBag {
   const numbering = isRecord(props.numbering) ? props.numbering : {};
   const configured = new Set(config.map((entry) => entry.reference));

@@ -42,7 +42,8 @@ function estimatedWidth(inlines: readonly ResolvedInline[]): number {
 
 const tabOf = (inline: ResolvedInline): Tab | null => (inline.kind === "tab" ? inline : null);
 
-const nextStop = (at: number, context: TabContext): TabStop | undefined => context.stops.find((s) => s.posPt > at + MIN_GAP_PT);
+const nextStop = (at: number, context: TabContext): TabStop | undefined =>
+  context.stops.find((s) => s.posPt > at + MIN_GAP_PT);
 
 function wrappedStop(at: number, context: TabContext): TabStop | undefined {
   const last = [...context.stops].reverse().find((s) => s.align !== "left");
@@ -60,7 +61,7 @@ export function tabLayout(inlines: readonly ResolvedInline[], context: TabContex
   let literal = false;
   tabs.forEach((tab, i) => {
     const after = segments[i + 1];
-    const stop = literal ? undefined : nextStop(end, context) ?? wrappedStop(end, context);
+    const stop = literal ? undefined : (nextStop(end, context) ?? wrappedStop(end, context));
     if (stop === undefined) {
       literal = true;
       items.push({ kind: "content", inlines: [tab, ...after] });

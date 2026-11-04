@@ -17,8 +17,6 @@ describe("React version picks a reconciler line", () => {
   });
 
   test.each(["17.0.2", "20.0.0", "abc"])("React %s is unsupported", (version) => {
-    expect(() => reactLine(version)).toThrow(
-      new Error(`react-docx supports React 18 and 19, found ${version}`)
-    );
+    expect(() => reactLine(version)).toThrow(new Error(`react-docx supports React 18 and 19, found ${version}`));
   });
 });

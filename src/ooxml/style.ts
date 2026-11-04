@@ -53,7 +53,6 @@ type StyleParagraph = {
 type StyleOptions = Omit<docx.IParagraphStyleOptions, "id">;
 type RawBecause = Extract<StyleRead, { kind: "raw" }>["because"];
 
-
 const NOT_A_TABLE_STYLE = "only a table style has table properties";
 
 export function readStyleParagraph(pPr: XmlElement, env: CodecEnv, notes: Note[]): StyleParagraph {
@@ -123,7 +122,8 @@ export function clashingStyleIds(styles: XmlElement | null): ReadonlyMap<string,
     const id = attrOf(el, "w:styleId");
     const type = attrOf(el, "w:type") ?? "paragraph";
     const slot = id === null ? undefined : own(DEFAULT_STYLE_SLOTS, id);
-    if (id === null || slot === undefined || slot.kind === type || (type !== "paragraph" && type !== "character")) continue;
+    if (id === null || slot === undefined || slot.kind === type || (type !== "paragraph" && type !== "character"))
+      continue;
     let fresh = `${id}${type === "character" ? "Char" : "Para"}`;
     while (taken.has(fresh)) fresh = `${fresh}0`;
     taken.add(fresh);
@@ -150,7 +150,8 @@ export function withRenamedStyles(el: XmlElement, renames: ReadonlyMap<string, s
 
 export function readStyle(original: XmlElement, env: CodecEnv): StyleRead | StyleDropped {
   const renamed = env.styleIds?.get(attrOf(original, "w:styleId") ?? "");
-  const style = renamed === undefined ? original : { ...original, attributes: { ...original.attributes, "w:styleId": renamed } };
+  const style =
+    renamed === undefined ? original : { ...original, attributes: { ...original.attributes, "w:styleId": renamed } };
   const type = attrOf(style, "w:type") ?? "paragraph";
   if (type !== "paragraph" && type !== "character" && type !== "table" && type !== "numbering") {
     return { kind: "dropped", because: `w:type="${type}" is not a style type` };
@@ -200,7 +201,7 @@ const DOC_DEFAULTS_FATES: FateTable<docx.IDocumentDefaultsOptions> = {
 
 export function readDocDefaults(
   docDefaults: XmlElement | null,
-  env: CodecEnv
+  env: CodecEnv,
 ): CodecResult<docx.IDocumentDefaultsOptions> {
   return applyFates(docDefaults, DOC_DEFAULTS_FATES, env);
 }

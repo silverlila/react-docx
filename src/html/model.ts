@@ -92,8 +92,16 @@ export type ResolvedInline =
 export type ResolvedFloat = {
   readonly wrap: "none" | "square" | "topAndBottom";
   readonly behind: boolean;
-  readonly horizontal: { readonly from: "page" | "margin"; readonly align: "left" | "center" | "right" | null; readonly offsetPt: number };
-  readonly vertical: { readonly from: "page" | "margin" | "paragraph"; readonly align: "top" | "center" | "bottom" | null; readonly offsetPt: number };
+  readonly horizontal: {
+    readonly from: "page" | "margin";
+    readonly align: "left" | "center" | "right" | null;
+    readonly offsetPt: number;
+  };
+  readonly vertical: {
+    readonly from: "page" | "margin" | "paragraph";
+    readonly align: "top" | "center" | "bottom" | null;
+    readonly offsetPt: number;
+  };
   readonly distancePt: Readonly<Record<Side, number>>;
 };
 
@@ -144,7 +152,11 @@ export type ResolvedBlock =
     }
   | { readonly kind: "raw"; readonly path: TreePath; readonly element: string };
 
-export type ResolvedRow = { readonly heightPt: number | null; readonly isHeader: boolean; readonly cells: readonly ResolvedCell[] };
+export type ResolvedRow = {
+  readonly heightPt: number | null;
+  readonly isHeader: boolean;
+  readonly cells: readonly ResolvedCell[];
+};
 
 export type ResolvedCell = {
   readonly colSpan: number;

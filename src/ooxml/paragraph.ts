@@ -56,7 +56,6 @@ type FrameBase = Omit<docx.IXYFrameOptions, "type" | "position">;
 
 const WRITTEN_ONLY_WHEN_ON: readonly ParagraphFlag[] = ["pageBreakBefore", "overflowPunctuation"];
 
-
 const TAB_STOP_TYPES: readonly ValueOf<typeof docx.TabStopType>[] = [
   "left",
   "right",
@@ -74,7 +73,14 @@ const LEADERS: readonly ValueOf<typeof docx.LeaderType>[] = ["dot", "hyphen", "m
 const LINE_RULES: readonly ValueOf<typeof docx.LineRuleType>[] = ["atLeast", "exactly", "exact", "auto"];
 
 const FRAME_ANCHORS: readonly ValueOf<typeof docx.FrameAnchorType>[] = ["margin", "page", "text"];
-const FRAME_WRAPS: readonly ValueOf<typeof docx.FrameWrap>[] = ["around", "auto", "none", "notBeside", "through", "tight"];
+const FRAME_WRAPS: readonly ValueOf<typeof docx.FrameWrap>[] = [
+  "around",
+  "auto",
+  "none",
+  "notBeside",
+  "through",
+  "tight",
+];
 const DROP_CAPS: readonly ValueOf<typeof docx.DropCapType>[] = ["none", "drop", "margin"];
 const HORIZONTAL_ALIGNS: readonly ValueOf<typeof docx.HorizontalPositionAlign>[] = [
   "center",
@@ -97,7 +103,6 @@ const to = <K extends keyof ParagraphOptions>(key: K, read: ValueReader<NonNulla
 const offIsWritable = (key: ParagraphFlag): boolean => !WRITTEN_ONLY_WHEN_ON.includes(key);
 
 const flag = (key: ParagraphFlag) => to(key, onOff(offIsWritable(key)));
-
 
 const side = (key: keyof docx.IBordersOptions) => mapTo<docx.IBordersOptions, typeof key>(key, readBorder);
 

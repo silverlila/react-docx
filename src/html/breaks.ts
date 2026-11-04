@@ -40,8 +40,14 @@ export function formatKey(key: BreakKey): string {
 
 const KEY_PATTERNS: readonly (readonly [RegExp, (numbers: number[]) => BreakKey])[] = [
   [/^b(\d+)\.(\d+)$/, ([block, piece]) => ({ kind: "piece", block, piece })],
-  [/^b(\d+)\.(\d+)@(\d+):(\d+)$/, ([block, piece, text, offset]) => ({ kind: "continuation", block, piece, from: [text, offset] })],
-  [/^s(\d+)\.(\d+)@(\d+):(\d+)$/, ([block, piece, text, offset]) => ({ kind: "split", block, piece, at: [text, offset] })],
+  [
+    /^b(\d+)\.(\d+)@(\d+):(\d+)$/,
+    ([block, piece, text, offset]) => ({ kind: "continuation", block, piece, from: [text, offset] }),
+  ],
+  [
+    /^s(\d+)\.(\d+)@(\d+):(\d+)$/,
+    ([block, piece, text, offset]) => ({ kind: "split", block, piece, at: [text, offset] }),
+  ],
   [/^t(\d+):(\d+):(\d+)$/, ([block, start, repeated]) => ({ kind: "table", block, start, repeated })],
   [/^r(\d+):(\d+)$/, ([block, row]) => ({ kind: "row", block, row })],
 ];
@@ -64,13 +70,19 @@ const LAID_OUT_SLACK = 1.2;
 
 const MIN_ROOM = 0.2;
 
-function splitLine(el: HTMLElement, sliceTop: number, foot: number, toPage: (clientY: number) => number): { key: string; top: number } | null {
+function splitLine(
+  el: HTMLElement,
+  sliceTop: number,
+  foot: number,
+  toPage: (clientY: number) => number,
+): { key: string; top: number } | null {
   const piece = keyOf(el);
   if ((piece.kind !== "piece" && piece.kind !== "continuation") || el.dataset.docxKeepLines !== undefined) return null;
   const chars: { span: HTMLElement; node: Text; offset: number }[] = [];
   for (const span of el.querySelectorAll<HTMLElement>("[data-docx-text]")) {
     if (span.closest("[data-docx-floating]") !== null) continue;
-    for (const node of span.childNodes) if (node instanceof Text) for (let o = 0; o < node.length; o++) chars.push({ span, node, offset: o });
+    for (const node of span.childNodes)
+      if (node instanceof Text) for (let o = 0; o < node.length; o++) chars.push({ span, node, offset: o });
   }
   const range = el.ownerDocument.createRange();
   const lines: { start: number; top: number; bottom: number }[] = [];
@@ -114,19 +126,24 @@ export function measureBreaks(root: HTMLElement): string[] {
     if (body === null) continue;
     const footer = page.querySelector<HTMLElement>("[data-docx-footer]")?.offsetHeight ?? 0;
     const notes = new Map<string, number>();
-    for (const note of page.querySelectorAll<HTMLElement>("[data-docx-footnote]")) notes.set(note.dataset.docxFootnote ?? "", note.offsetHeight);
+    for (const note of page.querySelectorAll<HTMLElement>("[data-docx-footnote]"))
+      notes.set(note.dataset.docxFootnote ?? "", note.offsetHeight);
     const allNotes = page.querySelector<HTMLElement>("[data-docx-footnotes]")?.offsetHeight ?? 0;
     const rule = Math.max(0, allNotes - [...notes.values()].reduce((sum, h) => sum + h, 0));
-    const refsOf = (el: Element) => [...el.querySelectorAll<HTMLElement>("[data-docx-note]")].map((ref) => ref.dataset.docxNote ?? "");
+    const refsOf = (el: Element) =>
+      [...el.querySelectorAll<HTMLElement>("[data-docx-note]")].map((ref) => ref.dataset.docxNote ?? "");
     const blocks = [...body.children].filter(
-      (el): el is HTMLElement => el instanceof HTMLElement && el.dataset.docxKey !== undefined && el.dataset.docxFloating === undefined
+      (el): el is HTMLElement =>
+        el instanceof HTMLElement && el.dataset.docxKey !== undefined && el.dataset.docxFloating === undefined,
     );
     let sliceTop = y(body, "top");
     const foot = pageHeight - parseFloat(style.paddingBottom) - footer;
     let room = foot - sliceTop;
     if (room < pageHeight * MIN_ROOM) continue;
     const headerZone = page.querySelector<HTMLElement>("[data-docx-header]");
-    const marginTop = parseFloat(style.paddingTop) + (headerZone === null ? 0 : parseFloat(getComputedStyle(headerZone).minHeight) || 0);
+    const marginTop =
+      parseFloat(style.paddingTop) +
+      (headerZone === null ? 0 : parseFloat(getComputedStyle(headerZone).minHeight) || 0);
     const laterRoom = foot - marginTop >= pageHeight * MIN_ROOM ? foot - marginTop : room;
     let first = 0;
     let sliceNotes = new Set<string>();
@@ -154,7 +171,12 @@ export function measureBreaks(root: HTMLElement): string[] {
       const key = keyOf(el);
       if (key.kind !== "table") {
         while (!fits(y(el, "bottom"), refsOf(el))) {
-          const split = splitLine(el, sliceTop, sliceTop + room - notesHeight(), (clientY) => (clientY - box.top) / scale);
+          const split = splitLine(
+            el,
+            sliceTop,
+            sliceTop + room - notesHeight(),
+            (clientY) => (clientY - box.top) / scale,
+          );
           if (split !== null) {
             found.push(split.key);
             startSlice(split.top, []);

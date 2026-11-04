@@ -62,7 +62,7 @@ const MERGED_TABLE = renderToTree(
         </TableRow>
       </Table>
     </Section>
-  </Document>
+  </Document>,
 );
 
 const html = (document: DocumentNode): string => renderToStaticMarkup(<DocxPreview document={document} />);
@@ -98,7 +98,12 @@ describe("DocxPreview", () => {
     const out = html(document);
     const pages = resolveDocument(document);
     const blocks = allBlocks(
-      pages.flatMap((p) => [...p.header, ...p.parts.flatMap((part) => part.blocks), ...p.footer, ...p.footnotes.flatMap((note) => note.blocks)])
+      pages.flatMap((p) => [
+        ...p.header,
+        ...p.parts.flatMap((part) => part.blocks),
+        ...p.footer,
+        ...p.footnotes.flatMap((note) => note.blocks),
+      ]),
     );
     expect(blocks.length).toBeGreaterThan(0);
     for (const block of blocks) expect(out).toContain(pathAttr(block));
@@ -121,8 +126,8 @@ describe("DocxPreview", () => {
             <Paragraph>one</Paragraph>
             <Paragraph pageBreakBefore>two</Paragraph>
           </Section>
-        </Document>
-      )
+        </Document>,
+      ),
     );
     expect(count(out, "data-docx-page=")).toBe(2);
     expect(out).not.toContain("break-before");
@@ -167,7 +172,7 @@ describe("DocxPreview", () => {
             two
           </Paragraph>
         </Section>
-      </Document>
+      </Document>,
     );
     const out = html(document);
     expect(count(out, "data-docx-page=")).toBe(2);
@@ -194,7 +199,7 @@ describe("DocxPreview", () => {
             two
           </Paragraph>
         </Section>
-      </Document>
+      </Document>,
     );
     const fields = [...html(document).matchAll(/<span data-docx-field=""[^>]*>([^<]*)<\/span>/g)].map((m) => m[1]);
     expect(fields).toEqual(["1", "2", "2", "2"]);
@@ -223,26 +228,28 @@ describe("DocxPreview", () => {
     expect(out).not.toContain("<a");
   });
 
-  test.each([" JavaScript:alert(1)", "java\tscript:alert(1)", "vbscript:msgbox(1)", "data:text/html,<script>alert(1)</script>"])(
-    "draws %j as text with no href",
-    (link) => {
-      const out = html(
-        renderToTree(
-          <Document>
-            <Section>
-              <Paragraph>
-                <ExternalHyperlink link={link}>
-                  <TextRun text="click" />
-                </ExternalHyperlink>
-              </Paragraph>
-            </Section>
-          </Document>
-        )
-      );
-      expect(out).toContain("click");
-      expect(out).not.toContain("href=");
-    }
-  );
+  test.each([
+    " JavaScript:alert(1)",
+    "java\tscript:alert(1)",
+    "vbscript:msgbox(1)",
+    "data:text/html,<script>alert(1)</script>",
+  ])("draws %j as text with no href", (link) => {
+    const out = html(
+      renderToTree(
+        <Document>
+          <Section>
+            <Paragraph>
+              <ExternalHyperlink link={link}>
+                <TextRun text="click" />
+              </ExternalHyperlink>
+            </Paragraph>
+          </Section>
+        </Document>,
+      ),
+    );
+    expect(out).toContain("click");
+    expect(out).not.toContain("href=");
+  });
 
   test("draws http, https, mailto and bookmark links with their href, styled only by their runs", () => {
     const out = html(
@@ -267,8 +274,8 @@ describe("DocxPreview", () => {
               </InternalHyperlink>
             </Paragraph>
           </Section>
-        </Document>
-      )
+        </Document>,
+      ),
     );
     expect(out).toContain('<a href="https://example.com/a?b=1" style="color:inherit;text-decoration:none">');
     expect(out).toContain('<a href="http://example.com/" style="color:inherit;text-decoration:none">');
@@ -277,8 +284,12 @@ describe("DocxPreview", () => {
   });
 
   test("forwards className and other div props to its root", () => {
-    const out = renderToStaticMarkup(<DocxPreview document={MERGED_TABLE} className="my-preview" aria-label="Preview" />);
-    expect(out).toMatch(/^<div(?=[^>]*\bdata-docx-preview="")(?=[^>]*\bclass="my-preview")(?=[^>]*\baria-label="Preview")[^>]*>/);
+    const out = renderToStaticMarkup(
+      <DocxPreview document={MERGED_TABLE} className="my-preview" aria-label="Preview" />,
+    );
+    expect(out).toMatch(
+      /^<div(?=[^>]*\bdata-docx-preview="")(?=[^>]*\bclass="my-preview")(?=[^>]*\baria-label="Preview")[^>]*>/,
+    );
   });
 
   test("forwards its ref", () => {

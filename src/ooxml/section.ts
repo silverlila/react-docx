@@ -46,7 +46,6 @@ type SectionRead = CodecResult<{ properties?: docx.ISectionPropertiesOptions }> 
   }[];
 };
 
-
 const ORIENTATIONS: readonly ValueOf<typeof docx.PageOrientation>[] = ["portrait", "landscape"];
 const PAGE_NUMBER_SEPARATORS: readonly ValueOf<typeof docx.PageNumberSeparator>[] = [
   "hyphen",
@@ -79,7 +78,6 @@ const SECTION_TYPES: readonly ValueOf<typeof docx.SectionType>[] = [
   "oddPage",
 ];
 const REFERENCE_TYPES: readonly HeaderFooterReference["type"][] = ["default", "first", "even"];
-
 
 const isEmpty = (options: object): boolean => Object.keys(options).length === 0;
 

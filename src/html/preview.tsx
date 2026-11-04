@@ -33,7 +33,10 @@ import type {
 import { resolveDocument, type ResolvedPage, type ResolvedPart } from "./pages";
 import { hasTabs, tabLayout, type TabItem } from "./tabs";
 
-export type DocxPreviewProps = { readonly document: DocumentNode } & Omit<React.ComponentPropsWithoutRef<"div">, "children">;
+export type DocxPreviewProps = { readonly document: DocumentNode } & Omit<
+  React.ComponentPropsWithoutRef<"div">,
+  "children"
+>;
 
 const MIN_MARKER_GAP_PT = 6;
 const TEXTBOX_PADDING = "3.6pt 7.2pt";
@@ -123,7 +126,13 @@ const LINK: CSSProperties = { color: "inherit", textDecoration: "none" };
 
 const PT_PER_PX = 0.75;
 
-function aligned(align: "left" | "center" | "right" | "top" | "bottom" | null, start: number, size: number, item: number, offset: number): number {
+function aligned(
+  align: "left" | "center" | "right" | "top" | "bottom" | null,
+  start: number,
+  size: number,
+  item: number,
+  offset: number,
+): number {
   if (align === "left" || align === "top") return start;
   if (align === "center") return start + (size - item) / 2;
   if (align === "right" || align === "bottom") return start + size - item;
@@ -158,20 +167,44 @@ function placement(float: ResolvedFloat, widthPt: number, heightPt: number, geom
   }
   const right = left + widthPt / 2 > marginsPt.left + contentWidth / 2;
   return right
-    ? { float: "right", marginRight: pt(marginsPt.left + contentWidth - left - widthPt), marginLeft: pt(d.left), marginTop, marginBottom: pt(d.bottom) }
-    : { float: "left", marginLeft: pt(left - marginsPt.left), marginRight: pt(d.right), marginTop, marginBottom: pt(d.bottom) };
+    ? {
+        float: "right",
+        marginRight: pt(marginsPt.left + contentWidth - left - widthPt),
+        marginLeft: pt(d.left),
+        marginTop,
+        marginBottom: pt(d.bottom),
+      }
+    : {
+        float: "left",
+        marginLeft: pt(left - marginsPt.left),
+        marginRight: pt(d.right),
+        marginTop,
+        marginBottom: pt(d.bottom),
+      };
 }
 
-function FloatingImage({ image, float }: { readonly image: Extract<ResolvedInline, { kind: "image" }>; readonly float: ResolvedFloat }): ReactNode {
+function FloatingImage({
+  image,
+  float,
+}: {
+  readonly image: Extract<ResolvedInline, { kind: "image" }>;
+  readonly float: ResolvedFloat;
+}): ReactNode {
   const page = usePage();
   return (
-    <span data-docx-floating="" style={placement(float, image.widthPx * PT_PER_PX, image.heightPx * PT_PER_PX, page.geometry)}>
+    <span
+      data-docx-floating=""
+      style={placement(float, image.widthPx * PT_PER_PX, image.heightPx * PT_PER_PX, page.geometry)}
+    >
       <img src={image.src} width={image.widthPx} height={image.heightPx} alt={image.alt} style={{ display: "block" }} />
     </span>
   );
 }
 
-function TextboxBlock({ block, breakKey }: { readonly block: Extract<ResolvedBlock, { kind: "textbox" }> } & Keyed): ReactNode {
+function TextboxBlock({
+  block,
+  breakKey,
+}: { readonly block: Extract<ResolvedBlock, { kind: "textbox" }> } & Keyed): ReactNode {
   const page = usePage();
   const placed = block.float !== null;
   const place = placed ? placement(block.float, block.widthPt ?? 0, block.heightPt ?? 0, page.geometry) : {};
@@ -222,7 +255,13 @@ function Inline({ inline }: { readonly inline: ResolvedInline }): ReactNode {
       return <Field inline={inline} />;
     case "image":
       return inline.float === null ? (
-        <img src={inline.src} width={inline.widthPx} height={inline.heightPx} alt={inline.alt} style={{ verticalAlign: "bottom" }} />
+        <img
+          src={inline.src}
+          width={inline.widthPx}
+          height={inline.heightPx}
+          alt={inline.alt}
+          style={{ verticalAlign: "bottom" }}
+        />
       ) : (
         <FloatingImage image={inline} float={inline.float} />
       );
@@ -261,7 +300,13 @@ function Inlines({ inlines }: { readonly inlines: readonly ResolvedInline[] }): 
   return inlines.map((inline, i) => <Inline key={i} inline={inline} />);
 }
 
-function Marker({ marker, format }: { readonly marker: ResolvedMarker; readonly format: ComputedParagraph }): ReactNode {
+function Marker({
+  marker,
+  format,
+}: {
+  readonly marker: ResolvedMarker;
+  readonly format: ComputedParagraph;
+}): ReactNode {
   if (marker.suffix !== "tab") {
     return (
       <>
@@ -327,7 +372,8 @@ function Gap({ item }: { readonly item: Extract<TabItem, { kind: "gap" }> }): Re
 
 function TabbedInlines({ block }: { readonly block: Paragraph }): ReactNode {
   const { format, marker } = block;
-  const startPt = marker === null ? format.firstLinePt : format.firstLinePt < 0 ? 0 : format.firstLinePt + MIN_MARKER_GAP_PT * 3;
+  const startPt =
+    marker === null ? format.firstLinePt : format.firstLinePt < 0 ? 0 : format.firstLinePt + MIN_MARKER_GAP_PT * 3;
   const spans = tabLayout(block.inlines, { stops: format.tabStops, startPt });
   const placed = spans.filter((span) => span.widthPt !== null);
   const rest = spans.filter((span) => span.widthPt === null);
@@ -339,7 +385,7 @@ function TabbedInlines({ block }: { readonly block: Paragraph }): ReactNode {
         <span key={j} style={span.widthPt === null ? undefined : { flex: "0 1 auto", minWidth: 0 }}>
           <Inlines inlines={item.inlines} />
         </span>
-      )
+      ),
     );
   return (
     <>
@@ -453,7 +499,11 @@ function TableBlock({ block, breakKey }: { readonly block: Table } & Keyed): Rea
         ...(block.rtl ? { direction: "rtl" } : {}),
         ...(block.fixed ? { tableLayout: "fixed" } : {}),
         ...(block.indentPt === 0 || block.align !== "start" ? {} : { marginInlineStart: pt(block.indentPt) }),
-        ...(block.widthPct !== null ? { width: `${block.widthPct}%` } : block.widthPt === null ? {} : { width: pt(block.widthPt) }),
+        ...(block.widthPct !== null
+          ? { width: `${block.widthPct}%` }
+          : block.widthPt === null
+            ? {}
+            : { width: pt(block.widthPt) }),
       }}
     >
       {block.columnWidthsPt.length === 0 ? null : (
@@ -515,7 +565,11 @@ function Part({ part }: { readonly part: ResolvedPart }): ReactNode {
     return (
       <div
         data-docx-columns={columns.count}
-        style={{ display: "grid", gridTemplateColumns: `repeat(${columns.count}, minmax(0, 1fr))`, columnGap: pt(columns.spacePt) }}
+        style={{
+          display: "grid",
+          gridTemplateColumns: `repeat(${columns.count}, minmax(0, 1fr))`,
+          columnGap: pt(columns.spacePt),
+        }}
       >
         {columnStarts.map((start, i) => (
           <div
@@ -574,7 +628,10 @@ function Page({ page, total }: { readonly page: ResolvedPage; readonly total: nu
           ))}
         </div>
         <Footnotes notes={page.footnotes} />
-        <div data-docx-footer="" style={{ ...FLOW, justifyContent: "flex-end", minHeight: pt(Math.max(0, bottom - footer)) }}>
+        <div
+          data-docx-footer=""
+          style={{ ...FLOW, justifyContent: "flex-end", minHeight: pt(Math.max(0, bottom - footer)) }}
+        >
           <Blocks blocks={page.footer} />
         </div>
       </div>
@@ -586,7 +643,7 @@ const useIsomorphicLayoutEffect = typeof window === "undefined" ? React.useEffec
 
 export const DocxPreview = React.forwardRef<HTMLDivElement, DocxPreviewProps>(function DocxPreview(
   { document, ...rest },
-  ref
+  ref,
 ) {
   const [measured, setMeasured] = React.useState<{ readonly document: DocumentNode; readonly breaks: MeasuredBreaks }>({
     document,

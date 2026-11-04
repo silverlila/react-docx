@@ -54,7 +54,8 @@ const wrapped = (root: string, inside: string): string => `${DECLARATION}<${root
 const relationship = (id: string, type: string, target: string): string =>
   `<Relationship Id="${id}" Type="${type}" Target="${target}"/>`;
 
-const relationships = (inside: string): string => `${DECLARATION}<Relationships xmlns="${RELATIONSHIPS}">${inside}</Relationships>`;
+const relationships = (inside: string): string =>
+  `${DECLARATION}<Relationships xmlns="${RELATIONSHIPS}">${inside}</Relationships>`;
 
 const override = (partName: string, contentType: string): string =>
   `<Override PartName="/${partName}" ContentType="${contentType}"/>`;
@@ -82,7 +83,9 @@ export function docx(parts: FixtureParts): Uint8Array {
     overrides.push(override("word/theme/theme1.xml", "application/vnd.openxmlformats-officedocument.theme+xml"));
   }
   if (parts.core !== undefined) {
-    files["docProps/core.xml"] = strToU8(`${DECLARATION}<cp:coreProperties ${CORE_NAMESPACES}>${parts.core}</cp:coreProperties>`);
+    files["docProps/core.xml"] = strToU8(
+      `${DECLARATION}<cp:coreProperties ${CORE_NAMESPACES}>${parts.core}</cp:coreProperties>`,
+    );
     packageRels.push(relationship("rIdFixture-core", `${RELATIONSHIPS}/metadata/core-properties`, "docProps/core.xml"));
     overrides.push(override("docProps/core.xml", "application/vnd.openxmlformats-package.core-properties+xml"));
   }

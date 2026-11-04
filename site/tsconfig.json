@@ -1,11 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": [
-      "ES2022",
-      "DOM",
-      "DOM.Iterable"
-    ],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
@@ -15,34 +11,15 @@
     "isolatedModules": true,
     "esModuleInterop": true,
     "resolveJsonModule": true,
-    "types": [
-      "node",
-      "vite/client"
-    ],
+    "types": ["node", "vite/client"],
     "paths": {
-      "@react-docx/core": [
-        "../src/index.ts"
-      ],
-      "@react-docx/core/reader": [
-        "../src/read/index.ts"
-      ],
-      "@react-docx/core/codegen": [
-        "../src/codegen/index.ts"
-      ],
-      "@react-docx/core/html": [
-        "../src/html/index.ts"
-      ],
-      "react": [
-        "./node_modules/@types/react"
-      ],
-      "react/*": [
-        "./node_modules/@types/react/*"
-      ]
+      "@react-docx/core": ["../src/index.ts"],
+      "@react-docx/core/reader": ["../src/read/index.ts"],
+      "@react-docx/core/codegen": ["../src/codegen/index.ts"],
+      "@react-docx/core/html": ["../src/html/index.ts"],
+      "react": ["./node_modules/@types/react"],
+      "react/*": ["./node_modules/@types/react/*"]
     }
   },
-  "include": [
-    "src",
-    "vite.config.ts",
-    "../src/tree/reconcilers.d.ts"
-  ]
+  "include": ["src", "vite.config.ts", "../src/tree/reconcilers.d.ts"]
 }

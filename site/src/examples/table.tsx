@@ -7,7 +7,14 @@ const rows = [
 ];
 
 const border = { style: "single", size: 4, color: "BFC7D5" } as const;
-const borders = { top: border, bottom: border, left: border, right: border, insideHorizontal: border, insideVertical: border };
+const borders = {
+  top: border,
+  bottom: border,
+  left: border,
+  right: border,
+  insideHorizontal: border,
+  insideVertical: border,
+};
 
 export default function StatusTable() {
   return (
