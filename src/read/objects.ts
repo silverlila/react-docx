@@ -37,7 +37,7 @@ const length = (value: string): Length | null =>
   value === "auto" || isMeasure(value) ? value : NUMBER.test(value) ? Number(value) : null;
 const number = (value: string): number | null => (NUMBER.test(value) ? Number(value) : null);
 const oneOf =
-  <V extends string>(values: readonly V[]) =>
+  <const V extends string>(values: readonly V[]) =>
   (value: string): V | null =>
     values.find((known) => known === value) ?? null;
 const flag = (value: string): boolean | null => (value === "t" || value === "true" ? true : value === "f" || value === "false" ? false : null);
