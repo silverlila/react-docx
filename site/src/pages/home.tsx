@@ -31,7 +31,7 @@ const PATHS = [
     from: "tree",
     to: "HTML",
     title: "Preview",
-    body: "Show the document in your app as page-width sheets. The preview entry loads no docx.js.",
+    body: "Show the document in your app, laid out on pages. The preview entry loads no docx.js.",
     code: `<DocxPreview document={renderToTree(<Invoice />)} />`,
   },
 ] as const;

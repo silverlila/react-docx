@@ -269,6 +269,7 @@ Put `<Header>` and `<Footer>` directly inside a `<Section>`. They take the same 
 
 - **Headers and footers.** `Section`'s `headers` and `footers` props are removed. Use `<Header>` and `<Footer>` children.
 - **Footnotes and comments.** `Document`'s `footnotes` and `comments` props are removed. Put a `<Footnote>` in a paragraph where its number goes, and `<Comment>` elements directly in the `Document`.
+- **Checked props.** A prop value that docx.js would write into a file Word cannot open throws a `TreeError`: a `SymbolRun` `char` that is not four hex digits (such as `"F071"`), an `ImageRun` `type` other than jpg, png, gif, bmp or svg, an svg `ImageRun` without a raster `fallback`, and a `Textbox` `style` value of the wrong kind, such as a length that is not a CSS length (`".5in"` is one, `"1e2pt"` is not).
 - **Styles.** `Document`'s `externalStyles` and `styles.initialStyles` are removed. `styles.importedStyles` takes XML strings of `<w:style>` elements instead of docx.js objects.
 - **Lists.** `List`'s `level` prop is removed: nest a `<List>` in a `<List>` or a `<ListItem>` instead. Each `<List>` now numbers from 1, where before every numbered list continued the previous one, and a nested list keeps its own `type`.
 

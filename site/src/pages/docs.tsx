@@ -190,7 +190,7 @@ writeFileSync("hello.docx", await renderToBuffer(<Hello />));`}
               A <code>"first"</code> header shows only when the section sets <code>properties.titlePage</code>. An{" "}
               <code>"even"</code> header needs the document’s <code>evenAndOddHeaderAndFooters</code>.
             </li>
-            <li>The preview draws fields as placeholders, because page numbers only exist once Word lays out pages.</li>
+            <li>The preview shows each page’s own number, the page count and the section’s number.</li>
           </ul>
         </Section>
 
@@ -248,6 +248,13 @@ link.click();`}
             a paragraph:
           </p>
           <CodeBlock code="Document > Section[0] > PageBreak[0]: <PageBreak> is not allowed in <Section>" language="sh" />
+          <p>
+            A prop value that docx.js would write into a file Word cannot open throws the same way: a{" "}
+            <code>SymbolRun</code> <code>char</code> that is not four hex digits such as <code>"F071"</code>, an{" "}
+            <code>ImageRun</code> <code>type</code> other than jpg, png, gif, bmp or svg, an svg <code>ImageRun</code>{" "}
+            without a raster <code>fallback</code>, and a <code>Textbox</code> <code>style</code> value of the wrong
+            kind, such as a length that is not a CSS length.
+          </p>
         </Section>
 
         <Section id="reading" title="readDocx">
@@ -315,9 +322,9 @@ for (const asset of assets) writeFileSync(asset.path, asset.bytes); // assets/im
 
         <Section id="preview" title="DocxPreview">
           <p>
-            <code>DocxPreview</code> draws a tree as HTML: one page-width sheet per section, with the document’s
-            fonts, spacing, lists, tables, images, headers and footers. It takes a tree rather than children, so render
-            your JSX to a tree first.
+            <code>DocxPreview</code> draws a tree as HTML on pages of the document’s page size, with its fonts,
+            spacing, lists, tables, images, headers, footers and footnotes. It takes a tree rather than children, so
+            render your JSX to a tree first.
           </p>
           <CodeBlock
             title="ResumePreview.tsx"
@@ -330,6 +337,12 @@ export function ResumePreview({ data }: { data: ResumeData }) {
 }`}
           />
           <ul className="docs-list">
+            <li>
+              A page ends at a page break, before a section that is not continuous and before a paragraph with{" "}
+              <code>pageBreakBefore</code>, and
+              where Word ended it when it last saved the file. In a browser the preview also measures each page and
+              moves what does not fit to the next one; rendered on a server, a page that overflows grows instead.
+            </li>
             <li>Every style is inline, so it needs no stylesheet. It forwards its ref and any div props.</li>
             <li>
               Every block carries <code>data-docx-path</code>, its path in the tree, for linking your UI to a place in
@@ -349,11 +362,10 @@ export function ResumePreview({ data }: { data: ResumeData }) {
         <Section id="limits" title="Known limits">
           <ul className="docs-list">
             <li>
-              The preview does not paginate. Each section is one sheet as long as its content, and fields such as page
-              numbers show as placeholders.
+              Lines and pages break where the browser’s text layout puts them, so a page can end a few lines earlier
+              or later than in Word.
             </li>
             <li>Fonts are the browser’s. A font the document names but the viewer lacks falls back to another.</li>
-            <li>The preview draws right-to-left text, such as Arabic and Hebrew, left-aligned.</li>
             <li>
               docx.js always writes table borders, so a table that relied on its table style can gain thin borders when
               read and written back.
