@@ -26,6 +26,7 @@ import { levelOf, markerText, type Counters } from "../ooxml/markers";
 import type { RunOptions } from "../ooxml/run";
 import type { TreePath } from "../read/diagnostics";
 import type { ChildKind, DocumentNode, Node, Props } from "../schema/elements";
+import { VML_MEASURE } from "../schema/docx-facts";
 import { own } from "../schema/own";
 import { xmlRoots } from "../tree/xml-roots";
 import { lineHeightOf } from "./fonts";
@@ -777,9 +778,9 @@ function table(node: Node<"Table">, path: TreePath, story: Story): ResolvedBlock
 function vmlLength(length: unknown): number | null {
   if (typeof length === "number") return length * 0.75;
   if (typeof length !== "string") return null;
-  const px = /^(-?[0-9.]+)px$/.exec(length);
-  if (px !== null) return Number(px[1]) * 0.75;
-  return UNIVERSAL_MEASURE.test(length) ? pointsOf(length, 1) : null;
+  const match = VML_MEASURE.exec(length);
+  const perUnit = match === null ? undefined : own(POINTS_PER_UNIT, match[2]);
+  return match === null || perUnit === undefined ? null : Number(match[1]) * perUnit;
 }
 
 const VML_ALIGNS: Readonly<Record<string, "left" | "center" | "right">> = { left: "left", center: "center", right: "right", inside: "left", outside: "right" };

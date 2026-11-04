@@ -470,6 +470,17 @@ describe("Textbox style", () => {
     expect(error.message).toContain(`Textbox style.${field} must be ${expected}`);
   });
 
+  test.each([".5in", "-.5cm", "+2pt", "1.25mm", "10%"])("style.width = %j, a CSS length Word reads, is kept", (width) => {
+    expect(styleOf(canon(box({ width })))).toEqual({ width });
+  });
+
+  test.each(["1e2pt", "1.in", "0x10in", " 1in", "1 in", "--1in"])(
+    "style.width = %j, which docx.js's type allows but a VML style cannot hold, throws",
+    (width) => {
+      expect(treeError(() => canon(box({ width }))).message).toContain(`Textbox style.width must be "auto", a number or a measure such as "2in", got "${width}"`);
+    }
+  );
+
   test("a style that is not an object throws", () => {
     expect(treeError(() => canon(box("width:1in"))).message).toContain('Textbox style must be an object, got "width:1in"');
   });

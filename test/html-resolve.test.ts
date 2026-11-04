@@ -886,6 +886,14 @@ describe("text boxes", () => {
     ).toMatchObject({ widthPt: 144, heightPt: 40, float: { wrap: "none", horizontal: { from: "page", offsetPt: 72 }, vertical: { from: "paragraph", offsetPt: 15 } } });
   });
 
+  test("lengths with a leading-dot fraction or a sign place and size the box", () => {
+    expect(box({ position: "absolute", marginLeft: ".5in", width: ".5in", height: "+36pt" })).toMatchObject({
+      widthPt: 36,
+      heightPt: 36,
+      float: { horizontal: { offsetPt: 36 } },
+    });
+  });
+
   test("a text box without a position stays in the flow", () => {
     expect(box({ width: "100pt" })).toMatchObject({ widthPt: 100, float: null });
   });

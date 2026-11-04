@@ -288,6 +288,11 @@ describe("VML", () => {
     });
   });
 
+  test("a text box's lengths with a leading-dot fraction or a sign read as written", () => {
+    const box = '<w:pict><v:shape id="b1" style="position:absolute;width:.5in;height:+36pt;margin-left:-.25in"><v:textbox><w:txbxContent/></v:textbox></v:shape></w:pict>';
+    expect(blocksOf({ body: p(r(box)) })[0].props).toEqual({ style: { position: "absolute", width: ".5in", height: "+36pt", marginLeft: "-.25in" } });
+  });
+
   test("w:object (an OLE object) is dropped", () => {
     const object = '<w:object><v:shape id="o1" style="width:72pt;height:36pt"><v:imagedata r:id="rId5"/></v:shape><o:OLEObject r:id="rId6"/></w:object>';
     const parts = withMedia(p(r(object)));

@@ -7,9 +7,11 @@
  *  - RAW_XML_ROOTS: the top-level OOXML elements a RawXml fragment may hold, by slot.
  *  - SYMBOL_CHAR: a w:sym's w:char, OOXML's ST_ShortHexNumber. docx.js writes SymbolRun's char unchecked.
  *  - RASTER_IMAGE_TYPES: the ImageRun types other than "svg"; an svg ImageRun needs a fallback of one.
- *  - VML_POSITIONS, VML_RELATIVE_TO, VML_POSITION, VML_MEASURE: the values docx.js's VmlShapeStyle (a
- *    Textbox style) types allow for its positions and its lengths' string form. docx.js writes the style
- *    unchecked. */
+ *  - VML_POSITIONS, VML_RELATIVE_TO, VML_POSITION: the values docx.js's VmlShapeStyle (a Textbox style)
+ *    types allow for its positions. docx.js writes the style unchecked.
+ *  - VML_MEASURE: a length's string form in a VML style, which is CSS: a CSS number ("2", "1.5", ".5",
+ *    "-.5", "+2") and a unit; its groups are the number and the unit. docx.js's ${number} types also
+ *    admit forms CSS has no number for, such as "1e2pt", "1.in" and "0x10in". */
 
 import type * as docx from "docx";
 
@@ -31,7 +33,7 @@ export const VML_RELATIVE_TO = ["margin", "page", "text", "char"] as const satis
   ShapeStyle["positionHorizontalRelative"] & ShapeStyle["positionVerticalRelative"]
 >;
 export const VML_POSITION = ["static", "absolute", "relative"] as const satisfies Values<ShapeStyle["position"]>;
-export const VML_MEASURE = /^-?[0-9]+(\.[0-9]+)?(mm|cm|in|pt|pc|pi|em|ex|%)$/;
+export const VML_MEASURE = /^([+-]?(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+))(mm|cm|in|pt|pc|pi|em|ex|%)$/;
 
 type DefaultStyleKey = Exclude<keyof NonNullable<docx.IStylesOptions["default"]>, "document">;
 type DefaultStyleSlot = { readonly key: DefaultStyleKey; readonly kind: "paragraph" | "character" };
