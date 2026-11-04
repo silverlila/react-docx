@@ -8,7 +8,7 @@
  *  - The w15:tentative attribute is not a child element, so it has no fate; docx.js writes its own. */
 
 import type * as docx from "docx";
-import { attrOf, type XmlElement } from "../read/xml";
+import { attrOf, type XmlElement } from "./xml";
 import {
   applyFates,
   dropped,

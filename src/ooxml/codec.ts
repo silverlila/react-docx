@@ -15,10 +15,22 @@
  *  - Codecs import docx only as types, because the HTML bundle uses them (decision 15). */
 
 import type * as docx from "docx";
-import type { OpcPackage } from "../read/package";
-import { attrOf, elementsOf, isOn, type XmlElement } from "../read/xml";
+import { attrOf, elementsOf, isOn, type XmlElement } from "./xml";
 
-export type CodecEnv = { readonly theme: OpcPackage["theme"] };
+export type ThemeFontSet = {
+  readonly latin: string | null;
+  readonly eastAsia: string | null;
+  readonly complex: string | null;
+};
+
+export type ThemeFonts = { readonly major: ThemeFontSet; readonly minor: ThemeFontSet };
+
+/** Word theme colour names → 6-digit hex. Keys: dk1 lt1 dk2 lt2 accent1–6 hlink folHlink. */
+export type ThemeColors = Readonly<Record<string, string>>;
+
+export type Theme = { readonly fonts: ThemeFonts; readonly colors: ThemeColors };
+
+export type CodecEnv = { readonly theme: Theme };
 
 export type Note = {
   readonly fate: "resolved" | "dropped" | "ignored";

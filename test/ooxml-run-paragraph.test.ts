@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import type { CodecEnv } from "../src/ooxml/codec";
 import { readParagraphProperties, type ParagraphOptions } from "../src/ooxml/paragraph";
 import { readRunProperties, type RunOptions } from "../src/ooxml/run";
-import { parseXml } from "../src/read/xml";
+import { parseXml } from "../src/ooxml/xml";
 import { paragraphPropertiesXml, runPropertiesXml } from "./support/docx-props";
 
 const NO_FONTS = { latin: null, eastAsia: null, complex: null };

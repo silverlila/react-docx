@@ -12,7 +12,7 @@
  *  - docx.js's paragraph borders have no `between` or `bar` side, so those are dropped. */
 
 import type * as docx from "docx";
-import { attrOf, childNamed, childrenNamed, isOn, type XmlElement } from "../read/xml";
+import { attrOf, childNamed, childrenNamed, isOn, type XmlElement } from "./xml";
 import {
   applyFates,
   dropped,

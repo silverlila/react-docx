@@ -11,7 +11,7 @@ import type { CodecEnv, Note } from "../ooxml/codec";
 import { createDiagnostics, type DiagnosticCollector, type LocatedDiagnostic, type TreePath } from "./diagnostics";
 import { createOrdinals, type Ordinals } from "./ordinals";
 import { targetOfType, type OpcPackage } from "./package";
-import type { XmlElement } from "./xml";
+import type { XmlElement } from "../ooxml/xml";
 
 export type Report = Omit<LocatedDiagnostic, "part" | "at">;
 

@@ -25,7 +25,7 @@ import { commentNode, readNotesParts } from "./notes";
 import { readNumberingPart } from "./numbering";
 import { NotADocxError } from "./package";
 import { readStylesPart } from "./styles";
-import { attrOf, childNamed, elementsOf, isOn, textOf, type XmlElement } from "./xml";
+import { attrOf, childNamed, elementsOf, isOn, textOf, type XmlElement } from "../ooxml/xml";
 
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 type DocumentProps = Mutable<Omit<docx.IPropertiesOptions, "sections" | "styles">> & {

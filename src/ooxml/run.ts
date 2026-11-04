@@ -17,8 +17,7 @@
  *    give the string form. */
 
 import type * as docx from "docx";
-import { attrOf, childNamed, type XmlElement } from "../read/xml";
-import type { ThemeFonts, ThemeFontSet } from "../read/package";
+import { attrOf, childNamed, type XmlElement } from "./xml";
 import {
   applyFates,
   colorOf,
@@ -40,6 +39,8 @@ import {
   type Draft,
   type FateTable,
   type Note,
+  type ThemeFonts,
+  type ThemeFontSet,
   type ValueOf,
   type ValueReader,
 } from "./codec";

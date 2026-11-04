@@ -13,24 +13,14 @@
  *    whole number, the only form docx.js can write back. */
 
 import { strFromU8, unzipSync } from "fflate";
-import { attrOf, childNamed, elementsOf, parseXml, textOf, type XmlElement } from "./xml";
+import type { Theme, ThemeColors, ThemeFonts, ThemeFontSet } from "../ooxml/codec";
+import { attrOf, childNamed, elementsOf, parseXml, textOf, type XmlElement } from "../ooxml/xml";
 
 export class NotADocxError extends Error {
   name = "NotADocxError";
 }
 
 export type Rel = { readonly type: string; readonly target: string; readonly external: boolean };
-
-export type ThemeFontSet = {
-  readonly latin: string | null;
-  readonly eastAsia: string | null;
-  readonly complex: string | null;
-};
-
-export type ThemeFonts = { readonly major: ThemeFontSet; readonly minor: ThemeFontSet };
-
-/** Word theme colour names → 6-digit hex. Keys: dk1 lt1 dk2 lt2 accent1–6 hlink folHlink. */
-export type ThemeColors = Readonly<Record<string, string>>;
 
 export type CoreProperties = {
   readonly title?: string;
@@ -49,7 +39,7 @@ export type OpcPackage = {
   media(path: string): Uint8Array | null;
   hasPart(path: string): boolean;
   readonly paths: readonly string[];
-  readonly theme: { readonly fonts: ThemeFonts; readonly colors: ThemeColors };
+  readonly theme: Theme;
   readonly core: CoreProperties;
 };
 

@@ -11,7 +11,7 @@ import { strFromU8, unzipSync } from "fflate";
 import type { ParagraphOptions } from "../../src/ooxml/paragraph";
 import type { RunOptions } from "../../src/ooxml/run";
 import type { CellOptions, RowOptions, TableOptions } from "../../src/ooxml/table";
-import { childNamed, childrenNamed, parseXml, serializeXml, type XmlElement } from "../../src/read/xml";
+import { childNamed, childrenNamed, parseXml, serializeXml, type XmlElement } from "../../src/ooxml/xml";
 
 export type StyleSample =
   | { readonly kind: "paragraph"; readonly options: docx.IParagraphStyleOptions }

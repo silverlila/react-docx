@@ -58,7 +58,7 @@ import {
 import { parseDrawing, parseVmlImage, readDrawing, readPicture } from "./images";
 import { isPlainMath, readMath } from "./math";
 import { alternateContent, textBoxOf, textBoxStyle, type TextBox } from "./objects";
-import { attrOf, childNamed, elementsOf, serializeXml, textOf, type XmlElement } from "./xml";
+import { attrOf, childNamed, elementsOf, serializeXml, textOf, type XmlElement } from "../ooxml/xml";
 
 type Slot = "block" | "inline" | "run";
 type Children = readonly (AuthorNode | string)[];

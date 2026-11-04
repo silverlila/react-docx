@@ -10,7 +10,7 @@
 
 import type * as docx from "docx";
 import { dropped, type Note } from "../ooxml/codec";
-import { attrOf, childNamed, childrenNamed, elementsOf, type XmlElement } from "./xml";
+import { attrOf, childNamed, childrenNamed, elementsOf, type XmlElement } from "../ooxml/xml";
 
 type ShapeStyle = NonNullable<ConstructorParameters<typeof docx.Textbox>[0]["style"]>;
 type StyleValue = string | number | boolean;

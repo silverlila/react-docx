@@ -17,7 +17,7 @@ import { readLevel } from "../ooxml/level";
 import { hasNumberFormat, markerText, type Counters } from "../ooxml/markers";
 import { partOfType, type ReadContext } from "./context";
 import type { Ordinals } from "./ordinals";
-import { attrOf, childNamed, elementsOf, type XmlElement } from "./xml";
+import { attrOf, childNamed, elementsOf, type XmlElement } from "../ooxml/xml";
 
 type Levels = readonly docx.ILevelsOptions[];
 

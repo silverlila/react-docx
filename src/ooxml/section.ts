@@ -8,7 +8,7 @@
  *  - w:headerReference and w:footerReference are not options: the body walk (unit 04) reads their parts. */
 
 import type * as docx from "docx";
-import { attrOf, elementsOf, type XmlElement } from "../read/xml";
+import { attrOf, elementsOf, type XmlElement } from "./xml";
 import {
   applyFates,
   dropped,

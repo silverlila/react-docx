@@ -14,7 +14,7 @@ import { readDocDefaults, readStyle } from "../ooxml/style";
 import type { StylesProps } from "../schema/elements";
 import { partOfType, type ReadContext } from "./context";
 import { numberingOption, type NumberingReader } from "./numbering";
-import { attrOf, elementsOf, type XmlElement } from "./xml";
+import { attrOf, elementsOf, type XmlElement } from "../ooxml/xml";
 
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 

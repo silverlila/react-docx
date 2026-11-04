@@ -13,10 +13,10 @@
  *    it wrote, and docx.js writes no theme part. */
 
 import type * as docx from "docx";
-import type { CodecEnv } from "../ooxml/codec";
-import type { RunOptions } from "../ooxml/run";
-import { readStyleForPreview } from "../ooxml/style";
-import { parseXml } from "../read/xml";
+import { isOneOf, isOnValue, type CodecEnv, type Note } from "../ooxml/codec";
+import { readRunOption, type RunOptions } from "../ooxml/run";
+import { readStyleParagraph } from "../ooxml/style";
+import { attrOf, childNamed, parseXml, type XmlElement } from "../ooxml/xml";
 import { DEFAULT_STYLE_SLOTS } from "../schema/docx-facts";
 import type { StylesProps } from "../schema/elements";
 import { DOCX_DEFAULT_STYLES } from "./docx-default-styles.generated";
@@ -40,6 +40,10 @@ export type EffectiveSheet = {
 
 type StyleOptions = { readonly basedOn?: string; readonly paragraph?: SheetParagraph; readonly run?: RunOptions };
 
+type ImportedStyle = { readonly id: string; readonly isDefault: boolean; readonly sheet: SheetStyle };
+
+const SHEET_TYPES: readonly SheetStyle["type"][] = ["paragraph", "character", "table"];
+
 /** folio's cap on a basedOn chain, which also stops a cycle. */
 const MAX_STYLE_HOPS = 10;
 
@@ -55,6 +59,32 @@ function sheetStyle(type: SheetStyle["type"], { basedOn, paragraph, run }: Style
   };
 }
 
+/** Any w:style, read with the property codecs (raw `importedStyles` included); null for a numbering style
+ *  or a style with no w:styleId, which no paragraph, run or table can name.
+ *
+ *  - Notes are not kept: the reader already reported this style when it read the file.
+ *  - w:tblStylePr (conditional formatting of first rows, banding, …) is not read. That is a preview
+ *    simplification, not a reader or writer gap.
+ *  - A w:numPr in the style's w:pPr is left out: it names a numId, which only the reader can resolve. */
+function readImportedStyle(style: XmlElement): ImportedStyle | null {
+  const type = attrOf(style, "w:type") ?? "paragraph";
+  const id = attrOf(style, "w:styleId");
+  if (id === null || !isOneOf(SHEET_TYPES, type)) return null;
+  const notes: Note[] = [];
+  const pPr = childNamed(style, "w:pPr");
+  const rPr = childNamed(style, "w:rPr");
+  const isDefault = attrOf(style, "w:default");
+  return {
+    id,
+    isDefault: isDefault !== null && isOnValue(isDefault),
+    sheet: sheetStyle(type, {
+      basedOn: attrOf(childNamed(style, "w:basedOn"), "w:val") ?? undefined,
+      paragraph: pPr === null ? undefined : readStyleParagraph(pPr, EMPTY_ENV, notes).paragraph,
+      run: (rPr === null ? null : readRunOption(rPr, EMPTY_ENV, notes)) ?? undefined,
+    }),
+  };
+}
+
 export function effectiveSheet(styles: StylesProps | undefined): EffectiveSheet {
   const authored = styles?.default;
   const builtIn = DOCX_DEFAULT_STYLES.default;
@@ -67,7 +97,7 @@ export function effectiveSheet(styles: StylesProps | undefined): EffectiveSheet 
   for (const style of styles?.characterStyles ?? []) byId.set(style.id, sheetStyle("character", style));
   let defaultParagraphStyle: string | null = null;
   for (const xml of styles?.importedStyles ?? []) {
-    const read = readStyleForPreview(parseXml(xml), EMPTY_ENV);
+    const read = readImportedStyle(parseXml(xml));
     if (read === null) continue;
     byId.set(read.id, read.sheet);
     if (read.isDefault && read.sheet.type === "paragraph") defaultParagraphStyle = read.id;

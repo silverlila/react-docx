@@ -21,7 +21,7 @@ import type { ImageProps } from "../schema/elements";
 import type { AuthorNode } from "../tree/author";
 import type { ReadContext } from "./context";
 import { styleDeclarations } from "./objects";
-import { attrOf, childNamed, elementsOf, textOf, type XmlElement } from "./xml";
+import { attrOf, childNamed, elementsOf, textOf, type XmlElement } from "../ooxml/xml";
 
 type ValueOf<T> = T[keyof T];
 type Raster = { readonly type: "jpg" | "png" | "gif" | "bmp"; readonly data: Uint8Array };

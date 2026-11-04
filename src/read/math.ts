@@ -7,7 +7,7 @@
 
 import type { AuthorNode } from "../tree/author";
 import type { ReadContext } from "./context";
-import { elementsOf, textOf, type XmlElement } from "./xml";
+import { elementsOf, textOf, type XmlElement } from "../ooxml/xml";
 
 const RUN_PROPERTIES = new Set(["m:rPr", "w:rPr"]);
 

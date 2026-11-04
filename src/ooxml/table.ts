@@ -16,7 +16,7 @@
  *    side the file leaves to the table style comes back as a single border. No option can avoid it. */
 
 import type * as docx from "docx";
-import { attrOf, childNamed, elementsOf, type XmlElement } from "../read/xml";
+import { attrOf, childNamed, elementsOf, type XmlElement } from "./xml";
 import {
   applyFates,
   dropped,

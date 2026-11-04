@@ -12,7 +12,7 @@ import {
   type RowOptions,
   type TableOptions,
 } from "../src/ooxml/table";
-import { parseXml } from "../src/read/xml";
+import { parseXml } from "../src/ooxml/xml";
 import {
   cellPropertiesXml,
   docDefaultsXml,

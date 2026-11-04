@@ -2,7 +2,7 @@ import { strToU8, zipSync } from "fflate";
 import { describe, expect, test } from "vitest";
 import { renderToBuffer } from "../src/index";
 import { NotADocxError, openPackage } from "../src/read/package";
-import { attrOf, childNamed, isOn, parseXml, parseXmlFragment, serializeXml, textOf } from "../src/read/xml";
+import { attrOf, childNamed, isOn, parseXml, parseXmlFragment, serializeXml, textOf } from "../src/ooxml/xml";
 import { CASES } from "./support/cases";
 import { PICTURE, docx, part } from "./support/docx-fixture";
 

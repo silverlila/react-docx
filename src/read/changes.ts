@@ -9,7 +9,7 @@
  *    deleted text and deleted page fields as it reads live ones. */
 
 import type { ReadContext } from "./context";
-import { attrOf, elementsOf, type XmlElement } from "./xml";
+import { attrOf, elementsOf, type XmlElement } from "../ooxml/xml";
 
 export type ChangeKind = "InsertedTextRun" | "DeletedTextRun";
 

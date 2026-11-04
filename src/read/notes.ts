@@ -13,7 +13,7 @@
 
 import type { AuthorNode } from "../tree/author";
 import { partOfType, type ReadContext } from "./context";
-import { attrOf, elementsOf, type XmlElement } from "./xml";
+import { attrOf, elementsOf, type XmlElement } from "../ooxml/xml";
 
 export type CommentRead = {
   readonly id: number;

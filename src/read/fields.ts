@@ -19,7 +19,7 @@ import { dropped, isOnValue, type Note } from "../ooxml/codec";
 import { PAGE_NUMBER_VALUES } from "../schema/docx-facts";
 import type { AuthorNode } from "../tree/author";
 import type { ReadContext } from "./context";
-import { attrOf, childNamed, elementsOf, textOf, type XmlElement } from "./xml";
+import { attrOf, childNamed, elementsOf, textOf, type XmlElement } from "../ooxml/xml";
 
 /** One unit of an inline container's content: a child of a w:r (with its run), or any other element. */
 export type Item =
