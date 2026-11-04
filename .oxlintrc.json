@@ -1,0 +1,76 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "react", "import", "unicorn", "oxc"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn"
+  },
+  "rules": {
+    "react/react-in-jsx-scope": "off",
+    "react/no-children-prop": "off",
+    "react/style-prop-object": "off",
+    "unicorn/no-array-sort": "off",
+    "unicorn/no-array-reverse": "off",
+    "no-unused-vars": [
+      "error",
+      {
+        "ignoreRestSiblings": true
+      }
+    ],
+    "import/no-unassigned-import": [
+      "warn",
+      {
+        "allow": ["**/*.css"]
+      }
+    ]
+  },
+  "ignorePatterns": ["dist/**", "test/.generated/**", "src/html/docx-default-styles.generated.ts"],
+  "overrides": [
+    {
+      "files": ["src/ooxml/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "docx",
+                "allowTypeImports": true,
+                "message": "Codecs import docx.js as types only: the HTML preview bundle uses them and must not load docx.js."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/html/model.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["./*"],
+                "message": "model.ts is the preview's types-only data model: other preview modules import it, never the reverse."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/codegen/print.ts"],
+      "rules": {
+        "no-control-regex": "off"
+      }
+    },
+    {
+      "files": ["test/**"],
+      "rules": {
+        "unicorn/consistent-function-scoping": "off",
+        "react/set-state-in-effect": "off"
+      }
+    }
+  ]
+}
