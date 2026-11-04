@@ -33,6 +33,7 @@ import { formatNumber } from "../ooxml/markers";
 import type { TreePath } from "../read/diagnostics";
 import type { DocumentNode } from "../schema/elements";
 import { NO_BREAKS, formatKey, parseKey, type MeasuredBreaks, type Split } from "./breaks";
+import { cutInlines, isContainer } from "./inlines";
 import type {
   PageGeometry,
   ResolvedBlock,
@@ -105,15 +106,13 @@ const draftPart = (columns: ResolvedColumns | null, afterColumns = false): Draft
 const hasContent = (page: Draft): boolean => page.parts.some((part) => part.blocks.length > 0);
 
 function isVisibleInline(inline: ResolvedInline): boolean {
+  if (isContainer(inline)) return inline.inlines.some(isVisibleInline);
   switch (inline.kind) {
     case "pageBreak":
     case "columnBreak":
       return false;
     case "text":
       return inline.text.trim().length > 0;
-    case "link":
-    case "anchor":
-      return inline.inlines.some(isVisibleInline);
     case "raw":
       return false;
     default:
@@ -126,29 +125,9 @@ const isVisible = (block: ResolvedBlock): boolean =>
 
 const hasVisible = (page: Draft): boolean => page.parts.some((part) => part.blocks.some(isVisible));
 
-/** `inlines` cut at its page breaks, top level and inside links and anchors: n + 1 segments around n breaks. */
-function splitInlines(inlines: readonly ResolvedInline[]): { segments: ResolvedInline[][]; breaks: Break[] } {
-  const segments: ResolvedInline[][] = [[]];
-  const breaks: Break[] = [];
-  const last = () => segments[segments.length - 1];
-  for (const inline of inlines) {
-    if (inline.kind === "pageBreak" || inline.kind === "columnBreak") {
-      breaks.push(inline.kind === "pageBreak" ? (inline.rendered ? "rendered" : "authored") : "column");
-      segments.push([]);
-    } else if (inline.kind === "link" || inline.kind === "anchor") {
-      const inner = splitInlines(inline.inlines);
-      inner.segments.forEach((segment, i) => {
-        if (i > 0) {
-          breaks.push(inner.breaks[i - 1]);
-          segments.push([]);
-        }
-        if (segment.length > 0) last().push({ ...inline, inlines: segment });
-      });
-    } else {
-      last().push(inline);
-    }
-  }
-  return { segments, breaks };
+function breakOf(inline: ResolvedInline): Break | null {
+  if (inline.kind === "pageBreak") return inline.rendered ? "rendered" : "authored";
+  return inline.kind === "columnBreak" ? "column" : null;
 }
 
 /** `inlines` with each text numbered in order, nested ones included, for split keys to name. */
@@ -157,7 +136,7 @@ function numberTexts(inlines: readonly ResolvedInline[]): ResolvedInline[] {
   const walk = (list: readonly ResolvedInline[]): ResolvedInline[] =>
     list.map((inline) => {
       if (inline.kind === "text") return { ...inline, at: [index++, 0] as const };
-      if (inline.kind === "link" || inline.kind === "anchor") return { ...inline, inlines: walk(inline.inlines) };
+      if (isContainer(inline)) return { ...inline, inlines: walk(inline.inlines) };
       return inline;
     });
   return walk(inlines);
@@ -189,7 +168,7 @@ function cutAt(inlines: readonly ResolvedInline[], [index, offset]: Split): [Res
     } else if (inline.kind === "text" && inline.at !== undefined && inline.at[0] > index) {
       after.push(inline);
       cut = true;
-    } else if (inline.kind === "link" || inline.kind === "anchor") {
+    } else if (isContainer(inline)) {
       const [head, rest] = cutAt(inline.inlines, [index, offset]);
       if (head.length > 0) before.push({ ...inline, inlines: head });
       if (rest.length > 0) {
@@ -245,7 +224,7 @@ function cutAtRenderedBreaks(blocks: readonly ResolvedBlock[]): ResolvedBlock[][
       groups[groups.length - 1].push(block);
       continue;
     }
-    const { segments, breaks } = splitInlines(block.inlines);
+    const { segments, cuts: breaks } = cutInlines(block.inlines, breakOf);
     if (breaks.length === 0) {
       groups[groups.length - 1].push(block);
       continue;
@@ -293,7 +272,7 @@ function rowPieces(row: ResolvedRow, cells: readonly ResolvedBlock[][][]): Resol
 
 function containsRenderedBreak(blocks: readonly ResolvedBlock[]): boolean {
   return blocks.some((block) => {
-    if (block.kind === "paragraph") return splitInlines(block.inlines).breaks.includes("rendered");
+    if (block.kind === "paragraph") return cutInlines(block.inlines, breakOf).cuts.includes("rendered");
     if (block.kind === "table") return block.rows.some((row) => row.cells.some((cell) => containsRenderedBreak(cell.blocks)));
     return false;
   });
@@ -365,7 +344,7 @@ function paginateSections(sections: readonly ResolvedSection[], measured: Measur
 
   const placeParagraph = (p: Paragraph, n: number) => {
     if (p.format.pageBreakBefore) breakPage("content");
-    const { segments, breaks } = splitInlines(p.inlines);
+    const { segments, cuts: breaks } = cutInlines(p.inlines, breakOf);
     // A piece with nothing visible (a bookmark, an empty run) goes with the piece after it, or the last
     // one with the piece before it.
     const pieces = segments.map((inlines, i) => ({ inlines, before: i === 0 ? null : breaks[i - 1] }));
@@ -492,7 +471,7 @@ function footnoteNumbers(blocks: readonly ResolvedBlock[], out: Set<number>): Se
   const inInlines = (inlines: readonly ResolvedInline[]) => {
     for (const inline of inlines) {
       if (inline.kind === "footnoteRef") out.add(inline.n);
-      else if (inline.kind === "link" || inline.kind === "anchor") inInlines(inline.inlines);
+      else if (isContainer(inline)) inInlines(inline.inlines);
     }
   };
   for (const block of blocks) {

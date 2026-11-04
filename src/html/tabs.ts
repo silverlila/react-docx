@@ -16,6 +16,7 @@
  *    characters with the default stop as the paragraph's tab-size.
  *  - A span is the last one when it has no width: it stays inline, and its text wraps. */
 
+import { cutInlines, isContainer } from "./inlines";
 import type { ResolvedInline, TabStop } from "./model";
 
 type Tab = Extract<ResolvedInline, { kind: "tab" }>;
@@ -44,7 +45,7 @@ function estimatedWidth(inlines: readonly ResolvedInline[]): number {
     if (inline.kind === "text" || inline.kind === "field") {
       const text = inline.kind === "text" ? inline.text : inline.placeholder;
       for (const char of text) width += inline.run.sizePt * (WIDE.test(char) ? 1 : ESTIMATED_EM);
-    } else if (inline.kind === "link" || inline.kind === "anchor") {
+    } else if (isContainer(inline)) {
       width += estimatedWidth(inline.inlines);
     } else if (inline.kind === "image") {
       width += inline.widthPx * 0.75;
@@ -53,30 +54,7 @@ function estimatedWidth(inlines: readonly ResolvedInline[]): number {
   return width;
 }
 
-/** `inlines` cut at its tabs, top level and inside links and anchors: n + 1 segments around n tabs. */
-function splitAtTabs(inlines: readonly ResolvedInline[]): { segments: ResolvedInline[][]; tabs: Tab[] } {
-  const segments: ResolvedInline[][] = [[]];
-  const tabs: Tab[] = [];
-  const last = () => segments[segments.length - 1];
-  for (const inline of inlines) {
-    if (inline.kind === "tab") {
-      tabs.push(inline);
-      segments.push([]);
-    } else if (inline.kind === "link" || inline.kind === "anchor") {
-      const inner = splitAtTabs(inline.inlines);
-      inner.segments.forEach((segment, i) => {
-        if (i > 0) {
-          tabs.push(inner.tabs[i - 1]);
-          segments.push([]);
-        }
-        if (segment.length > 0) last().push({ ...inline, inlines: segment });
-      });
-    } else {
-      last().push(inline);
-    }
-  }
-  return { segments, tabs };
-}
+const tabOf = (inline: ResolvedInline): Tab | null => (inline.kind === "tab" ? inline : null);
 
 const nextStop = (at: number, context: TabContext): TabStop | undefined => context.stops.find((s) => s.posPt > at + MIN_GAP_PT);
 
@@ -87,10 +65,10 @@ function wrappedStop(at: number, context: TabContext): TabStop | undefined {
   return last !== undefined && at > last.posPt && last.posPt > context.startPt ? last : undefined;
 }
 
-export const hasTabs = (inlines: readonly ResolvedInline[]): boolean => splitAtTabs(inlines).tabs.length > 0;
+export const hasTabs = (inlines: readonly ResolvedInline[]): boolean => cutInlines(inlines, tabOf).cuts.length > 0;
 
 export function tabLayout(inlines: readonly ResolvedInline[], context: TabContext): TabSpan[] {
-  const { segments, tabs } = splitAtTabs(inlines);
+  const { segments, cuts: tabs } = cutInlines(inlines, tabOf);
   const spans: TabSpan[] = [];
   let start = context.startPt;
   let items: TabItem[] = segments[0].length > 0 ? [{ kind: "content", inlines: segments[0] }] : [];
