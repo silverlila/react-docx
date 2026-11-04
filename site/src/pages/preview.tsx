@@ -77,7 +77,9 @@ function PreviewPage() {
 function useWindowDrop(onFile: (file: File) => void): boolean {
   const [dragging, setDragging] = useState(false);
   const latest = useRef(onFile);
-  latest.current = onFile;
+  useLayoutEffect(() => {
+    latest.current = onFile;
+  });
   useEffect(() => {
     let depth = 0;
     const hasFiles = (event: DragEvent) => event.dataTransfer?.types.includes("Files") ?? false;
@@ -213,14 +215,9 @@ function Workspace({ file, onOpen }: { file: LoadedFile; onOpen: (file: File) =>
   const [tab, setTab] = useState<Tab>("preview");
   const [target, setTarget] = useState<string | null>(null);
   const [zoom, setZoom] = useState<number | null>(null);
-  const fitting = useFitZoom(file.document);
-  const effectiveZoom = zoom ?? fitting.fit;
+  const { ref: canvasRef, fit } = useFitZoom(file.document);
+  const effectiveZoom = zoom ?? fit;
   const id = useId();
-
-  useEffect(() => {
-    setTab("preview");
-    setZoom(null);
-  }, [file]);
 
   const lost = file.diagnostics.filter((d) => d.kind === "dropped" || d.kind === "raw").length;
   const sections = file.document.children.filter((node) => node.type === "Section").length;
@@ -277,7 +274,7 @@ function Workspace({ file, onOpen }: { file: LoadedFile; onOpen: (file: File) =>
       </div>
 
       <div className="panel" role="tabpanel" id={`${id}-${tab}`} aria-labelledby={`${id}-${tab}-tab`}>
-        <div ref={fitting.ref} className="canvas panel-fill" hidden={tab !== "preview"}>
+        <div ref={canvasRef} className="canvas panel-fill" hidden={tab !== "preview"}>
           <PreviewSheets file={file} zoom={effectiveZoom} target={target} onShown={() => setTarget(null)} />
         </div>
         {tab === "jsx" ? <JsxPanel file={file} /> : null}

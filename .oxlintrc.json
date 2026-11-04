@@ -71,6 +71,12 @@
         "unicorn/consistent-function-scoping": "off",
         "react/set-state-in-effect": "off"
       }
+    },
+    {
+      "files": ["site/src/pages/docs.tsx"],
+      "rules": {
+        "react/jsx-key": "off"
+      }
     }
   ]
 }
