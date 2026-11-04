@@ -1,10 +1,3 @@
-/** `@react-docx/core/reader`: readDocx turns a .docx into a canonical document tree plus diagnostics.
- *
- *  - Synchronous and browser-safe: no Buffer, no fs, no docx.js at runtime.
- *  - The reader builds author nodes and canonicalize owns every canonical rule (decision 3). A TreeError
- *    from canonicalize means the reader built a tree it should not have, so it is rethrown as a reader
- *    bug. NotADocxError is thrown only for bytes that are not a Word package. */
-
 import type { DocumentNode } from "../schema/elements";
 import { TreeError } from "../tree/author";
 import { canonicalize } from "../tree/canonical";
@@ -18,6 +11,8 @@ export type ReadResult = { readonly document: DocumentNode; readonly diagnostics
 export { NotADocxError } from "./package";
 export type { Diagnostic, TreePath } from "./diagnostics";
 
+/** Synchronous and browser-safe: no Buffer, no fs, no docx.js. Throws NotADocxError only for bytes that
+ *  are not a Word package. */
 export function readDocx(bytes: Uint8Array | ArrayBuffer): ReadResult {
   const pkg = openPackage(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes));
   const { ctx, diagnostics, consumed } = createReadSession(pkg);

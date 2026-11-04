@@ -1,13 +1,8 @@
 /** w:style → a docx.js paragraph or character style, or the style's raw XML when docx.js cannot express
  *  it; and w:docDefaults → docx.js document defaults.
  *
- *  - Raw styles (decision 8): a paragraph or character style marked w:default (docx.js's styles never
- *    write w:default), and every table and numbering style. They become `importedStyles` strings, so they
- *    must pass the same checks as RawXml: no r: attribute, and xmlRoots accepts them.
- *  - A style's w:pPr reads without w:pStyle, which only a paragraph carries. A paragraph style's w:numPr
- *    is returned beside the options, for unit 05.
- *  - docx.js gives a character style uiPriority 99 and unhideWhenUsed when they are absent, so a
- *    character style read from Word gains both on its first write (decision 10). */
+ *  - docx.js's paragraph and character styles never write w:default.
+ *  - docx.js gives a character style uiPriority 99 and unhideWhenUsed on write when they are absent. */
 
 import type * as docx from "docx";
 import { attrOf, childNamed, serializeXml, type XmlElement } from "./xml";
@@ -44,7 +39,6 @@ type StyleRead =
 
 type StyleDropped = { readonly kind: "dropped"; readonly because: string };
 
-/** The paragraph options a style, a numbering level or the document defaults can hold. */
 type StyleParagraph = {
   readonly paragraph: Omit<ParagraphOptions, "style">;
   readonly numPr: ParagraphRead["numPr"];
@@ -56,7 +50,6 @@ type RawBecause = Extract<StyleRead, { kind: "raw" }>["because"];
 
 const NOT_A_TABLE_STYLE = "only a table style has table properties";
 
-/** A w:pPr outside a body paragraph: its options without w:pStyle, and its w:numPr. */
 export function readStyleParagraph(pPr: XmlElement, env: CodecEnv, notes: Note[]): StyleParagraph {
   const read = readParagraphProperties(pPr, env);
   notes.push(...read.notes);
@@ -139,7 +132,6 @@ export function readStyle(style: XmlElement, env: CodecEnv): StyleRead | StyleDr
   return { kind: "paragraph", options: { id, ...withParagraph }, numPr, notes };
 }
 
-/** A w:numPr outside a style, where docx.js has no numbering option. */
 export function dropNumbering(numPr: StyleParagraph["numPr"], where: string, notes: Note[]): void {
   if (numPr !== null) notes.push(dropped("w:numPr", `docx.js has no numbering option in ${where}`));
 }
@@ -165,7 +157,6 @@ const DOC_DEFAULTS_FATES: FateTable<docx.IDocumentDefaultsOptions> = {
   },
 };
 
-/** w:docDefaults → docx.js IDocumentDefaultsOptions { paragraph, run }. */
 export function readDocDefaults(
   docDefaults: XmlElement | null,
   env: CodecEnv

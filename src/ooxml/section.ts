@@ -1,11 +1,12 @@
 /** w:sectPr → docx.js section properties, plus the header and footer references beside them.
  *
- *  - The writer-inverse test defines correctness.
  *  - docx.js's page size is the portrait one: for a landscape page it writes w:w from height and w:h from
- *    width. So a landscape w:pgSz reads w:w into height and w:h into width.
+ *    width.
  *  - docx.js's column.children must be docx.js Column instances, which a plain tree cannot hold, so each
- *    w:col is dropped. docx.js writes no w:col when equalWidth is on, so equal columns lose nothing.
- *  - w:headerReference and w:footerReference are not options: the body walk (unit 04) reads their parts. */
+ *    w:col is dropped. docx.js writes no w:col when equalWidth is on.
+ *  - docx.js writes w:pgNumType on every section, empty when no page-number option is set.
+ *  - docx.js writes w:docGrid's w:charSpace only when it is not zero, and w:linePitch always (360 when
+ *    unset). */
 
 import type * as docx from "docx";
 import { attrOf, elementsOf, type XmlElement } from "./xml";
@@ -82,7 +83,6 @@ const REFERENCE_TYPES: readonly HeaderFooterReference["type"][] = ["default", "f
 
 const isEmpty = (options: object): boolean => Object.keys(options).length === 0;
 
-/** A fate that sets `page[key]` to what `read` returns, unless it returns null. */
 function pageTo<K extends keyof Page>(key: K, read: ValueReader<NonNullable<Page[K]>>): Fate<SectionProperties> {
   return {
     fate: "mapped",
@@ -127,7 +127,6 @@ const readMargin: ValueReader<docx.IPageMarginAttributes> = (el, _env, notes) =>
   return margin;
 };
 
-/** docx.js writes an empty w:pgNumType when there is nothing to say, so an empty one reads as nothing. */
 const readPageNumbers: ValueReader<docx.IPageNumberTypeAttributes> = (el, _env, notes) => {
   const pageNumbers: Draft<docx.IPageNumberTypeAttributes> = {};
   const start = wholeNumberAt(el, "w:start", notes);
@@ -163,7 +162,6 @@ const readPageBorders: ValueReader<docx.IPageBordersOptions> = (el, env, notes) 
   return isEmpty(borders) ? null : borders;
 };
 
-/** docx.js writes w:charSpace only when it is not zero, and w:linePitch always (360 when unset). */
 const readGrid: ValueReader<NonNullable<SectionProperties["grid"]>> = (el, _env, notes) => {
   const grid: Draft<docx.IDocGridAttributesProperties> = {};
   const type = oneOfAt(el, "w:type", GRID_TYPES, notes);

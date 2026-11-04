@@ -1,10 +1,10 @@
-/** Computed formatting → React inline styles. Lengths are written in pt, colours as "#hex". */
+/** CSS has no "at least" line height, so atLeast is drawn as exact. A paragraph's box takes the paragraph
+ *  mark's font, so an empty paragraph is as tall as in Word. */
 
 import type { CSSProperties } from "react";
 import { isOwnKey } from "../schema/own";
 import type { ComputedBorder, ComputedParagraph, ComputedRun } from "./resolve";
 
-/** docx.js underline types → the CSS line style closest to each. */
 const UNDERLINE_STYLES: Readonly<Record<string, CSSProperties["textDecorationStyle"]>> = {
   double: "double",
   wavyDouble: "double",
@@ -24,7 +24,6 @@ const UNDERLINE_STYLES: Readonly<Record<string, CSSProperties["textDecorationSty
 
 const pt = (n: number): string => `${n}pt`;
 
-/** A CSS font-family value: the name quoted, with no fallback list. */
 const fontFamily = (name: string): string => `"${name.replace(/["\\]/g, "\\$&")}"`;
 
 function textDecoration(r: ComputedRun): CSSProperties {
@@ -62,11 +61,9 @@ export function borderCss(b: ComputedBorder): string {
 }
 
 function lineHeight(p: ComputedParagraph): CSSProperties["lineHeight"] {
-  // CSS has no "at least" line height, so atLeast is drawn as exact.
   return p.lineHeight.kind === "multiple" ? p.lineHeight.value : pt(p.lineHeight.pt);
 }
 
-/** The paragraph's box. Its font is the paragraph mark's, so an empty paragraph is as tall as in Word. */
 export function paragraphStyle(p: ComputedParagraph): CSSProperties {
   const { top, bottom, left, right } = p.borders;
   return {

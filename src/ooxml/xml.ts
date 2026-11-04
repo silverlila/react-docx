@@ -1,15 +1,8 @@
-/** Plain XML values for the read side, and the one place that touches the XML parser.
+/** Plain XML values for the read side, and the one place that touches the XML parser: codecs and the HTML
+ *  resolver never see htmlparser2's types.
  *
- *  - `parseXml` converts htmlparser2's domhandler nodes into `XmlElement` at once, so codecs and the
- *    HTML resolver never see the parser's types.
- *  - Qualified names keep their prefix ("w:p") and attributes are keyed by qualified name ("w:val").
- *  - Text children are decoded strings. CDATA becomes plain text, and adjacent text is merged into one
- *    string. Comments, processing instructions and the XML declaration are not kept.
- *  - Whitespace-only text between elements is kept as parsed: consumers skip it, and keeping it lets
- *    `serializeXml(parseXml(s))` reproduce `s` for XML written without indentation, as Word and docx.js
- *    write it.
- *  - `serializeXml` writes text escaped, never as CDATA, using only XML's predefined entities, because
- *    phase 1 accepts no other named entity in RawXml. */
+ *  - htmlparser2 decodes entities but hands back CDATA sections, comments, processing instructions and the
+ *    XML declaration as nodes of their own. parseXml reads CDATA as text and drops the rest. */
 
 import type { ChildNode } from "domhandler";
 import { parseDocument } from "htmlparser2";

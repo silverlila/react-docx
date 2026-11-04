@@ -2,7 +2,7 @@
  *  (through renderToTree) or from a read .docx alike.
  *
  *  Browser-safe: no docx.js and no fflate at runtime. htmlparser2 is bundled for the raw styles a read
- *  document keeps (decision 15). */
+ *  document keeps. */
 
 export { DocxPreview, type DocxPreviewProps } from "./preview";
 export { resolveDocument, type ResolvedSection, type ResolvedBlock, type ResolvedInline } from "./resolve";

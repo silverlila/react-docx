@@ -1,16 +1,11 @@
-/** The OPC package layer: unzips a .docx and exposes its parts, relationships, media, theme and core
- *  properties as plain values. Adapted from folio's packages/rebuild/docx-parts.ts.
+/** The main part is the target of the package relationship whose type ends with /officeDocument, falling
+ *  back to word/document.xml. Relationship targets resolve against the folder of the part owning the rels
+ *  file; a target starting with / is from the package root. docx.js writes directory entries (names
+ *  ending in /), which are not parts.
  *
- *  - The main part is the target of the package relationship whose type ends with `/officeDocument`,
- *    falling back to word/document.xml.
- *  - Relationship targets are resolved against the folder of the part that owns the rels file, and a
- *    target starting with `/` is from the package root. External targets are kept verbatim.
- *  - `paths` lists the zip's file entries. Directory entries (names ending in `/`, which docx.js writes)
- *    are not parts and are left out.
- *  - The theme is found through the main part's `theme` relationship, falling back to
- *    word/theme/theme1.xml. A package without one has every font null and no colours, as docx.js writes.
- *  - Core properties come from docProps/core.xml, text verbatim. `revision` is kept only when it is a
- *    whole number, the only form docx.js can write back. */
+ *  The theme comes from the main part's `theme` relationship, falling back to word/theme/theme1.xml; a
+ *  package without one has every font null and no colours, as docx.js writes. docx.js can only write core
+ *  `revision` back as a whole number. */
 
 import { strFromU8, unzipSync } from "fflate";
 import type { Theme, ThemeColors, ThemeFonts, ThemeFontSet } from "../ooxml/codec";

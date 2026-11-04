@@ -1,21 +1,16 @@
-/** List marker text: what Word shows in front of a numbered paragraph, from its numbering level's lvlText
- *  and the running count of each level. The reader writes it as literal text where docx.js cannot keep the
- *  numbering (headers and footers), and the HTML resolver draws it.
+/** List marker text: what Word shows in front of a numbered paragraph, from its level's lvlText and the
+ *  running count of each level.
  *
- *  - A level's count starts at its `start` (default 1). Advancing a level resets every deeper level, so the
- *    next item there starts again.
- *  - In lvlText, `%n` (1-based) is level n−1's current count in level n−1's format; a level not counted yet
- *    shows its start. A `bullet` level's lvlText is the bullet itself and is shown as it is.
- *  - Letters repeat as Word repeats them: 27 is "aa", 28 is "bb". Formats not in NUMBER_FORMATS render as
- *    decimal; `decimalFormats` tells the caller which, so it can report them. */
+ *  - In lvlText, `%n` is level n−1's count. A bullet level's lvlText is the bullet itself.
+ *  - Word repeats letters rather than carrying over: 27 is `aa`, 28 is `bb`.
+ *  - `decimalFormats`: the number formats in a level's marker that markerText cannot render and shows
+ *    as decimal instead. */
 
 import type * as docx from "docx";
 import { isOwnKey } from "../schema/own";
 
-/** Running counts: `${reference}:${instance}` → the count per level. */
 export type Counters = Map<string, number[]>;
 
-/** A `%n` placeholder in lvlText; the group is n. Stateless use only (`matchAll`, `replace`). */
 export const LEVEL_NUMBER = /%([1-9])/g;
 const ROMAN: readonly (readonly [number, string])[] = [
   [1000, "m"],
@@ -58,7 +53,6 @@ function ordinal(n: number): string {
   return `${n}${ORDINAL_SUFFIXES[n % 10] ?? "th"}`;
 }
 
-/** Each format the marker text can show, by its w:numFmt value. */
 const NUMBER_FORMATS: Readonly<Record<string, (n: number) => string>> = {
   decimal: (n) => String(n),
   decimalZero: (n) => (n < 10 ? `0${n}` : String(n)),
@@ -78,7 +72,6 @@ export function formatNumber(n: number, format: string): string {
 export const levelOf = (levels: readonly docx.ILevelsOptions[], level: number): docx.ILevelsOptions | undefined =>
   levels.find((l) => l.level === level);
 
-/** The formats of the numbers a level's marker shows that markerText renders as decimal. */
 export function decimalFormats(levels: readonly docx.ILevelsOptions[], level: number): string[] {
   const own = levelOf(levels, level);
   if (own === undefined || own.format === "bullet") return [];
@@ -87,7 +80,6 @@ export function decimalFormats(levels: readonly docx.ILevelsOptions[], level: nu
     .filter((format) => !isOwnKey(NUMBER_FORMATS, format));
 }
 
-/** Advances the counter for (key, level), resets deeper levels, and renders the level's lvlText. */
 export function markerText(levels: readonly docx.ILevelsOptions[], counters: Counters, key: string, level: number): string {
   const startOf = (n: number): number => levelOf(levels, n)?.start ?? 1;
   const counts = counters.get(key) ?? [];

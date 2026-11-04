@@ -28,7 +28,6 @@ function defaultLevels(type: ListType): Level[] {
   return Array.from({ length: LEVEL_COUNT }, (_, n) => level(type, n));
 }
 
-/** Levels 0–8 for "NumberedList" and "BulletList". Level 0 of each is 0.1.8's DEFAULT_NUMBERING. */
 export const LIST_NUMBERING: { readonly config: readonly NumberingConfig[] } = {
   config: [
     { reference: "NumberedList", levels: defaultLevels("NumberedList") },

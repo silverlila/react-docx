@@ -1,4 +1,4 @@
-/** DocxPreview: draws resolveDocument's data as React DOM (decision 13).
+/** DocxPreview: draws resolveDocument's data as React DOM.
  *
  *  - One sheet per section, at the section's page width with its margins as padding. There is no fixed
  *    height and no pagination: the default header comes first, then the body, the section's footnotes and
@@ -7,7 +7,13 @@
  *    CSS setup in the host app.
  *  - Every block carries `data-docx-path`, its canonical tree path joined with ".".
  *  - It takes a tree, not JSX children: rendering children here would run react-docx's reconciler inside a
- *    React DOM render. Callers write `useMemo(() => renderToTree(element), [element])`. */
+ *    React DOM render. Callers write `useMemo(() => renderToTree(element), [element])`.
+ *  - Word's default cell margins are 0.075in left and right; its default text box insets are 0.05in top
+ *    and bottom, 0.1in left and right.
+ *  - Link targets come from whoever wrote the file, so only http:, https: and mailto: survive. The scheme
+ *    is whatever `new URL` reports, which normalises case, spaces and tabs as a browser does.
+ *  - text-indent is inherited and would shift an inline-block's own first line.
+ *  - A page break's <hr> would close a <p> when the markup is parsed, so paragraphs are <div>s. */
 
 import React, { type CSSProperties, type ReactNode } from "react";
 import type { TreePath } from "../read/diagnostics";
@@ -26,18 +32,12 @@ import {
 
 export type DocxPreviewProps = { readonly document: DocumentNode } & Omit<React.ComponentPropsWithoutRef<"div">, "children">;
 
-/** Word's default tab stop, 0.5in. */
 const DEFAULT_TAB_PT = 36;
-/** The least room a marker's tab leaves before the text. */
 const MIN_MARKER_GAP_PT = 6;
-/** Word's default cell margins: 0.075in left and right. */
 const CELL_PADDING = "0 5.4pt";
-/** Word's default text box insets: 0.05in top and bottom, 0.1in left and right. */
 const TEXTBOX_PADDING = "3.6pt 7.2pt";
 const FOOTNOTE_RULE_WIDTH = "144pt";
 
-/** The URL schemes a link may keep. A document's link targets come from whoever wrote the file, so a
- *  `javascript:` or `data:` one would run their script in the host page when clicked. */
 const SAFE_LINK_SCHEMES: ReadonlySet<string> = new Set(["http:", "https:", "mailto:"]);
 
 const pt = (n: number): string => `${n}pt`;
@@ -58,10 +58,6 @@ const VERTICAL_ALIGN: Readonly<Record<ResolvedCell["verticalAlign"], CSSProperti
   bottom: "bottom",
 };
 
-// ── Inlines ──────────────────────────────────────────────────────────────────────────────────────────
-
-/** The scheme a browser would give `href`, e.g. "https:", with its case, spaces and tabs normalised the
- *  same way; null when `href` is not an absolute URL. */
 function schemeOf(href: string): string | null {
   try {
     return new URL(href).protocol;
@@ -70,7 +66,6 @@ function schemeOf(href: string): string | null {
   }
 }
 
-/** A bookmark link, or an absolute URL with a safe scheme. */
 function isSafeHref(href: string): boolean {
   if (href.startsWith("#")) return true;
   const scheme = schemeOf(href);
@@ -107,7 +102,6 @@ function Inline({ inline }: { readonly inline: ResolvedInline }): ReactNode {
         />
       );
     case "link":
-      // An unsafe link keeps its text and loses its target.
       return isSafeHref(inline.href) ? (
         <a href={inline.href}>
           <Inlines inlines={inline.inlines} />
@@ -138,8 +132,6 @@ function Inlines({ inlines }: { readonly inlines: readonly ResolvedInline[] }): 
   return inlines.map((inline, i) => <Inline key={i} inline={inline} />);
 }
 
-/** The marker, then its suffix. A tab suffix is drawn as the marker's minimum width, so the text starts at
- *  the hanging indent, or `MIN_MARKER_GAP_PT` past a marker wider than it. */
 function Marker({ marker, format }: { readonly marker: ResolvedMarker; readonly format: ComputedParagraph }): ReactNode {
   if (marker.suffix !== "tab") {
     return (
@@ -156,7 +148,6 @@ function Marker({ marker, format }: { readonly marker: ResolvedMarker; readonly 
     boxSizing: "border-box",
     minWidth: pt(Math.max(0, -format.firstLinePt)),
     paddingRight: pt(MIN_MARKER_GAP_PT),
-    // text-indent is inherited, and would shift an inline-block's own first line.
     textIndent: 0,
     ...runStyle(marker.run),
   };
@@ -167,8 +158,6 @@ function Marker({ marker, format }: { readonly marker: ResolvedMarker; readonly 
   );
 }
 
-// ── Blocks ───────────────────────────────────────────────────────────────────────────────────────────
-
 type Paragraph = Extract<ResolvedBlock, { kind: "paragraph" }>;
 type Table = Extract<ResolvedBlock, { kind: "table" }>;
 type Row = Table["rows"][number];
@@ -176,8 +165,6 @@ type Row = Table["rows"][number];
 function ParagraphBlock({ block }: { readonly block: Paragraph }): ReactNode {
   const empty = block.marker === null && block.inlines.length === 0;
   return (
-    // A <div>, not a <p>: a page break's <hr> would close a <p> when the markup is parsed. pre-wrap keeps
-    // the runs' spaces, as Word does.
     <div data-docx-path={pathAttr(block.path)} style={{ ...paragraphStyle(block.format), whiteSpace: "pre-wrap" }}>
       {block.marker === null ? null : <Marker marker={block.marker} format={block.format} />}
       <Inlines inlines={block.inlines} />
@@ -217,7 +204,6 @@ function TableRow({ row }: { readonly row: Row }): ReactNode {
   );
 }
 
-/** Leading header rows go in <thead>; a header row after a body row stays in place. */
 function TableBlock({ block }: { readonly block: Table }): ReactNode {
   const firstBodyRow = block.rows.findIndex((row) => !row.isHeader);
   const headCount = firstBodyRow === -1 ? block.rows.length : firstBodyRow;
@@ -274,8 +260,6 @@ function Block({ block }: { readonly block: ResolvedBlock }): ReactNode {
 function Blocks({ blocks }: { readonly blocks: readonly ResolvedBlock[] }): ReactNode {
   return blocks.map((block) => <Block key={pathAttr(block.path)} block={block} />);
 }
-
-// ── Sections ─────────────────────────────────────────────────────────────────────────────────────────
 
 function Footnotes({ notes }: { readonly notes: readonly ResolvedFootnote[] }): ReactNode {
   if (notes.length === 0) return null;

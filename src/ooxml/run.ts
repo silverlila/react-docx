@@ -1,20 +1,11 @@
 /** w:rPr → docx.js run options (IRunOptions without content).
  *
- *  - The writer-inverse test defines correctness: for options docx.js writes, reading its w:rPr gives
- *    options that docx.js writes identically.
- *  - Complex-script twins (w:bCs, w:iCs, w:szCs, w:highlightCs): docx.js writes each twin equal to its main
- *    option unless the twin option is set, and leaves it out when the twin option is false. So a twin equal
- *    to its main is not kept as an option, and a twin that is off while its main is on becomes `false`
- *    (dropped: the explicit off). A main with no twin is read alone, so docx.js writes the twin beside it,
- *    which changes only complex-script text.
- *  - docx.js writes w:caps only when smallCaps is unset, so with both present w:caps is dropped.
- *  - Off values docx.js cannot write: vanish, specVanish and math, which it writes only when on. These are
- *    dropped.
- *  - w:position: a universal measure ("6pt") is kept verbatim, as docx.js writes it; Word's half-points
- *    ("6") become points ("3pt"), because docx.js types position as a universal measure.
- *  - Fonts: theme font attributes resolve against the file's theme and win over the literal beside them.
- *    The object keeps the file's attribute order, which docx.js writes back. Four equal names and no hint
- *    give the string form. */
+ *  - docx.js writes each complex-script twin (w:bCs, w:iCs, w:szCs, w:highlightCs) equal to its main option
+ *    unless the twin option is set, and omits it when the twin option is false.
+ *  - docx.js writes w:caps only when smallCaps is unset, and vanish, specVanish and math only when they are
+ *    on. It writes characterSpacing and kern only when they are not zero.
+ *  - docx.js types position as a universal measure, so Word's half-points become points ("6" is "3pt").
+ *  - docx.js writes w:rFonts attributes in the order given. */
 
 import type * as docx from "docx";
 import { attrOf, childNamed, type XmlElement } from "./xml";
@@ -137,7 +128,6 @@ const THEME_FONT_ATTRIBUTES = new Map<string, FontKey>([
   ["w:cstheme", "cs"],
 ]);
 
-/** ST_Theme font values → the theme font scheme and slot they name. */
 const THEME_FONTS = new Map<string, readonly [keyof ThemeFonts, keyof ThemeFontSet]>([
   ["majorAscii", ["major", "latin"]],
   ["majorHAnsi", ["major", "latin"]],
@@ -158,7 +148,6 @@ const offIsWritable = (key: RunFlag): boolean => !WRITTEN_ONLY_WHEN_ON.includes(
 const flag = (key: RunFlag) => to(key, onOff(offIsWritable(key)));
 
 
-/** docx.js writes characterSpacing and kern only when they are not zero. */
 const nonZero =
   (read: ValueReader<number>): ValueReader<number> =>
   (el, env, notes) => {
@@ -298,7 +287,6 @@ const RPR_FATES: FateTable<RunOptions> = {
   "w:rPrChange": to("revision", readRevision),
 };
 
-/** What the twin option should be, given the main and twin values read from the file; undefined omits it. */
 function twinOption<V>(main: V | undefined, twin: V | undefined, element: string, notes: Note[]): V | false | undefined {
   if (twin === undefined || twin === main) return undefined;
   if (twin) return twin;
@@ -311,7 +299,6 @@ function settle<K extends keyof RunOptions>(options: Draft<RunOptions>, key: K, 
   else options[key] = value;
 }
 
-/** Run properties as an option, or null when there are none: a paragraph mark's or a style's. */
 export const readRunOption: ValueReader<RunOptions> = (el, env, notes) => {
   const run = readRunProperties(el, env);
   notes.push(...run.notes);

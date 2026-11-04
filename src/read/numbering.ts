@@ -1,15 +1,10 @@
-/** word/numbering.xml → Document.numbering.config, and a paragraph's numId → its { reference, instance }.
+/** docx.js writes one w:lvlOverride on every w:num: level 0's startOverride, set to the first level's
+ *  `start` when that is a non-zero whole number and to 1 otherwise (createConcreteNumberingInstance). That
+ *  override is accepted; any other is dropped. docx.js throws above level 9.
  *
- *  - Ids are ordinals of first use (decision 5): a w:abstractNum becomes reference `list-N`, and each w:num
- *    on it an instance counted from 0, docx.js's default. Only abstractNums a paragraph or style uses are
- *    in `config()`; `reportUnused` counts the rest ignored, among them docx.js's own
- *    `default-bullet-numbering`.
- *  - docx.js writes one w:lvlOverride on every w:num: level 0's startOverride, set to the first level's
- *    `start` when that is a non-zero whole number and to 1 otherwise (`createConcreteNumberingInstance`).
- *    That override is accepted, since writing the instance back reproduces it. Any other override is
- *    dropped and the list keeps its abstract levels.
- *  - `markerOf` is for paragraphs where docx.js cannot keep numbering (decision 2): it renders the marker
- *    text without registering the list, with counters kept per part. */
+ *  numId "0" means "not a list, even if the style is", and docx.js writes it as that numId. A numbering
+ *  option without a style makes docx.js add pStyle ListParagraph; `custom: true` stops that. docx.js's own
+ *  `default-bullet-numbering` abstractNum is counted ignored. */
 
 import type * as docx from "docx";
 import { applyFates, type FateTable, type Note } from "../ooxml/codec";
@@ -24,17 +19,12 @@ type Levels = readonly docx.ILevelsOptions[];
 
 type ListRef = { readonly reference: string; readonly instance: number };
 
-/** A list marker written as text: the marker and the level it was rendered from. */
 type Marker = { readonly text: string; readonly level: docx.ILevelsOptions | undefined };
 
 export type NumberingReader = {
-  /** null for numId "0" or an unknown numId. Registers the reference/instance on first use (document order). */
   refOf(numId: string): ListRef | null;
-  /** numbering.config: one entry per referenced abstractNum, in order of first use. */
   config(): docx.INumberingOptions["config"];
-  /** Counts every abstractNum no paragraph or style used as ignored. Call once, after all reading. */
   reportUnused(): void;
-  /** The marker of the next item at `level` of numId's list within `ctx.part`, or null for an unknown numId. */
   markerOf(numId: string, level: number, ctx: ReadContext): Marker | null;
 };
 
@@ -58,25 +48,19 @@ const ABSTRACT_NUM_FATES: FateTable<AbstractNumOptions> = {
   },
 };
 
-/** What the numbering part holds besides abstractNums and nums. */
 const OTHER_CHILDREN: Readonly<Record<string, Note["fate"]>> = {
   "w:numPicBullet": "dropped",
   "w:numIdMacAtCleanup": "ignored",
 };
 
-/** The numbering option of a paragraph or paragraph style: false for numId "0" ("not a list, even if the
- *  style is"), which docx.js writes as that numId. */
 type NumberingOption =
   | { readonly reference: string; readonly level: number; readonly instance: number; readonly custom?: true }
   | false;
 
-/** docx.js throws above level 9 (`IndentLevel`). */
 const MAX_LEVEL = 9;
 
 export const unknownNumId = (numId: string): string => `numId ${numId} is not defined in numbering.xml`;
 
-/** A w:numPr → the option docx.js writes it back from, or null (reported dropped at `ctx`). `custom` stops
- *  docx.js from adding pStyle ListParagraph, which it does to any numbering option without a style. */
 export function numberingOption(
   numPr: { readonly numId: string; readonly level: number },
   options: { readonly custom: boolean },
@@ -97,14 +81,10 @@ export function numberingOption(
   return { reference, level: numPr.level, instance, ...(options.custom ? { custom: true as const } : {}) };
 }
 
-/** Each w:num is its own instance, which docx.js restarts. Whether Word instead continues counting across
- *  two w:nums on one abstractNum with no override is open (00-context.md); if it does, this is the one
- *  function to change. */
 function instanceOf(ordinals: Ordinals, reference: string, numId: string): number {
   return ordinals(`instance:${reference}`, numId) - 1;
 }
 
-/** The level-0 start override docx.js writes for a list with these levels. */
 function writerStart(levels: Levels): string {
   const start = levels[0]?.start;
   return start !== undefined && start !== 0 && Number.isInteger(start) ? String(start) : "1";

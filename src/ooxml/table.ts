@@ -1,19 +1,12 @@
 /** w:tblPr (with the sibling w:tblGrid), w:trPr and w:tcPr → docx.js table, row and cell options.
  *
- *  - The writer-inverse test defines correctness, as for runs and paragraphs.
- *  - Vertical merges read as verticalMerge on every w:tc, never as rowSpan: rowSpan makes docx.js invent
- *    continuation cells, so the cell count would change between reads.
- *  - Widths (w:tblW, w:tblInd, w:tcW): docx.js writes a number with type "pct" as that many percent, but
- *    Word's whole-number pct is fiftieths of a percent, so it reads as a percentage string ("100%"). A
- *    w:w that is already a percentage or a universal measure is kept as written. An absent w:type is
- *    the schema's "dxa", which docx.js would otherwise write as "auto".
- *  - docx.js writes w:tblOverlap inside w:tblpPr, where Word writes it beside it in w:tblPr. Both read as
- *    float.overlap; beside a table with no w:tblpPr it is dropped, because docx.js writes it only in one.
- *  - w:start and w:end are the newer names of the left and right sides, in borders and margins alike.
- *  - Cell margins share one unit in docx.js, so a side whose w:type differs from the first side's is
- *    dropped.
- *  - docx.js writes w:tblBorders on every table, with a single border for each side not given, so a
- *    side the file leaves to the table style comes back as a single border. No option can avoid it. */
+ *  - docx.js's `rowSpan` invents continuation cells.
+ *  - docx.js writes a pct width as whole percent, where Word writes fiftieths of a percent. An absent w:type
+ *    is the schema's "dxa"; docx.js's default is "auto".
+ *  - docx.js writes w:tblOverlap inside w:tblpPr, where Word writes it beside it in w:tblPr.
+ *  - docx.js writes w:tblBorders on every table, with a single border for each side not given, so a side
+ *    left to the table style loses that style's border. No option avoids it.
+ *  - docx.js's cell margins share one unit, and each is a number, read as percent when the unit is pct. */
 
 import type * as docx from "docx";
 import { attrOf, childNamed, elementsOf, type XmlElement } from "./xml";
@@ -84,8 +77,6 @@ const PERCENT = /^-?[0-9]+(\.[0-9]+)?%$/;
 const FIFTIETHS_PER_PERCENT = 50;
 
 
-/** A w:w measure: a whole number (fiftieths of a percent when the type is pct), a percentage or a
- *  universal measure. */
 function measureAt(el: XmlElement, type: WidthType, notes: Note[]): Measure | null {
   const value = requiredAttr(el, "w:w", notes);
   if (value === null) return null;
@@ -96,7 +87,6 @@ function measureAt(el: XmlElement, type: WidthType, notes: Note[]): Measure | nu
   return null;
 }
 
-/** w:type, or the schema's default "dxa" when it is absent; null (with a note) when docx.js rejects it. */
 function widthTypeAt(el: XmlElement, notes: Note[]): WidthType | null {
   return attrOf(el, "w:type") === null ? "dxa" : oneOfAt(el, "w:type", WIDTH_TYPES, notes);
 }
@@ -115,7 +105,6 @@ const readCellSpacing: ValueReader<CellSpacing> = (el, _env, notes) => {
   return value === null ? null : { value, type };
 };
 
-/** docx.js types a cell margin as a number, written as that many percent when the unit is pct. */
 function marginSizeAt(el: XmlElement, type: WidthType, notes: Note[]): number | null {
   const size = measureAt(el, type, notes);
   if (size === null || typeof size === "number") return size;
@@ -253,7 +242,6 @@ const TBLPR_FATES: FateTable<TableOptions> = {
   "w:tblPrChange": noOption("docx.js cannot write tracked table formatting"),
 };
 
-/** w:gridCol widths, or null (with a note) when the grid has a column docx.js cannot write. */
 function readGrid(tblGrid: XmlElement | null, notes: Note[]): number[] | null {
   if (tblGrid === null) return null;
   const widths: number[] = [];
@@ -272,7 +260,6 @@ function readGrid(tblGrid: XmlElement | null, notes: Note[]): number[] | null {
   return null;
 }
 
-/** Takes the whole w:tbl, because columnWidths lives in w:tblGrid, beside w:tblPr. */
 export function readTableProperties(tbl: XmlElement, env: CodecEnv): CodecResult<TableOptions> {
   const tblPr = childNamed(tbl, "w:tblPr");
   const { options, notes } = applyFates(tblPr, TBLPR_FATES, env);
@@ -322,7 +309,6 @@ export function readRowProperties(trPr: XmlElement | null, env: CodecEnv): Codec
 const toCell = <K extends keyof CellOptions>(key: K, read: ValueReader<NonNullable<Draft<CellOptions>[K]>>) =>
   mapTo<CellOptions, K>(key, read);
 
-/** A w:vMerge with no w:val continues the merge above it. */
 const readVerticalMerge: ValueReader<NonNullable<CellOptions["verticalMerge"]>> = (el, _env, notes) =>
   attrOf(el, "w:val") === null ? "continue" : oneOfAt(el, "w:val", VERTICAL_MERGES, notes);
 

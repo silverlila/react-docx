@@ -1,18 +1,11 @@
-/** The codec framework: what every OOXML property codec (w:rPr, w:pPr, w:tblPr, …) shares.
+/** The codec framework every OOXML property codec (w:rPr, w:pPr, w:tblPr, …) shares, plus the border-side
+ *  and shading readers that run, paragraph and table properties all use.
  *
- *  - A codec turns one property element into docx.js options plus notes. Each child element has a fate
- *    (decision 6): mapped to an option, ignored as editing noise, or dropped because docx.js cannot write
- *    it. A child the fate table does not name is dropped. Attributes of the property element itself are
- *    never fates.
- *  - Theme colours resolve to literal hex (decision 9). Word writes the computed colour beside a theme
- *    reference, so a hex value is taken as it is, with no note. The theme is read only when the value is
- *    absent or "auto": tint is c·t + 255·(1−t) and shade is c·s, with t and s the hex byte / 255.
- *  - "auto" stays "auto", which docx.js writes back verbatim.
- *  - Values docx.js types as a closed set (BorderStyle, ShadingType, …) are checked against that set, and
- *    a value outside it is dropped with a note.
- *  - Shared sub-codecs: one border side (w:bdr, w:top, …) and shading (w:shd). They live here because run,
- *    paragraph and table properties all use them.
- *  - Codecs import docx only as types, because the HTML bundle uses them (decision 15). */
+ *  - docx.js types BorderStyle, ShadingType, … as closed sets, so a value outside the set is dropped with a note.
+ *  - Word writes the computed colour beside a theme reference. Applying a theme colour's tint gives
+ *    c·t + 255·(1−t) and its shade gives c·s, with t and s the hex byte / 255.
+ *  - docx.js's twipsMeasureValue throws on a negative number.
+ *  - Codecs import docx as types only, because the HTML bundle uses them. */
 
 import type * as docx from "docx";
 import { own } from "../schema/own";
@@ -26,7 +19,6 @@ export type ThemeFontSet = {
 
 export type ThemeFonts = { readonly major: ThemeFontSet; readonly minor: ThemeFontSet };
 
-/** Word theme colour names → 6-digit hex. Keys: dk1 lt1 dk2 lt2 accent1–6 hlink folHlink. */
 export type ThemeColors = Readonly<Record<string, string>>;
 
 export type Theme = { readonly fonts: ThemeFonts; readonly colors: ThemeColors };
@@ -43,20 +35,15 @@ export type CodecResult<T> = { readonly options: T; readonly notes: readonly Not
 
 export type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 
-/** The options object a codec builds before returning it as T. */
 export type Draft<T> = Partial<Mutable<T>>;
 
-/** How one OOXML child element is handled. `read` writes into the options being built and may push notes. */
 export type Fate<T> =
   | { readonly fate: "mapped"; readonly read: (el: XmlElement, out: Draft<T>, env: CodecEnv, notes: Note[]) => void }
   | { readonly fate: "ignored" }
   | { readonly fate: "dropped"; readonly why: string };
 
-/** Keyed by qualified child name. */
 export type FateTable<T> = Readonly<Record<string, Fate<T>>>;
 
-/** Reads one option value from an element, or null when there is nothing to set (with a note if that loses
- *  something). */
 export type ValueReader<V> = (el: XmlElement, env: CodecEnv, notes: Note[]) => V | null;
 
 export type ValueOf<T> = T[keyof T];
@@ -73,7 +60,6 @@ export const dropped = (element: string, detail: string): Note => ({ fate: "drop
 
 export const noOption = (why: string) => ({ fate: "dropped", why }) as const;
 
-/** A child the caller reads itself, beside applyFates: mapped, so it gets no note, but read into nothing here. */
 export const HANDLED_BESIDE = { fate: "mapped", read: () => undefined } as const;
 
 const UNIVERSAL_MEASURE = /^-?[0-9]+(\.[0-9]+)?(mm|cm|in|pt|pc|pi)$/;
@@ -96,7 +82,6 @@ export const ALIGNMENTS: readonly ValueOf<typeof docx.AlignmentType>[] = [
 
 export const HEIGHT_RULES: readonly ValueOf<typeof docx.HeightRule>[] = ["auto", "atLeast", "exact"];
 
-/** docx.js's NumberFormat: w:pgNumType's w:fmt, and a level's w:numFmt. */
 export const NUMBER_FORMATS: readonly ValueOf<typeof docx.NumberFormat>[] = [
   "decimal",
   "upperRoman",
@@ -196,7 +181,6 @@ export function applyFates<T>(
   return { options, notes };
 }
 
-/** A fate that sets `key` to what `read` returns, unless it returns null. */
 export function mapTo<T, K extends keyof T>(key: K, read: ValueReader<NonNullable<Draft<T>[K]>>): Fate<T> {
   return {
     fate: "mapped",
@@ -212,7 +196,6 @@ export const isOneOf = <V extends string>(values: readonly V[], value: string): 
 
 export const isOnValue = (value: string): boolean => !OFF_VALUES.includes(value);
 
-/** A CT_OnOff element read with isOn. When docx.js cannot write it off, an off value is dropped. */
 export const onOff =
   (offIsWritable: boolean): ValueReader<boolean> =>
   (el, _env, notes) => {
@@ -238,7 +221,6 @@ export function oneOfAt<V extends string>(el: XmlElement, attribute: string, val
   return null;
 }
 
-/** docx.js's twipsMeasureValue throws on a negative number, so one is dropped here instead. */
 export function twipsAt(el: XmlElement, attribute: string, notes: Note[]): number | null {
   const value = wholeNumberAt(el, attribute, notes);
   if (value === null || value >= 0) return value;
@@ -262,7 +244,6 @@ export const oneOfVal =
   (el, _env, notes) =>
     requiredAttr(el, "w:val", notes) === null ? null : oneOfAt(el, "w:val", values, notes);
 
-/** themeColor → clrScheme key. */
 const THEME_COLOR_KEYS: Readonly<Record<string, string>> = {
   dark1: "dk1",
   text1: "dk1",
@@ -282,7 +263,6 @@ const THEME_COLOR_KEYS: Readonly<Record<string, string>> = {
   followedHyperlink: "folHlink",
 };
 
-/** The attribute holding a colour's hex, and the theme attributes that go with it. */
 const COLOR_SOURCES = {
   "w:val": { theme: "w:themeColor", tint: "w:themeTint", shade: "w:themeShade" },
   "w:color": { theme: "w:themeColor", tint: "w:themeTint", shade: "w:themeShade" },
@@ -311,8 +291,6 @@ function themeHex(base: string, tint: string | null, shade: string | null): stri
   return s === null ? tinted : mapChannels(tinted, (c) => c * s);
 }
 
-/** The colour held by `source` (w:val by default): its hex; else, when absent or "auto", the theme colour
- *  named beside it with tint and shade applied, with a "resolved" note; else "auto"; else null. */
 export function colorOf(el: XmlElement, env: CodecEnv, notes: Note[], source: ColorSource = "w:val"): string | null {
   const value = attrOf(el, source);
   if (value !== null && HEX.test(value)) return value;
@@ -403,8 +381,6 @@ const SHADING_TYPES: readonly ShadingType[] = [
   "vertStripe",
 ];
 
-/** One border side: { style: w:val, color, size: w:sz, space: w:space }, or null (with a note) when its
- *  style is missing or not one docx.js accepts. */
 export function readBorder(side: XmlElement, env: CodecEnv, notes: Note[]): docx.IBorderOptions | null {
   const style = oneOfAt(side, "w:val", BORDER_STYLES, notes);
   if (style === null) {
@@ -421,7 +397,6 @@ export function readBorder(side: XmlElement, env: CodecEnv, notes: Note[]): docx
   return border;
 }
 
-/** w:shd: { type: w:val, fill: w:fill, color: w:color }, each colour hex or resolved from the theme. */
 export function readShading(shd: XmlElement, env: CodecEnv, notes: Note[]): docx.IShadingAttributesProperties {
   const shading: Mutable<docx.IShadingAttributesProperties> = {};
   const type = oneOfAt(shd, "w:val", SHADING_TYPES, notes);

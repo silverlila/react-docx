@@ -1,18 +1,13 @@
-/** Pictures: DrawingML w:drawing and VML v:imagedata → ImageRun (decision 11).
+/** DrawingML w:drawing and VML v:imagedata pictures → ImageRun.
  *
- *  - Only a picture (a:graphicData with the picture uri) whose bytes are embedded in the package, as png,
- *    jpg, gif or bmp, becomes an ImageRun; an SVG blip becomes `type: "svg"` with that raster as its
- *    fallback. Anything else is refused and dropped, never RawXml: it would need its relationship.
- *  - Size is Math.round(EMU / 9525) px, which docx.js writes back as px × 9525, so the second read is
- *    stable. Floating offsets stay in EMU, as docx.js takes them.
- *  - What docx.js writes the same way for every picture is accepted without a note: wp:cNvGraphicFramePr,
- *    pic:nvPicPr, a:stretch, an empty a:srcRect, a rect a:prstGeom, a:noFill, the blip's cstate, a zero
- *    wp:simplePos, and a wp:effectExtent equal to the one docx.js computes. Anchor flags, margins and the
- *    z-index equal to docx.js's defaults are left out. Word's `<a:ln><a:noFill/></a:ln>` draws no line, as
- *    docx.js's picture without an outline does, so it is read as no outline.
- *  - Parsing returns notes instead of reporting them, so mc:AlternateContent can ask whether a drawing is a
- *    picture without a report. It also returns the media parts a picture uses, which are marked consumed
- *    only when the picture is read. */
+ *  - docx.js writes every picture with the same boilerplate (wp:cNvGraphicFramePr, pic:nvPicPr, a:stretch,
+ *    an empty a:srcRect, a rect a:prstGeom, a:noFill, the blip's cstate, a zero wp:simplePos, the
+ *    wp:effectExtent it computes); it is accepted without a note.
+ *  - Size is px × 9525 EMU; floating offsets are in EMU. A VML length without a unit is px (96 dpi).
+ *  - `<a:ln><a:noFill/></a:ln>` draws no line, the same as docx.js's picture without an outline.
+ *  - a:xfrm rot is in 60000ths of a degree. docx.js writes rotation × 60000 unrounded, so about 6% of whole
+ *    angles come out as float noise (31905 → rot="31904.999999999996"); they are rounded back.
+ *  - docx.js needs an align or an offset on wp:positionH/V, and writes an image's run without properties. */
 
 import type * as docx from "docx";
 import { dropped, isOneOf, isOnValue, resolved, type Note } from "../ooxml/codec";
@@ -48,7 +43,6 @@ const DECIMAL = /^-?[0-9]+(?:\.[0-9]+)?$/;
 const VML_LENGTH = /^(-?[0-9]+(?:\.[0-9]+)?)(pt|in|cm|mm|pc|px)?$/;
 
 const RASTER_TYPES: Readonly<Record<string, Raster["type"]>> = { png: "png", jpg: "jpg", jpeg: "jpg", gif: "gif", bmp: "bmp" };
-/** px per unit at 96 dpi; a VML length without a unit is in px. */
 const PX_PER_UNIT: Readonly<Record<string, number>> = { pt: 96 / 72, in: 96, cm: 96 / 2.54, mm: 96 / 25.4, pc: 16, px: 1 };
 
 const HORIZONTAL_FROM = ["character", "column", "insideMargin", "leftMargin", "margin", "outsideMargin", "page", "rightMargin"] as const satisfies readonly ValueOf<typeof docx.HorizontalPositionRelativeFrom>[];
@@ -63,7 +57,6 @@ const WRAP_TYPES = {
   "wp:wrapTopAndBottom": 3,
 } as const satisfies Readonly<Record<string, ValueOf<typeof docx.TextWrappingType>>>;
 
-/** wp:anchor flags → IFloating keys, with docx.js's default for each. */
 const ANCHOR_FLAGS = [
   ["allowOverlap", "allowOverlap", true],
   ["behindDoc", "behindDocument", false],
@@ -89,13 +82,11 @@ const DOC_PR_ATTRIBUTES = new Set(["id", "name", "descr", "title"]);
 
 const refused = (notes: readonly Note[], note: Note): DrawingRead => ({ kind: "refused", notes: [...notes, note] });
 
-/** A whole-number attribute, or null when absent or not whole. */
 function wholeAt(el: XmlElement | null, name: string): number | null {
   const value = attrOf(el, name);
   return value !== null && WHOLE.test(value) ? Number(value) : null;
 }
 
-/** The embedded part `relId` names from the current part, added to `media`; or null with a dropped note. */
 function mediaOf(relId: string | null, element: string, ctx: ReadContext, notes: Note[], media: string[]): { path: string; data: Uint8Array } | null {
   if (relId === null) {
     notes.push(dropped(element, "the picture is not embedded (a linked file), which docx.js cannot write"));
@@ -115,7 +106,6 @@ function mediaOf(relId: string | null, element: string, ctx: ReadContext, notes:
   return { path: rel.target, data };
 }
 
-/** The bytes and docx.js type of a raster picture, or null with a dropped note. */
 function rasterOf(relId: string | null, element: string, ctx: ReadContext, notes: Note[], media: string[]): Raster | null {
   const part = mediaOf(relId, element, ctx, notes, media);
   if (part === null) return null;
@@ -127,7 +117,6 @@ function rasterOf(relId: string | null, element: string, ctx: ReadContext, notes
   return { type: RASTER_TYPES[extension], data: part.data };
 }
 
-/** pic:blipFill → the picture's bytes, or null when they cannot be written. */
 function pictureOf(blipFill: XmlElement | null, ctx: ReadContext, notes: Note[], media: string[]): Picture | null {
   for (const child of elementsOf(blipFill)) {
     if (!BLIP_FILL_PARTS.has(child.name)) notes.push(dropped(child.name, NO_OPTION));
@@ -151,7 +140,6 @@ function pictureOf(blipFill: XmlElement | null, ctx: ReadContext, notes: Note[],
   return svg === null ? raster : { type: "svg", data: svg.data, fallback: raster };
 }
 
-/** a:ln → docx.js's outline: a solid RGB line, with its width; or null for a line with no fill. */
 function outlineOf(ln: XmlElement, notes: Note[]): Outline | null {
   const [only, ...others] = elementsOf(ln);
   if (only?.name === "a:noFill" && others.length === 0) return null;
@@ -172,9 +160,6 @@ function outlineOf(ln: XmlElement, notes: Note[]): Outline | null {
 
 type Shape = { readonly flip?: Transformation["flip"]; readonly rotation?: number; readonly outline?: Outline };
 
-/** a:xfrm's rot, in 60000ths of a degree. docx.js writes rotation × 60000 unrounded, so for about 6% of whole
- *  values it writes float noise (rot="31904.999999999996" for 31905); that is rounded back to the whole
- *  angle it stands for, or the second read would lose the rotation. */
 function rotationOf(xfrm: XmlElement, notes: Note[]): number | null {
   const rot = attrOf(xfrm, "rot");
   if (rot === null) return null;
@@ -185,7 +170,6 @@ function rotationOf(xfrm: XmlElement, notes: Note[]): number | null {
   return Math.round(Number(rot));
 }
 
-/** pic:spPr → rotation and flip from a:xfrm, and the outline. */
 function shapeOf(spPr: XmlElement | null, notes: Note[]): Shape {
   let shape: Shape = {};
   for (const child of elementsOf(spPr)) {
@@ -218,7 +202,6 @@ function shapeOf(spPr: XmlElement | null, notes: Note[]): Shape {
   return shape;
 }
 
-/** wp:docPr → altText, or undefined when name, descr and title are all empty (as docx.js writes no altText). */
 function altTextOf(docPr: XmlElement | null, notes: Note[]): AltText | undefined {
   for (const name of Object.keys(docPr?.attributes ?? {})) {
     if (!DOC_PR_ATTRIBUTES.has(name)) notes.push(dropped("wp:docPr", `${name}: ${NO_OPTION}`));
@@ -231,8 +214,6 @@ function altTextOf(docPr: XmlElement | null, notes: Note[]): AltText | undefined
   return { name: name ?? "", ...(description === null ? {} : { description }), ...(title === null ? {} : { title }) };
 }
 
-/** wp:positionH or wp:positionV. docx.js needs an align or an offset, so a position with neither gets
- *  offset 0 and a note. */
 function positionOf<R extends string, A extends string>(
   el: XmlElement | null,
   from: readonly R[],
@@ -256,7 +237,6 @@ function positionOf<R extends string, A extends string>(
   return { ...at, offset: 0 };
 }
 
-/** The anchor's wrap element → docx.js's wrap. */
 function wrapOf(anchor: XmlElement, notes: Note[]): Floating["wrap"] | undefined {
   for (const el of elementsOf(anchor)) {
     if (el.name === "wp:wrapSquare") {
@@ -275,7 +255,6 @@ function wrapOf(anchor: XmlElement, notes: Note[]): Floating["wrap"] | undefined
   return undefined;
 }
 
-/** wp:anchor → docx.js's floating, leaving out what equals docx.js's defaults. */
 function floatingOf(anchor: XmlElement, height: number, notes: Note[]): Floating {
   const options: { -readonly [K in keyof Floating]?: Floating[K] } = {};
   for (const [attribute, key, fallback] of ANCHOR_FLAGS) {
@@ -297,7 +276,6 @@ function floatingOf(anchor: XmlElement, height: number, notes: Note[]): Floating
   };
 }
 
-/** Notes for the container's attributes and children that docx.js cannot write. */
 function checkContainer(container: XmlElement, outline: Outline | undefined, notes: Note[]): void {
   const inline = container.name === "wp:inline";
   for (const [name, value] of Object.entries(container.attributes)) {
@@ -318,7 +296,6 @@ function checkContainer(container: XmlElement, outline: Outline | undefined, not
   }
 }
 
-/** w:drawing → ImageRun props, or a refusal; nothing is reported. */
 export function parseDrawing(drawing: XmlElement, ctx: ReadContext): DrawingRead {
   const notes: Note[] = [];
   const [container, ...rest] = elementsOf(drawing);
@@ -352,14 +329,11 @@ export function parseDrawing(drawing: XmlElement, ctx: ReadContext): DrawingRead
   return { kind: "image", props, media, notes };
 }
 
-/** A VML length → px, or null when it has a unit VML pictures do not use. */
 function vmlPx(value: string | undefined): number | null {
   const match = VML_LENGTH.exec(value ?? "");
   return match === null ? null : Math.round(Number(match[1]) * PX_PER_UNIT[match[2] ?? "px"]);
 }
 
-/** A w:pict whose v:shape holds v:imagedata → ImageRun props, or a refusal; null when it is not a VML
- *  picture. Nothing is reported. */
 export function parseVmlImage(pict: XmlElement, ctx: ReadContext): DrawingRead | null {
   const shape = childNamed(pict, "v:shape");
   const imagedata = childNamed(shape, "v:imagedata");
@@ -377,8 +351,6 @@ export function parseVmlImage(pict: XmlElement, ctx: ReadContext): DrawingRead |
   return { kind: "image", props: { ...raster, transformation: { width, height } }, media, notes: [resolved("w:pict", "VML image converted to DrawingML"), ...notes] };
 }
 
-/** Reports a parsed picture's notes, marks its media consumed and gives its ImageRun, or null when it was
- *  refused. docx.js writes an image's run without properties, so the run's own are dropped. */
 export function readPicture(read: DrawingRead, runProps: RunOptions, ctx: ReadContext): AuthorNode | null {
   ctx.notes(read.notes);
   if (read.kind === "refused") return null;
@@ -389,7 +361,6 @@ export function readPicture(read: DrawingRead, runProps: RunOptions, ctx: ReadCo
   return { type: "ImageRun", props: read.props, children: [] };
 }
 
-/** w:drawing → ImageRun author node, or null (with a diagnostic) when it is not a supported picture. */
 export function readDrawing(drawing: XmlElement, runProps: RunOptions, ctx: ReadContext): AuthorNode | null {
   return readPicture(parseDrawing(drawing, ctx), runProps, ctx);
 }

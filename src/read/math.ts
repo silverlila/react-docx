@@ -1,9 +1,6 @@
-/** m:oMath → Math holding MathRuns, when it is plain runs of text.
- *
- *  - Plain means: every child of the m:oMath is an m:r, and every child of an m:r is m:t, m:rPr or w:rPr.
- *    Any other structure (fractions, scripts, m:oMathPara, …) is not a Math the tree can hold, so the
- *    caller keeps it through the generic fallback as RawXml; OMML carries no relationships.
- *  - MathRun takes no properties, so m:rPr and w:rPr are dropped. An m:r with no text is left out. */
+/** OMML: only an m:oMath made of m:r holding m:t, m:rPr or w:rPr maps to Math; docx.js's MathRun takes no
+ *  run properties. Other OMML (fractions, scripts, m:oMathPara) has no relationships and is kept as
+ *  RawXml. */
 
 import type { AuthorNode } from "../tree/author";
 import type { ReadContext } from "./context";
@@ -17,7 +14,6 @@ const isPlainRun = (run: XmlElement): boolean =>
 
 export const isPlainMath = (oMath: XmlElement): boolean => elementsOf(oMath).every(isPlainRun);
 
-/** The Math node of a plain m:oMath, or null when it is not plain. */
 export function readMath(oMath: XmlElement, ctx: ReadContext): AuthorNode | null {
   if (!isPlainMath(oMath)) return null;
   const children: AuthorNode[] = [];

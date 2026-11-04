@@ -1,5 +1,5 @@
-/** The style sheet Word applies to a document react-docx writes, built the way docx.js builds styles.xml
- *  (decision 14), so the preview shows what Word shows.
+/** The style sheet Word applies to a document react-docx writes, built the way docx.js builds styles.xml,
+ *  so the preview shows what Word shows.
  *
  *  - Document defaults: `styles.default.document` when given, else docx.js's. docx.js does
  *    `new DocumentDefaults(options.document ?? {})`, which replaces rather than merges.
@@ -21,7 +21,6 @@ import { DEFAULT_STYLE_SLOTS } from "../schema/docx-facts";
 import type { StylesProps } from "../schema/elements";
 import { DOCX_DEFAULT_STYLES } from "./docx-default-styles.generated";
 
-/** The paragraph options a style or the document defaults can set, a list's numbering among them. */
 export type SheetParagraph = docx.IParagraphStylePropertiesOptions & { readonly pageBreakBefore?: boolean };
 
 type SheetStyle = {
@@ -34,7 +33,6 @@ type SheetStyle = {
 export type EffectiveSheet = {
   readonly docDefaults: { readonly paragraph: SheetParagraph; readonly run: RunOptions };
   readonly styles: ReadonlyMap<string, SheetStyle>;
-  /** The raw style with w:default="1", if any. */
   readonly defaultParagraphStyle: string | null;
 };
 
@@ -44,7 +42,6 @@ type ImportedStyle = { readonly id: string; readonly isDefault: boolean; readonl
 
 const SHEET_TYPES: readonly SheetStyle["type"][] = ["paragraph", "character", "table"];
 
-/** folio's cap on a basedOn chain, which also stops a cycle. */
 const MAX_STYLE_HOPS = 10;
 
 const NO_FONTS = { latin: null, eastAsia: null, complex: null };
@@ -59,13 +56,6 @@ function sheetStyle(type: SheetStyle["type"], { basedOn, paragraph, run }: Style
   };
 }
 
-/** Any w:style, read with the property codecs (raw `importedStyles` included); null for a numbering style
- *  or a style with no w:styleId, which no paragraph, run or table can name.
- *
- *  - Notes are not kept: the reader already reported this style when it read the file.
- *  - w:tblStylePr (conditional formatting of first rows, banding, …) is not read. That is a preview
- *    simplification, not a reader or writer gap.
- *  - A w:numPr in the style's w:pPr is left out: it names a numId, which only the reader can resolve. */
 function readImportedStyle(style: XmlElement): ImportedStyle | null {
   const type = attrOf(style, "w:type") ?? "paragraph";
   const id = attrOf(style, "w:styleId");
@@ -109,7 +99,6 @@ export function effectiveSheet(styles: StylesProps | undefined): EffectiveSheet 
   };
 }
 
-/** The style `id` and the styles it is basedOn, base first. Stops at a missing style or a cycle. */
 export function styleChain(sheet: EffectiveSheet, id: string | null | undefined): readonly SheetStyle[] {
   const chain: SheetStyle[] = [];
   const seen = new Set<string>();

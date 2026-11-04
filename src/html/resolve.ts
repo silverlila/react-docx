@@ -1,5 +1,5 @@
 /** resolveDocument: a canonical tree → plain data the preview draws, with the formatting Word would apply
- *  to each block and run already computed (decision 13).
+ *  to each block and run already computed.
  *
  *  - The cascade, lowest first. Paragraph: document defaults, the enclosing table's style, the paragraph
  *    style chain (`style`, else the default paragraph style), the numbering level, direct props. Run:
@@ -14,9 +14,11 @@
  *  - List markers count per story: the body of every section shares one set of counters, and each header,
  *    footer and footnote counts on its own. Footnotes are numbered 1..n in body order across the document
  *    and collected under the section that references them.
- *  - Accepted preview simplifications, each noted at its site: no conditional table-style formatting, no
- *    toggle-property semantics, no font fallback lists. Insertions show as plain text; deletions, comments
- *    and comment marks are not drawn (Out of Scope).
+ *  - Word draws a border that has no w:sz at its thinnest, 2 eighths of a point.
+ *  - docx.js inserts continuation cells in the rows below a cell with an authored rowSpan.
+ *  - Accepted preview simplifications: no conditional table-style formatting, no toggle-property
+ *    semantics, no font fallback lists. Insertions show as plain text; deletions, comments and comment
+ *    marks are not drawn.
  *  - Paths are canonical tree paths: child indices from the Document root. */
 
 import type * as docx from "docx";
@@ -155,7 +157,6 @@ type Measure = number | string;
 type FontSlot = "ascii" | "hAnsi" | "eastAsia" | "cs";
 type FontSlots = Partial<Record<FontSlot, string>>;
 
-/** The formatting a table's style gives the paragraphs and runs in its cells. */
 type TableLayer = { readonly paragraph: SheetParagraph; readonly run: RunOptions };
 
 type DocumentScope = {
@@ -165,28 +166,21 @@ type DocumentScope = {
   nextFootnote(): number;
 };
 
-/** One flow of text: a section's body, a header, a footer or a footnote. */
 type Story = {
   readonly doc: DocumentScope;
   readonly counters: Counters;
-  /** The section's footnotes, appended to as body paragraphs reference them. */
   readonly footnotes: ResolvedFootnote[];
   readonly table: TableLayer | null;
 };
 
-/** What inline content inherits from its paragraph. */
 type InlineScope = { readonly story: Story; readonly run: RunOptions };
 
-/** The OOXML application defaults, used when nothing sets a run's font or size. */
 const FALLBACK_RUN = { font: "Times New Roman", size: 20 } as const;
 
-/** docx.js's section defaults (sectionPageSizeDefaults, sectionMarginDefaults), in twips. */
 const PAGE_DEFAULTS = { width: 11906, height: 16838, top: 1440, right: 1440, bottom: 1440, left: 1440 } as const;
 
-/** The border docx.js writes for each table side not given (DEFAULT_BORDER in TableBorders). */
 const DOCX_TABLE_BORDER: docx.IBorderOptions = { style: "single", size: 4, color: "auto" };
 
-/** Word draws a border with no w:sz at its thinnest, 2 eighths of a point. */
 const THINNEST_BORDER = 2;
 
 const TWIPS_PER_PT = 20;
@@ -223,7 +217,6 @@ const BORDER_STYLES: Readonly<Record<string, ComputedBorder["style"] | null>> = 
   none: null,
 };
 
-/** Word's highlight palette. */
 const HIGHLIGHTS: Readonly<Record<string, string>> = {
   black: "000000",
   blue: "0000FF",
@@ -251,10 +244,6 @@ const IMAGE_MEDIA_TYPES: Readonly<Record<string, string>> = {
   svg: "image/svg+xml",
 };
 
-// ── Units ────────────────────────────────────────────────────────────────────────────────────────────
-
-/** A docx.js measure in points: a number in `perPoint` units (twips, half-points, …) or a universal
- *  measure string ("12pt", "2cm"). */
 function pointsOf(value: Measure, perPoint: number): number {
   if (typeof value === "number") return value / perPoint;
   const match = UNIVERSAL_MEASURE.exec(value);
@@ -262,10 +251,8 @@ function pointsOf(value: Measure, perPoint: number): number {
   return Number(match[1]) * POINTS_PER_UNIT[match[2]];
 }
 
-/** A colour docx.js wrote, or null for "auto", which Word draws as the automatic colour. */
 const hexOrNull = (color: string | undefined): string | null => (color !== undefined && HEX.test(color) ? color : null);
 
-/** The colour a w:shd shows: a solid pattern shows its pattern colour, any other its fill. */
 function shadingColor(shading: docx.IShadingAttributesProperties | undefined): string | null {
   if (shading === undefined || shading.type === "nil") return null;
   return shading.type === "solid" ? hexOrNull(shading.color) : hexOrNull(shading.fill);
@@ -291,8 +278,6 @@ function computeBorders(sides: Partial<Record<Side, docx.IBorderOptions>>): Comp
   return out;
 }
 
-// ── The cascade ──────────────────────────────────────────────────────────────────────────────────────
-
 function fontSlots(font: RunOptions["font"]): FontSlots {
   if (font === undefined) return {};
   if (typeof font === "string") return { ascii: font, hAnsi: font, eastAsia: font, cs: font };
@@ -305,8 +290,6 @@ function fontSlots(font: RunOptions["font"]): FontSlots {
   return slots;
 }
 
-/** `over` on top of `base`. Plain override precedence: Word's toggle properties (bold in a character
- *  style flipping the paragraph style's bold) are not modeled, a preview simplification. */
 function overRun(base: RunOptions, over: RunOptions | undefined): RunOptions {
   if (over === undefined) return base;
   if (base.font === undefined && over.font === undefined) return { ...base, ...over };
@@ -315,7 +298,6 @@ function overRun(base: RunOptions, over: RunOptions | undefined): RunOptions {
 
 type Indent = NonNullable<SheetParagraph["indent"]>;
 
-/** `start` and `end` are the newer names of `left` and `right`. */
 function indentOf(indent: Indent | undefined): Indent {
   if (indent === undefined) return {};
   const left = indent.left ?? indent.start;
@@ -343,7 +325,6 @@ function computeRun(run: RunOptions): ComputedRun {
   const underline = run.underline === undefined ? null : run.underline.type ?? "single";
   const highlight = run.highlight === undefined ? undefined : own(HIGHLIGHTS, run.highlight);
   return {
-    // A single family, with no fallback list: a preview simplification.
     fontFamily: font.ascii ?? font.hAnsi ?? FALLBACK_RUN.font,
     sizePt: pointsOf(run.size ?? FALLBACK_RUN.size, HALF_POINTS_PER_PT),
     bold: run.bold ?? false,
@@ -395,22 +376,17 @@ function computeParagraph(p: SheetParagraph, markRun: ComputedRun): ComputedPara
   };
 }
 
-/** The run options every run of a story inherits before its paragraph style. */
 function storyRun(story: Story): RunOptions {
   return overRun(story.doc.sheet.docDefaults.run, story.table?.run);
 }
 
-/** The character style chain's run options over `base`. */
 function withCharacterStyle(base: RunOptions, style: string | undefined, sheet: EffectiveSheet): RunOptions {
   return styleChain(sheet, style).reduce((run, s) => overRun(run, s.run), base);
 }
 
-/** A run's computed formatting: its paragraph's, then its character style chain, then its own props. */
 function runOf(scope: InlineScope, props: RunOptions): ComputedRun {
   return computeRun(overRun(withCharacterStyle(scope.run, props.style, scope.story.doc.sheet), props));
 }
-
-// ── Inlines ──────────────────────────────────────────────────────────────────────────────────────────
 
 function base64(bytes: Uint8Array): string {
   let binary = "";
@@ -544,8 +520,6 @@ function inline(node: InlineNode, at: TreePath, scope: InlineScope): ResolvedInl
   }
 }
 
-// ── Blocks ───────────────────────────────────────────────────────────────────────────────────────────
-
 type Numbering = { readonly reference: string; readonly level: number; readonly instance?: number };
 
 function marker(numbering: Numbering, markRun: RunOptions, story: Story): ResolvedMarker | null {
@@ -586,8 +560,6 @@ type TableBorderSide = keyof docx.ITableBordersOptions;
 type PlacedCell = { readonly cell: Node<"TableCell">; readonly index: number; readonly gridCol: number; readonly colSpan: number };
 type Span = { readonly colSpan: number; readonly rows: number };
 
-/** Each row's cells with their grid column. A cell with an authored rowSpan covers its grid columns in
- *  the rows below, where docx.js inserts continuation cells. */
 function placeCells(rows: readonly Node<"TableRow">[]): PlacedCell[][] {
   let covering = new Map<number, Span>();
   return rows.map((row) => {
@@ -608,7 +580,6 @@ function placeCells(rows: readonly Node<"TableRow">[]): PlacedCell[][] {
   });
 }
 
-/** 1 + the directly following rows whose cell at `gridCol` continues a vertical merge. */
 function mergedRows(grid: readonly PlacedCell[][], rowIndex: number, gridCol: number): number {
   let span = 1;
   for (const row of grid.slice(rowIndex + 1)) {
@@ -625,8 +596,6 @@ const widthPtOf = (width: docx.ITableWidthProperties | undefined): number | null
     : null;
 
 function tableLayer(table: Node<"Table">, story: Story): TableLayer {
-  // The table style's paragraph and run options only: its conditional formatting (w:tblStylePr, first
-  // row, banding, …) is not applied, a preview simplification.
   const { sheet } = story.doc;
   const chain = styleChain(sheet, table.props.style);
   return {
@@ -689,7 +658,6 @@ function table(node: Node<"Table">, path: TreePath, story: Story): ResolvedBlock
   };
 }
 
-/** A VML length in points, when it is given in points. */
 function pointLength(length: unknown): number | null {
   if (typeof length !== "string") return null;
   const match = POINT_LENGTH.exec(length);
@@ -725,8 +693,6 @@ function blocksOf(children: readonly BlockNode[], at: TreePath, story: Story): R
   return children.map((child, i) => block(child, [...at, i], story));
 }
 
-// ── Sections ─────────────────────────────────────────────────────────────────────────────────────────
-
 function pageOf(section: Node<"Section">): Pick<ResolvedSection, "widthPt" | "heightPt" | "marginsPt"> {
   const page = section.props.properties?.page;
   const size = page?.size;
@@ -754,7 +720,6 @@ function section(node: Node<"Section">, path: TreePath, doc: DocumentScope): Res
   const ownStory = (): Story => ({ doc, counters: new Map(), footnotes, table: null });
   node.children.forEach((child, i) => {
     const at = [...path, i];
-    // Only the default header and footer are shown (Out of Scope).
     if (child.type === "Header") {
       if (child.props.type === "default") header = blocksOf(child.children, at, ownStory());
     } else if (child.type === "Footer") {

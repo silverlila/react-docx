@@ -1,12 +1,8 @@
-/** Tracked changes: w:ins, w:del, w:moveTo and w:moveFrom holding runs → the runs of an InsertedTextRun or
- *  DeletedTextRun, for the body walk to read.
+/** w:ins/w:moveTo hold runs → InsertedTextRun; w:del/w:moveFrom hold runs → DeletedTextRun. Word writes a
+ *  deleted run's text as w:delText and w:delInstrText; they are read as w:t and w:instrText.
  *
- *  - Only a change whose element children are all w:r maps. The body walk keeps the content of any other
- *    insertion untracked and drops any other deletion with its content.
- *  - Change ids are ordinals of first appearance (decision 5). A move is shown as an insertion and a
- *    deletion, reported resolved; its range marks are editing noise.
- *  - A deleted run's w:delText and w:delInstrText are read as w:t and w:instrText, so the run walk reads
- *    deleted text and deleted page fields as it reads live ones. */
+ *  A move is written as a deletion plus an insertion, with range marks (w:move*RangeStart/End) that carry
+ *  no content. */
 
 import { isOwnKey } from "../schema/own";
 import type { ReadContext } from "./context";
@@ -16,7 +12,6 @@ type ChangeKind = "InsertedTextRun" | "DeletedTextRun";
 
 type TrackedRuns = {
   readonly kind: ChangeKind;
-  /** id, author and date: the change's props before the run's own. */
   readonly props: Readonly<Record<string, unknown>>;
   readonly runs: readonly XmlElement[];
 };
@@ -28,7 +23,6 @@ const CHANGES: Readonly<Record<string, { readonly kind: ChangeKind; readonly mov
   "w:moveFrom": { kind: "DeletedTextRun", moved: true },
 };
 
-/** The marks of where moved text was and went: ignored, as the move reads as an insertion and a deletion. */
 export const MOVE_RANGES: ReadonlySet<string> = new Set([
   "w:moveFromRangeStart",
   "w:moveFromRangeEnd",
@@ -51,7 +45,6 @@ function asLive(run: XmlElement): XmlElement {
   return { ...run, children };
 }
 
-/** The runs of change `el` with the props they share, or null when it holds anything but runs. */
 export function trackedRuns(el: XmlElement, ctx: ReadContext): TrackedRuns | null {
   const { kind, moved } = CHANGES[el.name];
   const runs = elementsOf(el);

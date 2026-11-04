@@ -1,8 +1,6 @@
-/** printJsx turns a canonical document tree into a .tsx module that renders the same tree (decision 12).
+/** printJsx turns a canonical document tree into a .tsx module that renders the same tree.
  *
- *  It is pure string building: no formatter, and no runtime import outside this folder. Its own layout
- *  rule is the format: a value, element or import list that fits in 100 columns stays on one line,
- *  otherwise it breaks with 2-space indentation.
+ *  It is pure string building: no formatter, and no runtime import outside this folder.
  *
  *  JSX facts the printer relies on:
  *  - JSX text loses whitespace at line ends and decodes HTML entities, so text with outer spaces, other
@@ -27,7 +25,6 @@ type Bag = Readonly<Record<string, unknown>>;
 type AssetMap = ReadonlyMap<Uint8Array, Asset>;
 type ImageSource = { readonly data: Uint8Array; readonly type: string };
 
-/** Source text spliced into the output as it is. */
 class Code {
   constructor(readonly text: string) {}
 }
@@ -39,7 +36,6 @@ const NOT_JSX_TEXT = /[{}<>&\u0000-\u001f\u007f]|[^\S ]/;
 const NOT_ATTRIBUTE_STRING = /["\\&\u0000-\u001f\u007f\u2028\u2029]/;
 const HOISTED = ["styles", "numbering"] as const;
 
-/** docx.PageNumber's key for each of its values. */
 const PAGE_NUMBER_KEYS: Readonly<Record<Props<"PageNumber">["field"], string>> = {
   CURRENT: "CURRENT",
   TOTAL_PAGES: "TOTAL_PAGES",
@@ -89,8 +85,6 @@ function assertFreeName(name: string, taken: readonly string[]): void {
   }
 }
 
-// ——— Tree walks ———
-
 function nodesOf(node: Node): Node[] {
   return [node, ...node.children.flatMap((child) => (typeof child === "string" ? [] : nodesOf(child)))];
 }
@@ -99,8 +93,6 @@ function kindsUsed(root: Node): Set<Kind> {
   return new Set(nodesOf(root).map((node) => node.type));
 }
 
-/** Every ImageRun's bytes (data, then fallback data) in document order, each mapped to its asset.
- *  Identical bytes share the first asset made for them. */
 function collectAssets(root: Node): AssetMap {
   const assets = new Map<Uint8Array, Asset>();
   const made: Asset[] = [];
@@ -120,8 +112,6 @@ function imageSources(props: Props<"ImageRun">): readonly ImageSource[] {
   return fallback === undefined ? [props] : [props, fallback];
 }
 
-/** The ImageRun's fallback, when it has one. ImageProps ties a fallback to an svg, but a raster ImageRun
- *  given one through a spread keeps it through canonicalize, so whether it is there decides, not the type. */
 function fallbackOf(props: Props<"ImageRun">): (Bag & ImageSource) | undefined {
   if (!("fallback" in props) || !isPlainObject(props.fallback)) return undefined;
   const { data, type } = props.fallback;
@@ -141,8 +131,6 @@ function readAsset(data: Uint8Array, assets: AssetMap): Code {
   return new Code(`readFileSync(new URL(${JSON.stringify(`./${asset.path}`)}, import.meta.url))`);
 }
 
-// ——— JSX ———
-
 function printElement(node: Node, indent: number, assets: AssetMap): string {
   const flat = flatElement(node, assets);
   if (fits(flat, indent)) return flat;
@@ -154,8 +142,6 @@ function printElement(node: Node, indent: number, assets: AssetMap): string {
   return `${open}>${children}\n${pad(indent)}</${node.type}>`;
 }
 
-/** `<Kind attributes`, without its closing `>`: on one line when it fits or has one attribute, else one
- *  attribute per line (stacked) and ending on a line of its own. */
 function openTag(type: string, attributes: [string, unknown][], indent: number): { open: string; stacked: boolean } {
   const flat = `<${type}${attributes.map(([name, value]) => ` ${attribute(name, value, flatValue)}`).join("")}`;
   if (fits(`${flat}>`, indent)) return { open: flat, stacked: false };
@@ -192,7 +178,6 @@ function pageNumber(node: Node<"PageNumber">): string {
   return `{PageNumber.${PAGE_NUMBER_KEYS[node.props.field]}}`;
 }
 
-/** The props to print, in the tree's key order, without undefined values. */
 function attributesOf(node: Node, assets: AssetMap): [string, unknown][] {
   const entries = definedEntries(codeProps(node, assets));
   for (const [name] of entries) {
@@ -201,7 +186,6 @@ function attributesOf(node: Node, assets: AssetMap): [string, unknown][] {
   return entries;
 }
 
-/** The node's props, with those that print as code rather than as their value replaced by that code. */
 function codeProps(node: Node, assets: AssetMap): object {
   switch (node.type) {
     case "Document": {
@@ -230,9 +214,6 @@ function brokenAttribute([name, value]: [string, unknown], indent: number, colum
   return attribute(name, value, (v) => printValue(v, indent, column + name.length + 2));
 }
 
-// ——— Values ———
-
-/** `value` as an expression starting at `column`: on one line when it fits, else broken at `indent`. */
 function printValue(value: unknown, indent: number, column: number): string {
   const flat = flatValue(value);
   if (fits(flat, column)) return flat;
@@ -295,8 +276,6 @@ function isPlainObject(value: unknown): value is Bag {
   const prototype: unknown = Object.getPrototypeOf(value);
   return prototype === Object.prototype || prototype === null;
 }
-
-// ——— Layout ———
 
 function namedImport(names: readonly string[], from: string): string {
   const flat = `import { ${names.join(", ")} } from ${JSON.stringify(from)};`;

@@ -1,8 +1,4 @@
-/** The element table: one row per kind, naming the docx.js class it builds, the child kinds it may hold
- *  and its content model.
- *
- *  `spec<P>()` is curried because TypeScript cannot infer some type arguments while others are given,
- *  and each row must keep its literal types.
+/** `spec<P>()` is curried because TypeScript cannot infer some type arguments while others are given.
  *
  *  docx.js facts the table encodes:
  *  - Textbox accepts a `text` option and ignores it.

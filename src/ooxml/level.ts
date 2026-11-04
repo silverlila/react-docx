@@ -1,11 +1,7 @@
 /** w:lvl (one numbering level of a w:abstractNum) → docx.js ILevelsOptions.
  *
- *  - The writer-inverse test defines correctness.
- *  - The level number is the w:ilvl attribute. docx.js throws above 9, so a missing or out-of-range one is
- *    reported and read as level 0.
- *  - docx.js writes w:isLgl only when it is on, and w:lvlText only when the text is not empty, so an off
- *    w:isLgl and an empty w:lvlText are dropped.
- *  - The w15:tentative attribute is not a child element, so it has no fate; docx.js writes its own. */
+ *  - docx.js throws above level 9, writes w:isLgl only when it is on, and writes w:lvlText only when it is
+ *    not empty. */
 
 import type * as docx from "docx";
 import { attrOf, type XmlElement } from "./xml";

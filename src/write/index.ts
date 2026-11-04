@@ -1,3 +1,5 @@
+/** Base64 output uses docx.js's own encoder, not Node's Buffer, so rendering works in browsers. */
+
 import { isValidElement, type ReactElement } from "react";
 import * as docx from "docx";
 import type { DocumentNode } from "../schema/elements";
@@ -25,7 +27,6 @@ export async function renderToBlob(source: RenderSource): Promise<Blob> {
   return docx.Packer.toBlob(toDocument(source));
 }
 
-/** Uses docx.js's own base64 output, not Node's Buffer, so it works in browsers. */
 export async function renderToBase64(source: RenderSource): Promise<string> {
   return docx.Packer.toBase64String(toDocument(source));
 }

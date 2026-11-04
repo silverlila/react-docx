@@ -1,13 +1,7 @@
-/** word/styles.xml → Document.styles (decision 8).
- *
- *  - w:docDefaults → `default.document`. Paragraph and character styles → `paragraphStyles` and
- *    `characterStyles`, in the file's order. Styles docx.js cannot express (Word's default style, table and
- *    numbering styles) → raw `importedStyles`.
- *  - Styles nothing references are kept: Word users expect their style gallery.
- *  - A style with one of docx.js's built-in ids (Heading1, Title, …) is left in its list; canonicalize
- *    folds it into `styles.default.<key>`.
- *  - A paragraph style's w:numPr becomes `paragraph.numbering` with `custom: true`: without it docx.js
- *    writes pStyle ListParagraph into the style's own w:pPr. */
+/** docx.js cannot express Word's default style, table styles or numbering styles, so they are kept as raw
+ *  importedStyles. A style with one of docx.js's built-in ids (Heading1, Title, …) is folded by
+ *  canonicalize into styles.default.<key>. A paragraph style's numPr needs `custom: true`, or docx.js
+ *  writes pStyle ListParagraph into the style's own w:pPr. */
 
 import type * as docx from "docx";
 import type { Mutable } from "../ooxml/codec";
@@ -62,8 +56,6 @@ function withNumbering(
   return { ...style, paragraph: { ...style.paragraph, numbering } };
 }
 
-/** The styles part found through the main part's `styles` relationship, falling back to word/styles.xml.
- *  Read after the body, so lists only a style uses are numbered after every list the body uses. */
 export function readStylesPart(ctx: ReadContext, numbering: NumberingReader): StylesProps | undefined {
   const path = partOfType(ctx.pkg, "/styles", "word/styles.xml");
   const root = ctx.readPart(path);

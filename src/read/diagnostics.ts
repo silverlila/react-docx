@@ -1,12 +1,3 @@
-/** What readDocx reports about everything it could not carry over as it was.
- *
- *  - `raw`: an element kept verbatim as RawXml. `resolved`: a theme reference turned into a literal value.
- *    `dropped`: something docx.js cannot write, or that no reader reads yet. `ignored`: editing noise,
- *    counted by element name and not listed.
- *  - `part` is the zip path the element came from. `at` is the tree path of the nearest enclosing block,
- *    or null for document-level parts (styles, settings, unread parts).
- *  - The list is sorted by part, path and element, so the same file always gives the same report. */
-
 /** Child indices from the Document root to the nearest enclosing block (Section, Header, Footer, Paragraph, Table,
  *  TableRow, TableCell, Textbox, Comment). Block positions survive canonicalize; inline positions do not (Break splits).
  *  Footnote is inline, so a diagnostic inside a footnote carries the path of the body Paragraph holding its
@@ -14,8 +5,12 @@
 export type TreePath = readonly number[];
 
 export type LocatedDiagnostic = {
+  /** raw = element kept as RawXml; resolved = theme reference turned into a literal; dropped = not
+   *  expressible in docx.js or not read; ignored = editing noise, counted by element. */
   readonly kind: "raw" | "resolved" | "dropped";
+  /** The zip path. */
   readonly part: string;
+  /** The tree path of the enclosing block, or null for document-level parts. */
   readonly at: TreePath | null;
   readonly element: string;
   readonly detail: string;

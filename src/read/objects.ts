@@ -1,12 +1,7 @@
-/** VML text boxes and mc:AlternateContent: the parts of unit 06 that are not pictures.
- *
- *  - A text box is a w:pict whose v:shape holds v:textbox/w:txbxContent. Its v:shape style becomes
- *    docx.js's VmlShapeStyle; declarations VmlShapeStyle has no key or value for are dropped. docx.js
- *    writes its own shape id, shape type #_x0000_t202 and v:textbox attributes, so those are accepted as
- *    they are, and anything else on the shape is dropped.
- *  - mc:AlternateContent is read as the first mc:Choice whose every element maps to a tree kind other than
- *    RawXml, else as its mc:Fallback. Whether an element maps is the caller's question, since it depends
- *    on the slot. */
+/** A text box is a w:pict whose v:shape holds v:textbox/w:txbxContent. Its style declarations map to
+ *  VmlShapeStyle; those with no key or value are dropped. docx.js writes its own shape id, shape type
+ *  #_x0000_t202 and v:textbox attributes on a text box, so those are accepted; anything else on the
+ *  v:shape is dropped. */
 
 import type * as docx from "docx";
 import { dropped, type Note } from "../ooxml/codec";
@@ -29,7 +24,6 @@ const NUMBER = /^-?[0-9]+(\.[0-9]+)?$/;
 const MEASURE = /^-?[0-9]+(\.[0-9]+)?(mm|cm|in|pt|pc|pi|em|ex|%)$/;
 const INTEGER = /^-?[0-9]+$/;
 
-/** What docx.js writes on a text box's v:shape and v:textbox itself. */
 const DOCX_SHAPE_TYPE = "#_x0000_t202";
 const DOCX_TEXTBOX_ATTRIBUTES: Readonly<Record<string, string>> = {
   style: "mso-fit-shape-to-text:t;",
@@ -48,7 +42,6 @@ const zIndex: StyleReader = (value) => (value === "auto" ? value : INTEGER.test(
 const POSITIONS = oneOf(["absolute", "left", "center", "right", "inside", "outside"]);
 const RELATIVE_TO = oneOf(["margin", "page", "text", "char"]);
 
-/** A v:shape style declaration → its VmlShapeStyle key and value reader, keyed as docx.js writes them. */
 const SHAPE_STYLE: Readonly<Record<string, readonly [keyof ShapeStyle, StyleReader]>> = {
   flip: ["flip", oneOf(["x", "y", "xy", "yx"])],
   height: ["height", length],
@@ -75,7 +68,6 @@ const SHAPE_STYLE: Readonly<Record<string, readonly [keyof ShapeStyle, StyleRead
   "z-index": ["zIndex", zIndex],
 };
 
-/** A CSS-like style attribute's declarations in order, as [name, value]. */
 export function styleDeclarations(style: string): [string, string][] {
   return style
     .split(";")
@@ -87,15 +79,12 @@ export function styleDeclarations(style: string): [string, string][] {
     });
 }
 
-/** The v:shape and w:txbxContent of a w:pict that is a VML text box, or null. */
 export function textBoxOf(pict: XmlElement): TextBox | null {
   const shape = childNamed(pict, "v:shape");
   const content = childNamed(childNamed(shape, "v:textbox"), "w:txbxContent");
   return shape === null || content === null ? null : { shape, content };
 }
 
-/** The Textbox `style` option from a text box's v:shape, in the file's declaration order, or undefined
- *  when it has none. Everything on the shape docx.js does not write is noted dropped. */
 export function textBoxStyle(box: TextBox, notes: Note[]): Readonly<Record<string, StyleValue>> | undefined {
   const { shape } = box;
   for (const [name, value] of Object.entries(shape.attributes)) {
@@ -122,8 +111,6 @@ export function textBoxStyle(box: TextBox, notes: Note[]): Readonly<Record<strin
   return Object.keys(style).length === 0 ? undefined : style;
 }
 
-/** mc:AlternateContent's content: the first mc:Choice whose every element `maps`, else the mc:Fallback's,
- *  or null when the Fallback is absent or empty. */
 export function alternateContent(el: XmlElement, maps: (element: XmlElement) => boolean): Alternate | null {
   for (const choice of childrenNamed(el, "mc:Choice")) {
     const elements = elementsOf(choice);

@@ -1,15 +1,6 @@
-/** Footnotes (word/footnotes.xml) and comments (word/comments.xml): which ids exist, their content with
- *  the mark run Word and docx.js write themselves removed, and the Footnote and Comment nodes.
- *
- *  - The body walk reads a footnote's content where its reference stands, because Footnote is inline.
- *    Separator footnotes are docx.js's own and counted ignored; a footnote no body reference reaches is
- *    dropped, since docx.js writes only referenced ones.
- *  - The first paragraph's run holding w:footnoteRef (or a comment's w:annotationRef) is removed: docx.js
- *    writes its own footnote number mark, and Word draws comment marks itself.
- *  - Comment ids are ordinals of first appearance (decision 5), counted from 0 like phase 1's: marks in
- *    reading order first, then unreferenced comments in file order.
- *  - A comment's w:date becomes a Date, and a comment without one has no `date`: phase 1 writes no w:date
- *    for an undated Comment. */
+/** Word and docx.js write the footnote number mark (w:footnoteRef) and the comment mark (w:annotationRef)
+ *  themselves, so the run holding it is removed on read. docx.js writes separator footnotes itself and
+ *  writes only referenced footnotes. It writes no w:date for an undated Comment. */
 
 import type { AuthorNode } from "../tree/author";
 import { partOfType, type ReadContext } from "./context";
@@ -17,23 +8,16 @@ import { attrOf, elementsOf, type XmlElement } from "../ooxml/xml";
 
 type CommentRead = {
   readonly id: number;
-  /** The w:comment, for its attributes. */
   readonly comment: XmlElement;
-  /** Its content, without the w:annotationRef run. */
   readonly content: XmlElement;
 };
 
 export type NotesReader = {
   readonly footnotesPart: string;
   readonly commentsPart: string;
-  /** The content of footnote `id` without its w:footnoteRef run, or null (reported dropped at `ctx`) when
-   *  footnotes.xml has no such footnote. A second reference is reported resolved. */
   footnote(id: string, ctx: ReadContext): XmlElement | null;
-  /** The ordinal id of comment `id`, or null when comments.xml has no such comment. */
   commentId(id: string): number | null;
-  /** Every comment in id order. Call once, after the body is read. */
   comments(): readonly CommentRead[];
-  /** Reports each footnote no reference reached. Call once, after all reading. */
   reportUnreferenced(): void;
 };
 
@@ -48,7 +32,6 @@ const node = (type: string, props: Readonly<Record<string, unknown>>, children: 
 
 const holds = (el: XmlElement, name: string): boolean => elementsOf(el).some((child) => child.name === name);
 
-/** `container` without the runs of its first paragraph that hold `mark`, each counted ignored. */
 function withoutMarkRun(container: XmlElement, mark: string, ctx: ReadContext): XmlElement {
   const first = elementsOf(container).find((el) => el.name === "w:p");
   if (first === undefined) return container;
@@ -63,7 +46,6 @@ function withoutMarkRun(container: XmlElement, mark: string, ctx: ReadContext): 
   return { ...container, children: container.children.map((child) => (child === first ? paragraph : child)) };
 }
 
-/** Children of the part root named `name`, by w:id; one without an id or with a repeated id is dropped. */
 function byId(root: XmlElement | null, name: string, here: ReadContext): Map<string, XmlElement> {
   const found = new Map<string, XmlElement>();
   for (const el of elementsOf(root)) {
@@ -123,15 +105,12 @@ export function readNotesParts(ctx: ReadContext): NotesReader {
   };
 }
 
-/** A Footnote of the blocks read from footnote `id`. canonicalize requires a leading Paragraph, which Word
- *  always writes; a footnote without one gets an empty one. */
 export function footnoteNode(blocks: readonly AuthorNode[], id: string, ctx: ReadContext): AuthorNode {
   if (blocks[0]?.type === "Paragraph") return node("Footnote", {}, blocks);
   ctx.report({ kind: "resolved", element: "w:footnote", detail: `footnote ${id} did not start with a paragraph` });
   return node("Footnote", {}, [node("Paragraph", {}, []), ...blocks]);
 }
 
-/** A Comment of one comment's attributes and the blocks read from its content. */
 export function commentNode(read: CommentRead, blocks: readonly AuthorNode[], ctx: ReadContext): AuthorNode {
   const author = attrOf(read.comment, "w:author");
   const initials = attrOf(read.comment, "w:initials");

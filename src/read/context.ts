@@ -1,12 +1,3 @@
-/** The state every reader shares while walking one package: where it is (part and block path), where its
- *  diagnostics go, and which parts have been read.
- *
- *  - `within` gives a context for another part or block; everything else is shared.
- *  - Codec notes become diagnostics at the current part and path: `ignored` notes are counted.
- *  - The empty path is the Document itself, which is not a block, so it reports `at: null`.
- *  - `readPart` is how a reader opens a part, so the parts nobody read can be reported at the end. A reader
- *    that carries a part's bytes over without parsing it (a picture's media) marks it with `consume`. */
-
 import type { CodecEnv, Note } from "../ooxml/codec";
 import { createDiagnostics, type DiagnosticCollector, type LocatedDiagnostic, type TreePath } from "./diagnostics";
 import { createOrdinals, type Ordinals } from "./ordinals";
@@ -19,9 +10,7 @@ export type ReadContext = {
   readonly pkg: OpcPackage;
   readonly env: CodecEnv;
   readonly ordinals: Ordinals;
-  /** The current part: relationships resolve against it. */
   readonly part: string;
-  /** The current block path. */
   readonly at: TreePath;
   report(diagnostic: Report): void;
   ignore(element: string): void;
@@ -64,13 +53,10 @@ function contextAt(shared: Shared, part: string, at: TreePath): ReadContext {
   };
 }
 
-/** The main part's internal relationship target whose type ends with `typeSuffix` ("/styles", …), falling
- *  back to `fallback`, the path Word and docx.js use. */
 export function partOfType(pkg: OpcPackage, typeSuffix: string, fallback: string): string {
   return targetOfType(pkg.relsOf(pkg.mainPart), typeSuffix) ?? fallback;
 }
 
-/** A context at the main part with the empty path. */
 export function createReadSession(pkg: OpcPackage): ReadSession {
   const diagnostics = createDiagnostics();
   const consumed = new Set<string>();

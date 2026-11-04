@@ -13,7 +13,8 @@
  *  - Custom properties are kept only as vt:lpwstr, the one value type docx.js writes.
  *  - Numbering, footnotes and comments are opened before the body, which reads them as it meets their
  *    references. Comments become Document children after the Sections. Styles are read after the body, so
- *    the lists only a style uses come after the body's (decision 5). */
+ *    the lists only a style uses come after the body's.
+ *  - docx.js recomputes app.xml's statistics, so app.xml is not read. */
 
 import type * as docx from "docx";
 import { colorOf, wholeNumberAt, type Mutable, type Note } from "../ooxml/codec";
@@ -34,17 +35,14 @@ type DocumentProps = Mutable<Omit<docx.IPropertiesOptions, "sections" | "styles"
 type SectionXml = {
   readonly elements: readonly XmlElement[];
   readonly sectPr: XmlElement | null;
-  /** The w:pPr children of a content-less section-ending paragraph, other than its w:sectPr. */
   readonly markProperties: readonly XmlElement[];
 };
 
 const CORE_PART = "docProps/core.xml";
 const CUSTOM_PART = "docProps/custom.xml";
 const DEFAULT_THEME = "word/theme/theme1.xml";
-/** Not parts a reader consumes: package plumbing, and app.xml's statistics docx.js recomputes. */
 const PLUMBING = ["[Content_Types].xml", "docProps/app.xml"];
 const IGNORED_PARTS = ["word/fontTable.xml", "word/webSettings.xml"];
-/** Parts docx.js cannot write, and why. */
 const DROPPED_PARTS: Readonly<Record<string, string>> = {
   "word/commentsExtended.xml": "comment resolved state: docx.js cannot write it",
   "word/commentsIds.xml": "comment threading ids: docx.js cannot write them",
@@ -183,7 +181,6 @@ function reportUnreadParts(ctx: ReadContext, consumed: ReadonlySet<string>): voi
   }
 }
 
-/** Every comment as a Comment, at the Document child index after the `start` Sections. */
 function readComments(ctx: BodyContext, start: number): AuthorNode[] {
   const { notes } = ctx.parts;
   return notes.comments().map((read, i) => {
@@ -192,8 +189,6 @@ function readComments(ctx: BodyContext, start: number): AuthorNode[] {
   });
 }
 
-/** The Document author node of the package `ctx` reads, before canonicalize. `consumed` is the set
- *  ctx.readPart fills, checked last for parts nothing read. */
 export function readDocumentNode(ctx: ReadContext, consumed: ReadonlySet<string>): AuthorNode {
   const root = ctx.readPart(ctx.pkg.mainPart);
   if (root?.name !== "w:document") throw new NotADocxError(`${ctx.pkg.mainPart} is not a w:document.`);

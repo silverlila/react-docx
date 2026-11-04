@@ -8,21 +8,19 @@
  *    page and column breaks, symbols and inline fields. Text breaks stay author `Break`s for canonicalize.
  *  - A page field becomes PageNumber run content of the run holding its instruction, so docx.js's
  *    one-run field reads back into the run it was written in.
- *  - A run's text equal to a PageNumber value ("CURRENT", …) would turn into a PageNumber in
- *    canonicalize, so it is written as the `text` of its own TextRun, which canonicalize keeps literal.
+ *  - Text equal to a PageNumber value ("CURRENT", …) is kept as its own TextRun's `text`, so canonicalize does not read it as a PageNumber.
  *  - Bookmarks: an end pairs with the most recent unpaired start of the same w:id in the same parent,
  *    because docx.js writes w:id="1" for every Bookmark. A pair crossing another pair or a field, or one
- *    split across parents, is kept as RawXml with its id moved to 100000 + an ordinal: docx.js's own
- *    Bookmarks all use id 1.
+ *    split across parents, is kept as RawXml with its id moved to 100000 + an ordinal.
  *  - Word's _GoBack bookmark (the last edit position) is removed up front with `withoutGoBack`.
- *  - The generic fallback (decision 7) keeps an element as RawXml when its slot allows its name and
+ *  - The generic fallback keeps an element as RawXml when its slot allows its name and
  *    `rawXmlOf` accepts it, else unwraps a wrapper's content, else drops it.
  *  - OOXML requires a table cell to end with a paragraph; Word always complies, so a cell whose last
  *    block would be RawXml or a Table gets an empty Paragraph without a diagnostic.
  *  - The walk reads the body, headers and footers, footnotes and comments, told apart by the context's
  *    part. docx.js registers numbering and writes footnote references only for the main part, so a
- *    numbered paragraph elsewhere gets its marker as leading text (decision 2), and a footnote reference
- *    elsewhere is dropped.
+ *    numbered paragraph elsewhere gets its marker as leading text, and a footnote reference
+ *    elsewhere is dropped. docx.js writes the footnote-reference run's style itself.
  *  - A paragraph with a list but no w:pStyle gets `custom: true`, because docx.js adds pStyle ListParagraph
  *    to a numbered paragraph otherwise.
  *  - docx.js writes a Textbox as its own paragraph, so a VML text box that is a paragraph's only content
@@ -64,15 +62,12 @@ import { attrOf, childNamed, elementsOf, serializeXml, textOf, type XmlElement }
 type Slot = "block" | "inline" | "run";
 type Children = readonly (AuthorNode | string)[];
 
-/** Run content of one source w:r, or an inline node that stands between runs. */
 type Piece =
   | { readonly kind: "run"; readonly run: XmlElement; readonly value: AuthorNode | string }
   | { readonly kind: "inline"; readonly node: AuthorNode };
 
-/** The document-wide readers the walk uses beside the package. */
 type BodyParts = { readonly numbering: NumberingReader; readonly notes: NotesReader };
 
-/** A ReadContext that carries the document-wide readers into every context made from it. */
 export type BodyContext = Omit<ReadContext, "within"> & {
   readonly parts: BodyParts;
   within(part: string | null, at: TreePath): BodyContext;
@@ -82,21 +77,15 @@ export function bodyContext(ctx: ReadContext, parts: BodyParts): BodyContext {
   return { ...ctx, parts, within: (part, at) => bodyContext(ctx.within(part, at), parts) };
 }
 
-/** A deleted run's content reads as live content, but only page fields stay fields. */
 type InlineMode = "live" | "deleted";
 
-/** One inline container's walk: its context and the properties of each run, read once per run. */
 type InlineScope = { readonly ctx: BodyContext; readonly mode: InlineMode; runProps(run: XmlElement): RunOptions };
 
 type RawXmlCheck = { readonly kind: "raw"; readonly xml: string } | { readonly kind: "refused"; readonly reason: string };
 
 type BlockOptions = {
-  /** False where block RawXml cannot stand (footnotes, comments, text boxes). Defaults to true. */
   readonly rawBlocks?: boolean;
-  /** The index of the container's first block among its parent's children: a Section's body blocks come
-   *  after its Header and Footer children. Defaults to 0. */
   readonly start?: number;
-  /** False in a text box, which holds only Paragraphs. Defaults to true. */
   readonly tables?: boolean;
 };
 
@@ -107,7 +96,6 @@ const NOISE = new Set(["w:proofErr", "w:permStart", "w:permEnd"]);
 const BLOCK_PARTS = new Set(["w:sectPr", "w:tcPr"]);
 const BOOKMARKS = new Set(["w:bookmarkStart", "w:bookmarkEnd"]);
 
-/** Run content that maps to a kind with no props. */
 const RUN_KINDS: Readonly<Record<string, string>> = {
   "w:tab": "Tab",
   "w:cr": "CarriageReturn",
@@ -121,12 +109,10 @@ const RUN_KINDS: Readonly<Record<string, string>> = {
   "w:yearLong": "YearLong",
 };
 
-/** Run content other than pictures that maps to a tree kind, for mc:AlternateContent's Choice. */
 const MAPPED_RUN_CONTENT = new Set([...Object.keys(RUN_KINDS), "w:t", "w:br", "w:sym", "w:ptab"]);
 
 const HEADINGS = ["Title", "Heading1", "Heading2", "Heading3", "Heading4", "Heading5", "Heading6"] as const satisfies readonly (typeof docx.HeadingLevel)[keyof typeof docx.HeadingLevel][];
 
-/** Run content no kind holds, and why. */
 const DROPPED_IN_RUN: Readonly<Record<string, string>> = {
   "w:endnoteReference": "docx.js cannot write endnotes",
   "w:footnoteRef": "docx.js writes a footnote's number mark only at its start",
@@ -134,7 +120,6 @@ const DROPPED_IN_RUN: Readonly<Record<string, string>> = {
   "w:continuationSeparator": "only a separator footnote, which docx.js writes itself, holds it",
 };
 
-/** Wrappers the fallback unwraps: the content it reads in the wrapper's slot. */
 const WRAPPED_CONTENT: Readonly<Record<string, (el: XmlElement) => XmlElement[]>> = {
   "w:sdt": (el) => elementsOf(childNamed(el, "w:sdtContent")),
   "w:smartTag": (el) => elementsOf(el).filter((child) => child.name !== "w:smartTagPr"),
@@ -149,9 +134,6 @@ const node = (type: string, props: Readonly<Record<string, unknown>> = {}, child
 
 const rawXml = (xml: string): AuthorNode => node("RawXml", { xml });
 
-/** The one gate for every RawXml the reader emits: no r: attribute anywhere, phase 1's xmlRoots accepts the
- *  serialized fragment, and every root is one RAW_XML_ROOTS allows in `slot` (canonicalize would throw
- *  otherwise). */
 function rawXmlOf(elements: readonly XmlElement[], slot: Slot): RawXmlCheck {
   const xml = elements.map(serializeXml).join("");
   const roots = xmlRoots(xml);
@@ -169,7 +151,6 @@ type Fallback =
   | { readonly kind: "content"; readonly elements: readonly XmlElement[] }
   | { readonly kind: "dropped" };
 
-/** Decision 7, reported: RawXml if the slot allows it, else a wrapper's content, else dropped. */
 function fallback(el: XmlElement, slot: Slot, ctx: ReadContext, rawAllowed = true): Fallback {
   const roots: readonly string[] = RAW_XML_ROOTS[slot];
   const check = rawAllowed && roots.includes(el.name) ? rawXmlOf([el], slot) : null;
@@ -187,7 +168,6 @@ function fallback(el: XmlElement, slot: Slot, ctx: ReadContext, rawAllowed = tru
   return { kind: "dropped" };
 }
 
-/** Whether `el` read in `slot` gives a tree kind other than RawXml: the test for mc:AlternateContent's Choice. */
 function mapsToKind(el: XmlElement, slot: Slot, ctx: ReadContext): boolean {
   switch (slot) {
     case "block":
@@ -206,7 +186,6 @@ function mapsToKind(el: XmlElement, slot: Slot, ctx: ReadContext): boolean {
   }
 }
 
-/** mc:AlternateContent's chosen content for `slot`, reported resolved, or nothing, reported dropped. */
 function alternateElements(el: XmlElement, slot: Slot, ctx: ReadContext): readonly XmlElement[] {
   const chosen = alternateContent(el, (child) => mapsToKind(child, slot, ctx));
   if (chosen === null) {
@@ -217,7 +196,6 @@ function alternateElements(el: XmlElement, slot: Slot, ctx: ReadContext): readon
   return chosen.elements;
 }
 
-/** Removes Word's _GoBack bookmark (start and end, anywhere in the part), counting it ignored. */
 export function withoutGoBack(root: XmlElement, ctx: ReadContext): XmlElement {
   const ids = new Set<string>();
   const collect = (el: XmlElement): void => {
@@ -238,14 +216,11 @@ export function withoutGoBack(root: XmlElement, ctx: ReadContext): XmlElement {
   return strip(root);
 }
 
-/** A bookmark start or end with its w:id moved past docx.js's own bookmark ids: the same source id in one
- *  part always gets the same new id, wherever its start and end are kept. */
 function renumberedBookmark(el: XmlElement, ctx: ReadContext): XmlElement {
   const id = BOOKMARK_ID_BASE + ctx.ordinals("bookmark", `${ctx.part}#${attrOf(el, "w:id") ?? ""}`);
   return { ...el, attributes: { ...el.attributes, "w:id": String(id) } };
 }
 
-/** A bookmark start or end kept as RawXml, renumbered. */
 function rawBookmark(el: XmlElement, slot: Slot, ctx: ReadContext): AuthorNode | null {
   const check = rawXmlOf([renumberedBookmark(el, ctx)], slot);
   if (check.kind === "refused") {
@@ -255,8 +230,6 @@ function rawBookmark(el: XmlElement, slot: Slot, ctx: ReadContext): AuthorNode |
   ctx.report({ kind: "raw", element: el.name, detail: "its bookmark does not open and close in one parent" });
   return rawXml(check.xml);
 }
-
-// Blocks
 
 export function readBlocks(container: XmlElement, ctx: BodyContext, options: BlockOptions = {}): AuthorNode[] {
   const blocks: AuthorNode[] = [];
@@ -273,7 +246,6 @@ export function readBlocks(container: XmlElement, ctx: BodyContext, options: Blo
 
 type BlockList = {
   readonly rawBlocks: boolean;
-  /** A Section body (document.ts reads each section's blocks from a w:body), where TableOfContents may stand. */
   readonly inSection: boolean;
   readonly start: number;
   readonly tables: boolean;
@@ -333,9 +305,6 @@ function readParagraph(p: XmlElement, ctx: BodyContext, inSection: boolean): Aut
   return node("Paragraph", props, readInline(content, ctx));
 }
 
-/** Decision 2: a numbered paragraph outside the body loses its numbering and starts with its marker as
- *  text, in the level's run properties over the paragraph mark's, followed by the level's suffix. It takes
- *  the level's indent unless it has its own. */
 function markedParagraph(
   options: ParagraphOptions,
   numPr: NonNullable<ParagraphRead["numPr"]>,
@@ -361,18 +330,13 @@ function markedParagraph(
   return node("Paragraph", props, [...markerRuns, ...readInline(content, ctx)]);
 }
 
-/** A text box that is its paragraph's only content, with what holds it there. */
 type LoneTextBox = {
   readonly box: TextBox;
-  /** The paragraph child holding it: the w:pict itself, or the run around it. */
   readonly holder: XmlElement;
   readonly run: XmlElement | null;
   readonly alternate: XmlElement | null;
 };
 
-/** The text box that is a paragraph's only content besides proofing and permission marks: a w:pict directly
- *  in the paragraph, as docx.js writes it, or the only content of its only run, alone or as the Fallback of
- *  an mc:AlternateContent, as Word writes it. Nothing is reported. */
 function loneTextBox(content: readonly XmlElement[], ctx: ReadContext): LoneTextBox | null {
   const significant = content.filter((el) => !NOISE.has(el.name));
   const [holder] = significant;
@@ -395,8 +359,6 @@ function loneTextBox(content: readonly XmlElement[], ctx: ReadContext): LoneText
   return box === null ? null : { box, holder, run: holder, alternate: only };
 }
 
-/** A lone text box's paragraph as a Textbox: the paragraph's options with a heading style as `heading`, the
- *  shape's style, and the text box's paragraphs. */
 function textboxNode(read: ParagraphRead, lone: LoneTextBox, ctx: BodyContext): AuthorNode {
   if (lone.alternate !== null) {
     ctx.report({ kind: "resolved", element: lone.alternate.name, detail: "alternate content: used Fallback" });
@@ -421,8 +383,6 @@ function textboxNode(read: ParagraphRead, lone: LoneTextBox, ctx: BodyContext): 
   return node("Textbox", props, readBlocks(lone.box.content, ctx, { rawBlocks: false, tables: false }));
 }
 
-// Tables
-
 type TableLevel = {
   readonly child: string;
   readonly own: ReadonlySet<string>;
@@ -436,7 +396,6 @@ const TABLE_DROPPED: Readonly<Record<string, string>> = {
   "w:tblPrEx": "docx.js has no table property exceptions option",
 };
 
-/** The rows of a w:tbl or the cells of a w:tr. Rows and cells cannot be RawXml, so wrappers are unwrapped. */
 function readTableLevel(elements: readonly XmlElement[], ctx: BodyContext, level: TableLevel, out: AuthorNode[]): AuthorNode[] {
   for (const el of elements) {
     if (level.own.has(el.name)) continue;
@@ -476,9 +435,6 @@ function readCell(tc: XmlElement, ctx: BodyContext): AuthorNode {
   return node("TableCell", read.options, endsWithParagraph ? blocks : [...blocks, node("Paragraph")]);
 }
 
-// Inline content
-
-/** The inline children of a w:p, w:hyperlink or other inline container. */
 function readInline(elements: readonly XmlElement[], ctx: BodyContext, mode: InlineMode = "live"): AuthorNode[] {
   const props = new Map<XmlElement, RunOptions>();
   const scope: InlineScope = {
@@ -506,8 +462,6 @@ function itemsOf(elements: readonly XmlElement[]): Item[] {
   );
 }
 
-/** Start index → end index of each bookmark that opens and closes in `items`, nesting properly, outside the
- *  field spans. */
 function bookmarkPairs(items: readonly Item[], inField: (index: number) => boolean): Map<number, number> {
   const pairs = new Map<number, number>();
   const open: { readonly index: number; readonly id: string | null }[] = [];
@@ -644,8 +598,6 @@ const COMMENT_MARKS: Readonly<Record<string, string>> = {
   "w:commentReference": "CommentReference",
 };
 
-/** A comment mark carrying its comment's ordinal id, or null (reported dropped) when comments.xml has no
- *  comment with its w:id: canonicalize rejects a mark without a Comment. */
 function commentMark(el: XmlElement, ctx: BodyContext): AuthorNode | null {
   const source = attrOf(el, "w:id") ?? "";
   const id = ctx.parts.notes.commentId(source);
@@ -656,8 +608,6 @@ function commentMark(el: XmlElement, ctx: BodyContext): AuthorNode | null {
   return node(COMMENT_MARKS[el.name], { id });
 }
 
-/** A tracked change: its runs as InsertedTextRuns or DeletedTextRuns. Content no tracked run holds is
- *  kept untracked when inserted and dropped when deleted; so is a change holding more than runs. */
 function changePieces(el: XmlElement, ctx: BodyContext): Piece[] {
   const deleted = isDeletion(el.name);
   const tracked = trackedRuns(el, ctx);
@@ -677,8 +627,6 @@ function changePieces(el: XmlElement, ctx: BodyContext): Piece[] {
   );
 }
 
-/** A w:pict that is not a paragraph's lone text box: a VML picture becomes an ImageRun, a text box is
- *  dropped, and anything else takes the slot's fallback. */
 function pictPieces(el: XmlElement, runProps: RunOptions, ctx: BodyContext, otherwise: () => Piece[]): Piece[] {
   const image = parseVmlImage(el, ctx);
   if (image !== null) {
@@ -753,15 +701,12 @@ function simpleFieldPieces(el: XmlElement, ctx: BodyContext): Piece[] {
   }
 }
 
-// Run content
-
 const POSITIONAL_TAB = {
   "w:alignment": ["left", "center", "right"],
   "w:relativeTo": ["margin", "indent"],
   "w:leader": ["none", "dot", "hyphen", "underscore", "middleDot"],
 } as const;
 
-/** w:ptab → PositionalTab, or null when an attribute docx.js requires is missing or not one it accepts. */
 function positionalTab(el: XmlElement): AuthorNode | null {
   const props: Record<string, string> = {};
   for (const [attribute, values] of Object.entries(POSITIONAL_TAB)) {
@@ -830,8 +775,6 @@ function atomPieces(run: XmlElement, el: XmlElement, scope: InlineScope): Piece[
   }
 }
 
-/** A w:footnoteReference → a Footnote holding the footnote's content. Only the body may hold one
- *  (canonicalize's rule), and docx.js writes the reference run's style itself. */
 function footnotePieces(run: XmlElement, el: XmlElement, ctx: BodyContext): Piece[] {
   if (ctx.part !== ctx.pkg.mainPart) {
     ctx.report({ kind: "dropped", element: el.name, detail: "docx.js writes footnote references only in the document body" });
@@ -865,9 +808,6 @@ function breakPieces(run: XmlElement, el: XmlElement, scope: InlineScope): Piece
   }
 }
 
-// Grouping pieces into runs
-
-/** One TextRun, split around any text canonicalize would read as a PageNumber value. */
 function textRuns(props: RunOptions, children: Children): AuthorNode[] {
   const runs: AuthorNode[] = [];
   let current: (AuthorNode | string)[] = [];
@@ -884,7 +824,6 @@ function textRuns(props: RunOptions, children: Children): AuthorNode[] {
   return runs;
 }
 
-/** Consecutive run content of one w:r becomes one TextRun; inline nodes stand between. */
 function grouped(pieces: readonly Piece[], scope: InlineScope): AuthorNode[] {
   const out: AuthorNode[] = [];
   let run: XmlElement | null = null;

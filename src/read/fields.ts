@@ -3,8 +3,8 @@
  *  - Page fields always map to PageNumber; their cached result is ignored, because Word recomputes it.
  *    Their instruction is matched trimmed, first token uppercased, with `\* MERGEFORMAT` the only switch:
  *    exactly what docx.js writes (classes Page, NumberOfPages, NumberOfPagesSection, CurrentSection).
- *  - Every other field and content control maps to its kind only in the exact shape docx.js writes for it
- *    (decision 18): SimpleField, SimpleMailMergeField, SequentialIdentifier, PageReference, CheckBox,
+ *  - Every other field and content control maps to its kind only in the exact shape docx.js writes for it:
+ *    SimpleField, SimpleMailMergeField, SequentialIdentifier, PageReference, CheckBox,
  *    TableOfContents. Word's versions carry cached results those kinds cannot hold, so they are left to
  *    the caller as "other" and kept as RawXml.
  *  - docx.js writes those field runs with no run properties, so a field whose runs have any is not in
@@ -22,7 +22,6 @@ import type { AuthorNode } from "../tree/author";
 import type { ReadContext } from "./context";
 import { attrOf, childNamed, elementsOf, textOf, type XmlElement } from "../ooxml/xml";
 
-/** One unit of an inline container's content: a child of a w:r (with its run), or any other element. */
 export type Item =
   | { readonly kind: "atom"; readonly run: XmlElement; readonly el: XmlElement }
   | { readonly kind: "element"; readonly el: XmlElement };
@@ -81,8 +80,6 @@ function matchingEnd(items: readonly Item[], begin: number): number | null {
   return null;
 }
 
-/** The complex fields in `items`: each top-level begin index with its end index, and the begins that never
- *  end in `items`. */
 export function fieldSpans(items: readonly Item[]): { readonly spans: Map<number, number>; readonly unclosed: Set<number> } {
   const spans = new Map<number, number>();
   const unclosed = new Set<number>();
@@ -101,7 +98,6 @@ export function fieldSpans(items: readonly Item[]): { readonly spans: Map<number
 
 const hasRunProperties = (run: XmlElement): boolean => elementsOf(childNamed(run, "w:rPr")).length > 0;
 
-/** The span's runs as written: consecutive atoms of one w:r become one w:r with that run's properties. */
 function rawRunsOf(span: readonly Item[]): XmlElement[] {
   const out: XmlElement[] = [];
   let run: XmlElement | null = null;
@@ -128,7 +124,6 @@ function rawRunsOf(span: readonly Item[]): XmlElement[] {
   return out;
 }
 
-/** SEQ and PAGEREF in the shape docx.js writes them: plain runs, nothing but the field. */
 function writerShapedField(instruction: string, span: readonly Item[], separate: number | null, result: readonly Item[]): AuthorNode | null {
   if (span.some((item) => item.kind === "element" || hasRunProperties(item.run))) return null;
   const seq = SEQ.exec(instruction);
@@ -142,7 +137,6 @@ function writerShapedField(instruction: string, span: readonly Item[], separate:
   });
 }
 
-/** Classifies one complex field: `span` runs from its begin to its matching end. */
 export function complexField(span: readonly Item[]): ComplexField {
   let depth = 0;
   let nested = false;
@@ -173,8 +167,6 @@ export function complexField(span: readonly Item[]): ComplexField {
   return shaped === null ? { kind: "other", raw: rawRunsOf(span), result } : { kind: "node", node: shaped };
 }
 
-/** w:fldSimple: a page field, a kind in docx.js's shape (no content, or one plain w:r holding one w:t), or
- *  "other". */
 export function simpleField(fldSimple: XmlElement): SimpleFieldRead {
   const instruction = attrOf(fldSimple, "w:instr");
   if (instruction === null) return { kind: "other" };
@@ -228,7 +220,6 @@ function readCheckBoxOptions(checkbox: XmlElement, out: Mutable<docx.ICheckboxSy
   }
 }
 
-/** An inline w:sdt holding w14:checkbox → CheckBox. */
 export function readCheckBox(sdt: XmlElement, ctx: ReadContext): AuthorNode {
   const options: Mutable<docx.ICheckboxSymbolOptions> = {};
   const notes: Note[] = [];
@@ -272,7 +263,6 @@ const TOC_FLAG_SWITCHES = {
   z: "hideTabAndPageNumbersInWebView",
 } as const satisfies Readonly<Record<string, KeysOfType<TocOptions, boolean>>>;
 
-/** `\t "Style,1,Other,2"` → stylesWithLevels, or null when it is not pairs of a name and a whole number. */
 function stylesWithLevels(value: string): TocOptions["stylesWithLevels"] | null {
   const parts = value.split(",");
   if (parts.length % 2 !== 0) return null;
@@ -284,7 +274,6 @@ function stylesWithLevels(value: string): TocOptions["stylesWithLevels"] | null 
   return styles;
 }
 
-/** Inverts docx.js's FieldInstruction: every switch must be one it writes, with the value it writes. */
 function tocOptions(instruction: string): TocOptions | null {
   if (!instruction.startsWith("TOC")) return null;
   const options: Mutable<TocOptions> = {};
@@ -314,15 +303,11 @@ function tocOptions(instruction: string): TocOptions | null {
 const fldChars = (run: XmlElement): string[] =>
   elementsOf(run).map((el) => (el.name === "w:fldChar" ? `fldChar:${attrOf(el, "w:fldCharType")}` : el.name));
 
-/** The one plain run a docx.js TOC paragraph holds, or null. */
 function onlyRun(p: XmlElement): XmlElement | null {
   const [run, ...rest] = elementsOf(p);
   return run?.name === "w:r" && rest.length === 0 && childNamed(run, "w:rPr") === null ? run : null;
 }
 
-/** A block w:sdt in docx.js's TableOfContents shape → TableOfContents, else null. The shape is a w:sdtPr
- *  holding at most w:alias, and content of exactly two paragraphs: [begin, TOC instruction, separate] and
- *  [end]. Anything else, such as Word's w:docPartObj or entries between the two, is not that shape. */
 export function readTableOfContents(sdt: XmlElement): AuthorNode | null {
   const [sdtPr, sdtContent, ...extra] = elementsOf(sdt);
   if (sdtPr?.name !== "w:sdtPr" || sdtContent?.name !== "w:sdtContent" || extra.length > 0) return null;

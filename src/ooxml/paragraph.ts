@@ -1,15 +1,10 @@
-/** w:pPr → docx.js paragraph options, plus the two children that are not options: w:numPr (for lists,
- *  unit 05) and w:sectPr (for the section split, unit 04).
+/** w:pPr → docx.js paragraph options, plus the two children that are not options: w:numPr and w:sectPr.
  *
- *  - The writer-inverse test defines correctness, as for runs.
- *  - Off values docx.js cannot write: pageBreakBefore and overflowPunctuation, which it writes only
- *    when on. These are dropped.
- *  - docx.js's wordWrap: true writes <w:wordWrap w:val="0"/> and false writes nothing, so an off
- *    w:wordWrap reads as wordWrap: true and an on one is dropped.
- *  - autoSpaceEastAsianText writes only w:autoSpaceDN, so that is what it reads; w:autoSpaceDE is dropped.
- *  - w:spacing keeps the file's attribute order, which docx.js writes back.
- *  - w:ind folds w:start into left and w:end into right when left and right are absent.
- *  - docx.js's paragraph borders have no `between` or `bar` side, so those are dropped. */
+ *  - docx.js writes pageBreakBefore and overflowPunctuation only when they are on.
+ *  - docx.js's wordWrap: true writes <w:wordWrap w:val="0"/>, and false writes nothing.
+ *  - docx.js's autoSpaceEastAsianText writes only w:autoSpaceDN.
+ *  - docx.js's paragraph borders have no `between` or `bar` side.
+ *  - docx.js writes w:spacing attributes in the order given. */
 
 import type * as docx from "docx";
 import { attrOf, childNamed, childrenNamed, isOn, type XmlElement } from "./xml";
@@ -115,7 +110,6 @@ const PBDR_FATES: FateTable<docx.IBordersOptions> = {
   "w:bar": noOption("docx.js paragraph borders have no bar side"),
 };
 
-/** w:pBdr's top, bottom, left and right sides, or undefined when none is read. */
 function readBorders(el: XmlElement | null, env: CodecEnv, notes: Note[]): docx.IBordersOptions | undefined {
   const read = applyFates(el, PBDR_FATES, env);
   notes.push(...read.notes);
