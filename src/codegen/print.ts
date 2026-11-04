@@ -12,7 +12,7 @@
  *  - A template literal reads a raw CR as LF, so RawXml escapes CR along with `\`, `` ` `` and `${`.
  *  - A PageNumber node is the docx.PageNumber value as a run child; canonicalize turns it back. */
 
-import type { DocumentNode, Props } from "../schema/elements";
+import type { DocumentNode, Kind, Node, Props } from "../schema/elements";
 
 export type Asset = { readonly path: `assets/${string}`; readonly bytes: Uint8Array };
 export type GeneratedModule = { readonly source: string; readonly assets: readonly Asset[] };
@@ -24,8 +24,8 @@ export type PrintOptions = {
 };
 
 type Bag = Readonly<Record<string, unknown>>;
-type Tree = { readonly type: string; readonly props: Bag; readonly children: readonly (Tree | string)[] };
 type AssetMap = ReadonlyMap<Uint8Array, Asset>;
+type ImageSource = { readonly data: Uint8Array; readonly type: string };
 
 /** Source text spliced into the output as it is. */
 class Code {
@@ -38,7 +38,6 @@ const OUTER_SPACE = /^ | $/;
 const NOT_JSX_TEXT = /[{}<>&\u0000-\u001f\u007f]|[^\S ]/;
 const NOT_ATTRIBUTE_STRING = /["\\&\u0000-\u001f\u007f\u2028\u2029]/;
 const HOISTED = ["styles", "numbering"] as const;
-const IMAGE_TYPES: readonly string[] = ["jpg", "png", "gif", "bmp", "svg"];
 
 /** docx.PageNumber's key for each of its values. */
 const PAGE_NUMBER_KEYS: Readonly<Record<Props<"PageNumber">["field"], string>> = {
@@ -47,34 +46,16 @@ const PAGE_NUMBER_KEYS: Readonly<Record<Props<"PageNumber">["field"], string>> =
   TOTAL_PAGES_IN_SECTION: "TOTAL_PAGES_IN_SECTION",
   SECTION: "CURRENT_SECTION",
 };
-const PAGE_NUMBER_KEY: ReadonlyMap<string, string> = new Map(Object.entries(PAGE_NUMBER_KEYS));
-
-/** Per kind, the props that print as code rather than as their value. */
-const CODE_PROPS: Readonly<Record<string, (props: Bag, assets: AssetMap) => Bag>> = {
-  Document: (props) => {
-    const hoisted = HOISTED.filter((name) => props[name] !== undefined);
-    return { ...props, ...Object.fromEntries(hoisted.map((name) => [name, new Code(name)])) };
-  },
-  ImageRun: (props, assets) => ({
-    ...props,
-    data: readAsset(props.data, assets),
-    ...(isPlainObject(props.fallback)
-      ? { fallback: { ...props.fallback, data: readAsset(props.fallback.data, assets) } }
-      : {}),
-  }),
-  RawXml: (props) => {
-    if (typeof props.xml !== "string") throw new TypeError("printJsx: RawXml xml must be a string in a canonical tree");
-    return { ...props, xml: new Code(templateLiteral(props.xml)) };
-  },
-};
 
 export function printJsx(document: DocumentNode, options: PrintOptions = {}): GeneratedModule {
   const componentName = options.componentName ?? "DocumentComponent";
   const importFrom = options.importFrom ?? "@react-docx/core";
-  const root: Tree = document;
-  const assets = collectAssets(root);
-  const kinds = kindsUsed(root);
-  const hoisted = HOISTED.flatMap((name) => (root.props[name] === undefined ? [] : [[name, root.props[name]] as const]));
+  const assets = collectAssets(document);
+  const kinds = kindsUsed(document);
+  const hoisted = HOISTED.flatMap((name) => {
+    const value = document.props[name];
+    return value === undefined ? [] : [[name, value] as const];
+  });
 
   const imports = [
     ...(assets.size > 0 ? [namedImport(["readFileSync"], "node:fs")] : []),
@@ -91,7 +72,7 @@ export function printJsx(document: DocumentNode, options: PrintOptions = {}): Ge
   const component = [
     `export function ${componentName}() {`,
     "  return (",
-    `    ${printElement(root, 4, assets)}`,
+    `    ${printElement(document, 4, assets)}`,
     "  );",
     "}",
     `export default ${componentName};`,
@@ -110,21 +91,21 @@ function assertFreeName(name: string, taken: readonly string[]): void {
 
 // ——— Tree walks ———
 
-function nodesOf(node: Tree): Tree[] {
+function nodesOf(node: Node): Node[] {
   return [node, ...node.children.flatMap((child) => (typeof child === "string" ? [] : nodesOf(child)))];
 }
 
-function kindsUsed(root: Tree): Set<string> {
+function kindsUsed(root: Node): Set<Kind> {
   return new Set(nodesOf(root).map((node) => node.type));
 }
 
 /** Every ImageRun's bytes (data, then fallback data) in document order, each mapped to its asset.
  *  Identical bytes share the first asset made for them. */
-function collectAssets(root: Tree): AssetMap {
+function collectAssets(root: Node): AssetMap {
   const assets = new Map<Uint8Array, Asset>();
   const made: Asset[] = [];
-  for (const image of nodesOf(root).filter((node) => node.type === "ImageRun")) {
-    for (const { data, type } of imageSources(image.props)) {
+  for (const image of nodesOf(root).flatMap((node) => (node.type === "ImageRun" ? [node.props] : []))) {
+    for (const { data, type } of imageSources(image)) {
       const known = made.find((asset) => sameBytes(asset.bytes, data));
       const asset = known ?? { path: `assets/image${made.length + 1}.${type}` as const, bytes: data };
       if (known === undefined) made.push(asset);
@@ -134,32 +115,35 @@ function collectAssets(root: Tree): AssetMap {
   return assets;
 }
 
-function imageSources(props: Bag): { data: Uint8Array; type: string }[] {
-  const fallback = isPlainObject(props.fallback) ? [imageSource(props.fallback)] : [];
-  return [imageSource(props), ...fallback];
+function imageSources(props: Props<"ImageRun">): readonly ImageSource[] {
+  const fallback = fallbackOf(props);
+  return fallback === undefined ? [props] : [props, fallback];
 }
 
-function imageSource({ data, type }: Bag): { data: Uint8Array; type: string } {
-  if (!(data instanceof Uint8Array)) throw new TypeError("printJsx: ImageRun data must be a Uint8Array in a canonical tree");
-  if (typeof type !== "string" || !IMAGE_TYPES.includes(type)) {
-    throw new TypeError(`printJsx: ImageRun type ${JSON.stringify(type)} is not one of ${IMAGE_TYPES.join(", ")}`);
+/** The ImageRun's fallback, when it has one. ImageProps ties a fallback to an svg, but a raster ImageRun
+ *  given one through a spread keeps it through canonicalize, so whether it is there decides, not the type. */
+function fallbackOf(props: Props<"ImageRun">): (Bag & ImageSource) | undefined {
+  if (!("fallback" in props) || !isPlainObject(props.fallback)) return undefined;
+  const { data, type } = props.fallback;
+  if (!(data instanceof Uint8Array) || typeof type !== "string") {
+    throw new TypeError("printJsx: an ImageRun fallback must have Uint8Array data and a string type in a canonical tree");
   }
-  return { data, type };
+  return { ...props.fallback, data, type };
 }
 
 function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
   return a.length === b.length && a.every((byte, i) => byte === b[i]);
 }
 
-function readAsset(data: unknown, assets: AssetMap): Code {
-  const asset = data instanceof Uint8Array ? assets.get(data) : undefined;
+function readAsset(data: Uint8Array, assets: AssetMap): Code {
+  const asset = assets.get(data);
   if (asset === undefined) throw new Error("printJsx: an ImageRun's bytes were not collected as an asset");
   return new Code(`readFileSync(new URL(${JSON.stringify(`./${asset.path}`)}, import.meta.url))`);
 }
 
 // ——— JSX ———
 
-function printElement(node: Tree, indent: number, assets: AssetMap): string {
+function printElement(node: Node, indent: number, assets: AssetMap): string {
   const flat = flatElement(node, assets);
   if (fits(flat, indent)) return flat;
 
@@ -181,19 +165,19 @@ function openTag(type: string, attributes: [string, unknown][], indent: number):
   return { open: `<${type}${lines.join("")}\n${pad(indent)}`, stacked: true };
 }
 
-function flatElement(node: Tree, assets: AssetMap): string {
+function flatElement(node: Node, assets: AssetMap): string {
   const open = `<${node.type}${attributesOf(node, assets).map(([name, value]) => ` ${attribute(name, value, flatValue)}`).join("")}`;
   if (node.children.length === 0) return `${open} />`;
   return `${open}>${node.children.map((child) => flatChild(child, assets)).join("")}</${node.type}>`;
 }
 
-function printChild(child: Tree | string, indent: number, assets: AssetMap): string {
+function printChild(child: Node | string, indent: number, assets: AssetMap): string {
   if (typeof child === "string") return text(child);
   if (child.type === "PageNumber") return pageNumber(child);
   return printElement(child, indent, assets);
 }
 
-function flatChild(child: Tree | string, assets: AssetMap): string {
+function flatChild(child: Node | string, assets: AssetMap): string {
   if (typeof child === "string") return text(child);
   if (child.type === "PageNumber") return pageNumber(child);
   return flatElement(child, assets);
@@ -204,21 +188,36 @@ function text(value: string): string {
   return plain ? value : `{${JSON.stringify(value)}}`;
 }
 
-function pageNumber(node: Tree): string {
-  const { field } = node.props;
-  const key = typeof field === "string" ? PAGE_NUMBER_KEY.get(field) : undefined;
-  if (key === undefined) throw new TypeError(`printJsx: PageNumber field ${JSON.stringify(field)} is not a docx.PageNumber value`);
-  return `{PageNumber.${key}}`;
+function pageNumber(node: Node<"PageNumber">): string {
+  return `{PageNumber.${PAGE_NUMBER_KEYS[node.props.field]}}`;
 }
 
 /** The props to print, in the tree's key order, without undefined values. */
-function attributesOf(node: Tree, assets: AssetMap): [string, unknown][] {
-  const props = CODE_PROPS[node.type]?.(node.props, assets) ?? node.props;
-  const entries = definedEntries(props);
+function attributesOf(node: Node, assets: AssetMap): [string, unknown][] {
+  const entries = definedEntries(codeProps(node, assets));
   for (const [name] of entries) {
     if (!IDENTIFIER.test(name)) throw new Error(`printJsx: ${node.type} prop "${name}" is not a JSX attribute name`);
   }
   return entries;
+}
+
+/** The node's props, with those that print as code rather than as their value replaced by that code. */
+function codeProps(node: Node, assets: AssetMap): object {
+  switch (node.type) {
+    case "Document": {
+      const hoisted = HOISTED.filter((name) => node.props[name] !== undefined);
+      return { ...node.props, ...Object.fromEntries(hoisted.map((name) => [name, new Code(name)])) };
+    }
+    case "ImageRun": {
+      const fallback = fallbackOf(node.props);
+      const printed = fallback === undefined ? {} : { fallback: { ...fallback, data: readAsset(fallback.data, assets) } };
+      return { ...node.props, data: readAsset(node.props.data, assets), ...printed };
+    }
+    case "RawXml":
+      return { ...node.props, xml: new Code(templateLiteral(node.props.xml)) };
+    default:
+      return node.props;
+  }
 }
 
 function attribute(name: string, value: unknown, print: (value: unknown) => string): string {
@@ -287,7 +286,7 @@ function objectKey(key: string): string {
   return IDENTIFIER.test(key) ? key : JSON.stringify(key);
 }
 
-function definedEntries(bag: Bag): [string, unknown][] {
+function definedEntries(bag: object): [string, unknown][] {
   return Object.entries(bag).filter(([, value]) => value !== undefined);
 }
 

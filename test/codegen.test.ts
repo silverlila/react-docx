@@ -11,7 +11,7 @@ import { pathToFileURL } from "node:url";
 import { createElement } from "react";
 import { beforeAll, describe, expect, test } from "vitest";
 import { printJsx, type GeneratedModule } from "../src/codegen/index";
-import { renderToBuffer, renderToTree } from "../src/index";
+import { Document, ImageRun, Paragraph, Section, renderToBuffer, renderToTree } from "../src/index";
 import { readDocx } from "../src/read/index";
 import { canonicalize } from "../src/tree/canonical";
 import type { DocumentNode } from "../src/schema/elements";
@@ -186,6 +186,25 @@ describe("printing rules", () => {
       n("ImageRun", { type: "svg", data: svg, fallback: { type: "png", data: PNG_1PX }, transformation: { width: 1, height: 1 } })
     );
     expect(printJsx(tree).assets.map((asset) => asset.path)).toEqual(["assets/image1.svg", "assets/image2.png"]);
+  });
+
+  test("a raster ImageRun given a fallback through a spread prints it as an asset and round trips", async () => {
+    const fallback = new TextEncoder().encode("fallback");
+    const image = {
+      type: "png" as const,
+      data: PNG_1PX,
+      fallback: { type: "png" as const, data: fallback },
+      transformation: { width: 1, height: 1 },
+    };
+    const tree = renderToTree(
+      createElement(Document, null, createElement(Section, null, createElement(Paragraph, null, createElement(ImageRun, image))))
+    );
+    const printed = printJsx(tree);
+    expect(printed.assets).toEqual([
+      { path: "assets/image1.png", bytes: PNG_1PX },
+      { path: "assets/image2.png", bytes: fallback },
+    ]);
+    await roundTrips("rule-raster-fallback", tree);
   });
 
   test("a literal text prop equal to a PageNumber value stays literal text", async () => {
