@@ -74,22 +74,15 @@ async function documentXml(kind: ProbedKind, path: string, value: boolean | unde
   return docxXml(buffer)["word/document.xml"];
 }
 
-async function probePresenceOnly(): Promise<Record<string, string[]>> {
-  const found: Record<string, string[]> = {};
-  for (const { kind, path } of BOOLEAN_OPTIONS) {
-    const absent = await documentXml(kind, path, undefined);
-    const yes = await documentXml(kind, path, true);
-    const no = await documentXml(kind, path, false);
-    if (no === yes && no !== absent) (found[kind] ??= []).push(path);
-  }
-  return found;
-}
-
 describe("docx.js presence-only booleans", () => {
-  test("docx.js writes no boolean option the same for true and false", async () => {
-    const probed = await probePresenceOnly();
-    expect(probed).toEqual({});
-  });
+  test.each(BOOLEAN_OPTIONS.map((option) => [`${option.kind} ${option.path}`, option] as const))(
+    "docx.js writes %s differently for true and false",
+    async (_name, { kind, path }) => {
+      const [absent, yes, no] = await Promise.all([undefined, true, false].map((value) => documentXml(kind, path, value)));
+      const presenceOnly = no === yes && no !== absent;
+      expect(presenceOnly).toBe(false);
+    }
+  );
 
   test("the probe reaches the option, including a nested section property", async () => {
     expect(await documentXml("TableRow", "tableHeader", undefined)).not.toContain("w:tblHeader");
