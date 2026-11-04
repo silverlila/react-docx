@@ -23,8 +23,9 @@
 import React, { useContext, type CSSProperties, type ReactNode } from "react";
 import type { TreePath } from "../read/diagnostics";
 import type { DocumentNode } from "../schema/elements";
+import { NO_BREAKS, measureBreaks, type MeasuredBreaks } from "./breaks";
 import { borderCss, paragraphStyle, runStyle } from "./css";
-import type { MeasuredBreaks, ResolvedPage, ResolvedPart } from "./pages";
+import type { ResolvedPage, ResolvedPart } from "./pages";
 import { hasTabs, tabLayout, type TabItem, type TabStop } from "./tabs";
 import {
   resolveDocument,
@@ -184,7 +185,7 @@ function FloatingImage({ image, float }: { readonly image: Extract<ResolvedInlin
 
 /** A text box in the flow is drawn as docx.js writes one, with Word's default line and white fill. A placed
  *  one is drawn without: Word's anchored text boxes mostly have neither, and the tree keeps neither. */
-function TextboxBlock({ block, breakKey }: { readonly block: Extract<ResolvedBlock, { kind: "textbox" }> } & BreakKey): ReactNode {
+function TextboxBlock({ block, breakKey }: { readonly block: Extract<ResolvedBlock, { kind: "textbox" }> } & Keyed): ReactNode {
   const page = useContext(PageContext);
   const placed = block.float !== null && page !== null;
   const place = placed ? placement(block.float, block.widthPt ?? 0, block.heightPt ?? 0, page.geometry) : {};
@@ -391,10 +392,10 @@ function TabbedInlines({ block }: { readonly block: Paragraph }): ReactNode {
   );
 }
 
-/** A body block's break key, for measuring pages (`measureBreaks`). */
-type BreakKey = { readonly breakKey?: string };
+/** A body block's break key (breaks.ts), for measuring pages. */
+type Keyed = { readonly breakKey?: string };
 
-function ParagraphBlock({ block, breakKey }: { readonly block: Paragraph } & BreakKey): ReactNode {
+function ParagraphBlock({ block, breakKey }: { readonly block: Paragraph } & Keyed): ReactNode {
   const empty = block.marker === null && block.inlines.length === 0;
   return (
     <div
@@ -456,7 +457,7 @@ function TableRow({ row }: { readonly row: Row }): ReactNode {
   );
 }
 
-function TableBlock({ block, breakKey }: { readonly block: Table } & BreakKey): ReactNode {
+function TableBlock({ block, breakKey }: { readonly block: Table } & Keyed): ReactNode {
   const firstBodyRow = block.rows.findIndex((row) => !row.isHeader);
   const headCount = firstBodyRow === -1 ? block.rows.length : firstBodyRow;
   const rows = (from: number, to?: number): ReactNode =>
@@ -487,7 +488,7 @@ function TableBlock({ block, breakKey }: { readonly block: Table } & BreakKey): 
   );
 }
 
-function Block({ block, breakKey }: { readonly block: ResolvedBlock } & BreakKey): ReactNode {
+function Block({ block, breakKey }: { readonly block: ResolvedBlock } & Keyed): ReactNode {
   switch (block.kind) {
     case "paragraph":
       return <ParagraphBlock block={block} breakKey={breakKey} />;
@@ -600,153 +601,7 @@ function Page({ page, total }: { readonly page: ResolvedPage; readonly total: nu
   );
 }
 
-const NO_BREAKS: MeasuredBreaks = new Set();
-
-/** How much taller than its page a page Word laid out may be before it is measured: more than this, and
- *  Word broke the page without recording it. */
-const LAID_OUT_SLACK = 1.2;
-
-/** The least room a page's body needs, as a share of the page, before it is measured: less, and what
- *  crowds it out is drawn here as Word does not (a floating picture drawn in line). */
-const MIN_ROOM = 0.2;
-
 const useIsomorphicLayoutEffect = typeof window === "undefined" ? React.useEffect : React.useLayoutEffect;
-
-/** Where to break paragraph `el` between lines: after the last of its lines from `sliceTop` that ends by
- *  `foot`. Returns the key naming the first character of the next line, and that line's top; null when
- *  no line of the slice can stay, or the paragraph keeps its lines together. With widow control, no line
- *  is left alone on either side of the break. `toPage` maps a viewport y to the page's. */
-function splitLine(el: HTMLElement, sliceTop: number, foot: number, toPage: (clientY: number) => number): { key: string; top: number } | null {
-  const piece = /^b(\d+)\.(\d+)/.exec(el.dataset.docxKey ?? "");
-  if (piece === null || el.dataset.docxKeepLines !== undefined) return null;
-  const chars: { span: HTMLElement; node: Text; offset: number }[] = [];
-  for (const span of el.querySelectorAll<HTMLElement>("[data-docx-text]")) {
-    if (span.closest("[data-docx-floating]") !== null) continue;
-    for (const node of span.childNodes) if (node instanceof Text) for (let o = 0; o < node.length; o++) chars.push({ span, node, offset: o });
-  }
-  const range = el.ownerDocument.createRange();
-  const lines: { start: number; top: number; bottom: number }[] = [];
-  chars.forEach((c, i) => {
-    range.setStart(c.node, c.offset);
-    range.setEnd(c.node, c.offset + 1);
-    const r = range.getBoundingClientRect();
-    if (r.height === 0) return;
-    const top = toPage(r.top);
-    const bottom = toPage(r.bottom);
-    const line = lines[lines.length - 1];
-    if (line === undefined || top >= line.bottom - 1) lines.push({ start: i, top, bottom });
-    else line.bottom = Math.max(line.bottom, bottom);
-  });
-  const first = lines.findIndex((line) => line.top >= sliceTop - 1);
-  if (first === -1) return null;
-  let cut = lines.findIndex((line, i) => i >= first && line.bottom > foot);
-  if (cut === -1 || cut <= first) return null;
-  if (el.dataset.docxWidowControl !== undefined) {
-    if (lines.length - cut === 1) cut--;
-    if (cut - first < (first === 0 ? 2 : 1) || cut <= first) return null;
-  }
-  const at = chars[lines[cut].start];
-  const from = Number(at.span.dataset.docxFrom ?? "0");
-  return { key: `s${piece[1]}.${piece[2]}@${at.span.dataset.docxText ?? "0"}:${from + at.offset}`, top: lines[cut].top };
-}
-
-/** The breaks the drawn pages need: on each page taller than its page, the body blocks are packed into
- *  page-high slices, breaking before the first block (or table row) that crosses a slice's foot. A block
- *  kept with the next one goes with it; a block taller than a page stays where it starts. A page Word
- *  laid out (it ends at a rendered break) is left as it is unless it overflows by more than
- *  LAID_OUT_SLACK: a little, and the text is set taller here than in Word, and breaking it would push
- *  every later page off Word's. */
-function measureBreaks(root: HTMLElement): string[] {
-  const found: string[] = [];
-  for (const page of root.querySelectorAll<HTMLElement>("[data-docx-page]")) {
-    const style = getComputedStyle(page);
-    const pageHeight = parseFloat(style.minHeight);
-    const limit = page.dataset.docxLaidOut === undefined ? pageHeight + 1 : pageHeight * LAID_OUT_SLACK;
-    if (!(page.offsetHeight > limit)) continue;
-    const box = page.getBoundingClientRect();
-    const scale = box.height / page.offsetHeight || 1;
-    const y = (el: Element, edge: "top" | "bottom") => (el.getBoundingClientRect()[edge] - box.top) / scale;
-    const body = page.querySelector("[data-docx-body]");
-    if (body === null) continue;
-    const footer = page.querySelector<HTMLElement>("[data-docx-footer]")?.offsetHeight ?? 0;
-    // Footnotes go on the page that references them: a slice needs room for its own.
-    const notes = new Map<string, number>();
-    for (const note of page.querySelectorAll<HTMLElement>("[data-docx-footnote]")) notes.set(note.dataset.docxFootnote ?? "", note.offsetHeight);
-    const allNotes = page.querySelector<HTMLElement>("[data-docx-footnotes]")?.offsetHeight ?? 0;
-    const rule = Math.max(0, allNotes - [...notes.values()].reduce((sum, h) => sum + h, 0));
-    const refsOf = (el: Element) => [...el.querySelectorAll<HTMLElement>("[data-docx-note]")].map((ref) => ref.dataset.docxNote ?? "");
-    const blocks = [...body.children].filter(
-      (el): el is HTMLElement => el instanceof HTMLElement && el.dataset.docxKey !== undefined && el.dataset.docxFloating === undefined
-    );
-    let sliceTop = y(body, "top");
-    const foot = pageHeight - parseFloat(style.paddingBottom) - footer;
-    let room = foot - sliceTop;
-    if (room < pageHeight * MIN_ROOM) continue;
-    // A later slice becomes a page of its own, whose header may differ from this page's (a first-page
-    // header): its body is taken to start at the top margin.
-    const headerZone = page.querySelector<HTMLElement>("[data-docx-header]");
-    const marginTop = parseFloat(style.paddingTop) + (headerZone === null ? 0 : parseFloat(getComputedStyle(headerZone).minHeight) || 0);
-    const laterRoom = foot - marginTop >= pageHeight * MIN_ROOM ? foot - marginTop : room;
-    let first = 0;
-    let sliceNotes = new Set<string>();
-    const notesHeight = (refs: readonly string[] = []) => {
-      const inSlice = new Set([...sliceNotes, ...refs]);
-      return inSlice.size === 0 ? 0 : rule + [...inSlice].reduce((sum, n) => sum + (notes.get(n) ?? 0), 0);
-    };
-    const fits = (bottom: number, refs: readonly string[]) => bottom - sliceTop + notesHeight(refs) <= room;
-    const startSlice = (top: number, refs: readonly string[]) => {
-      sliceTop = top;
-      sliceNotes = new Set(refs);
-      room = laterRoom;
-    };
-    const breakBefore = (i: number) => {
-      let j = i;
-      while (j > first && blocks[j - 1].dataset.docxKeepNext !== undefined) j--;
-      if (j === first) j = i;
-      const key = blocks[j].dataset.docxKey ?? "";
-      found.push(key.startsWith("t") ? `b${key.slice(1).split(":")[0]}.0` : key);
-      startSlice(y(blocks[j], "top"), blocks.slice(j, i).flatMap(refsOf));
-      first = j;
-    };
-    for (let i = 0; i < blocks.length; i++) {
-      const el = blocks[i];
-      if (el.tagName !== "TABLE") {
-        // A paragraph that crosses the foot breaks between its lines when it can, else moves whole.
-        while (!fits(y(el, "bottom"), refsOf(el))) {
-          const split = splitLine(el, sliceTop, sliceTop + room - notesHeight(), (clientY) => (clientY - box.top) / scale);
-          if (split !== null) {
-            found.push(split.key);
-            startSlice(split.top, []);
-            first = i;
-            continue;
-          }
-          if (i > first) breakBefore(i);
-          break;
-        }
-        for (const ref of refsOf(el)) sliceNotes.add(ref);
-        continue;
-      }
-      const [n, start, repeated] = (el.dataset.docxKey ?? "").slice(1).split(":").map(Number);
-      const head = el.querySelectorAll(":scope > thead > tr").length;
-      const rows = [...el.querySelectorAll<HTMLElement>(":scope > thead > tr, :scope > tbody > tr")];
-      for (let k = head; k < rows.length; k++) {
-        const refs = refsOf(rows[k]);
-        if (!fits(y(rows[k], "bottom"), refs)) {
-          // Breaking before the first body row would leave only the header rows: move the table instead.
-          if (k === head) {
-            if (i > first && y(el, "top") > sliceTop + 1) breakBefore(i);
-          } else {
-            found.push(`r${n}:${start + k - repeated}`);
-            startSlice(y(rows[k], "top"), []);
-            first = i;
-          }
-        }
-        for (const ref of refs) sliceNotes.add(ref);
-      }
-    }
-  }
-  return found;
-}
 
 export const DocxPreview = React.forwardRef<HTMLDivElement, DocxPreviewProps>(function DocxPreview(
   { document, ...rest },

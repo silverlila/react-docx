@@ -25,11 +25,13 @@
  *    even page its even header when the document has evenAndOddHeaderAndFooters, any other page its
  *    default header. A section without one of a type inherits the previous section's of that type; a page
  *    whose header has none at all shows none.
- *  - Breaks found by measuring the drawn pages (MeasuredBreaks) start a page where the page has content.
+ *  - Breaks found by measuring the drawn pages (MeasuredBreaks, breaks.ts) start a page where the page has
+ *    content.
  *  - Each page lists the footnotes it references. An empty last page is dropped. */
 
 import { formatNumber } from "../ooxml/markers";
 import type { TreePath } from "../read/diagnostics";
+import { NO_BREAKS, formatKey, parseKey, type MeasuredBreaks, type Split } from "./breaks";
 import type {
   PageGeometry,
   ResolvedBlock,
@@ -42,20 +44,13 @@ import type {
 
 /** columnStarts: the index in `blocks` where each column starts, when the document says where its columns
  *  break; null leaves a multi-column part to balance its columns. keys: each block's break key
- *  (`MeasuredBreaks`). */
+ *  (breaks.ts). */
 export type ResolvedPart = {
   readonly columns: ResolvedColumns | null;
   readonly blocks: readonly ResolvedBlock[];
   readonly keys: readonly string[];
   readonly columnStarts: readonly number[] | null;
 };
-
-/** Page breaks found by measuring the drawn pages (DocxPreview does, in a browser), as keys: `b<n>.<k>`
- *  breaks before piece k of the document's body block n; `r<n>:<i>` before row i of table n. A table
- *  piece's key is `t<n>:<first row>:<repeated header rows>`. */
-export type MeasuredBreaks = ReadonlySet<string>;
-
-const NO_BREAKS: MeasuredBreaks = new Set();
 
 export type ResolvedPage = PageGeometry & {
   /** The path of the section the page starts in. */
@@ -166,15 +161,12 @@ function numberTexts(inlines: readonly ResolvedInline[]): ResolvedInline[] {
   return walk(inlines);
 }
 
-type Split = readonly [number, number];
-
-/** The split points measured for a piece: `<prefix><text>:<offset>`, in text order. */
-function splitsOf(measured: MeasuredBreaks, prefix: string): Split[] {
+/** The split points measured for piece `piece` of block `block`, in text order. */
+function splitsOf(measured: MeasuredBreaks, block: number, piece: number): Split[] {
   const out: Split[] = [];
-  for (const key of measured) {
-    if (!key.startsWith(prefix)) continue;
-    const [text, offset] = key.slice(prefix.length).split(":").map(Number);
-    if (Number.isInteger(text) && Number.isInteger(offset)) out.push([text, offset]);
+  for (const text of measured) {
+    const key = parseKey(text);
+    if (key?.kind === "split" && key.block === block && key.piece === piece) out.push(key.at);
   }
   return out.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
 }
@@ -392,11 +384,11 @@ function paginateSections(sections: readonly ResolvedSection[], measured: Measur
       if (piece.before !== null) breakPage(piece.before);
       if (!kept.includes(piece)) return;
       const k = kept.indexOf(piece);
-      const parts = cutAtSplits(numberTexts(piece.inlines), splitsOf(measured, `s${n}.${k}@`));
+      const parts = cutAtSplits(numberTexts(piece.inlines), splitsOf(measured, n, k));
       parts.forEach((part, i) => {
         const first = k === 0 && i === 0;
         const last = k === kept.length - 1 && i === parts.length - 1;
-        const key = i === 0 ? `b${n}.${k}` : `b${n}.${k}@${part.from.join(":")}`;
+        const key = formatKey(i === 0 ? { kind: "piece", block: n, piece: k } : { kind: "continuation", block: n, piece: k, from: part.from });
         if (i === 0) measuredBreak(key);
         else newPage();
         const whole = breaks.length === 0 && parts.length === 1;
@@ -419,7 +411,7 @@ function paginateSections(sections: readonly ResolvedSection[], measured: Measur
     let chunk: ResolvedRow[] = [];
     let start = 0;
     let repeated = 0;
-    const flush = () => emit({ ...t, rows: chunk }, `t${n}:${start}:${repeated}`);
+    const flush = () => emit({ ...t, rows: chunk }, formatKey({ kind: "table", block: n, start, repeated }));
     const restart = (from: number, rows: readonly ResolvedRow[]) => {
       chunk = [...head, ...rows];
       start = from;
@@ -439,7 +431,7 @@ function paginateSections(sections: readonly ResolvedSection[], measured: Measur
       restart(target, carried);
       return true;
     };
-    measuredBreak(`b${n}.0`);
+    measuredBreak(formatKey({ kind: "piece", block: n, piece: 0 }));
     t.rows.forEach((row, r) => {
       const merged = mergeStart[r] !== r || row.cells.some((cell) => cell.rowSpan > 1);
       const split = merged ? null : cellPages(row);
@@ -456,7 +448,7 @@ function paginateSections(sections: readonly ResolvedSection[], measured: Measur
         return;
       }
       const rendered = row.cells.some((cell) => containsRenderedBreak(cell.blocks));
-      const breaksHere = rendered || measured.has(`r${n}:${r}`);
+      const breaksHere = rendered || measured.has(formatKey({ kind: "row", block: n, row: r }));
       if (breaksHere && r >= head.length && breakAt(r, rendered)) {
         // broken before the row
       } else if (rendered && chunk.length === 0) {
@@ -483,8 +475,9 @@ function paginateSections(sections: readonly ResolvedSection[], measured: Measur
       if (block.kind === "paragraph") placeParagraph(block, n);
       else if (block.kind === "table") placeTable(block, n);
       else {
-        measuredBreak(`b${n}.0`);
-        emit(block, `b${n}.0`);
+        const key = formatKey({ kind: "piece", block: n, piece: 0 });
+        measuredBreak(key);
+        emit(block, key);
       }
     }
     flushFloats();
