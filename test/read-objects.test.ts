@@ -264,6 +264,30 @@ describe("VML", () => {
     ]);
   });
 
+  test("a text box's position, lengths, rotation and z-index read into a style canonicalize accepts", () => {
+    const declarations =
+      "position:absolute;margin-left:10pt;margin-top:-5pt;left:1in;top:2;width:200pt;height:50%;rotation:30;z-index:-3;" +
+      "mso-position-horizontal:center;mso-position-horizontal-relative:page;mso-position-vertical:inside;mso-position-vertical-relative:margin";
+    const box = `<w:pict><v:shape id="b1" style="${declarations}"><v:textbox><w:txbxContent/></v:textbox></v:shape></w:pict>`;
+    expect(blocksOf({ body: p(r(box)) })[0].props).toEqual({
+      style: {
+        position: "absolute",
+        marginLeft: "10pt",
+        marginTop: "-5pt",
+        left: "1in",
+        top: 2,
+        width: "200pt",
+        height: "50%",
+        rotation: 30,
+        zIndex: -3,
+        positionHorizontal: "center",
+        positionHorizontalRelative: "page",
+        positionVertical: "inside",
+        positionVerticalRelative: "margin",
+      },
+    });
+  });
+
   test("w:object (an OLE object) is dropped", () => {
     const object = '<w:object><v:shape id="o1" style="width:72pt;height:36pt"><v:imagedata r:id="rId5"/></v:shape><o:OLEObject r:id="rId6"/></w:object>';
     const parts = withMedia(p(r(object)));

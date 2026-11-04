@@ -5,12 +5,15 @@
 
 import type * as docx from "docx";
 import { dropped, type Note } from "../ooxml/codec";
+import { VML_MEASURE, VML_POSITION, VML_POSITIONS, VML_RELATIVE_TO } from "../schema/docx-facts";
 import { own } from "../schema/own";
 import { attrOf, childNamed, childrenNamed, elementsOf, type XmlElement } from "../ooxml/xml";
 
 type ShapeStyle = NonNullable<ConstructorParameters<typeof docx.Textbox>[0]["style"]>;
-type StyleValue = string | number | boolean;
-type StyleReader = (value: string) => StyleValue | null;
+type ShapeStyleRead = { -readonly [K in keyof ShapeStyle]?: ShapeStyle[K] };
+type Length = ShapeStyle["width"];
+type StyleReader<K extends keyof ShapeStyle> = (value: string) => NonNullable<ShapeStyle[K]> | null;
+type StyleEntry = { [K in keyof ShapeStyle]-?: readonly [K, StyleReader<K>] }[keyof ShapeStyle];
 
 export type TextBox = {
   readonly shape: XmlElement;
@@ -21,7 +24,6 @@ type Alternate = { readonly used: "Choice" | "Fallback"; readonly elements: read
 
 const NO_OPTION = "docx.js has no option for it";
 const NUMBER = /^-?[0-9]+(\.[0-9]+)?$/;
-const MEASURE = /^-?[0-9]+(\.[0-9]+)?(mm|cm|in|pt|pc|pi|em|ex|%)$/;
 const INTEGER = /^-?[0-9]+$/;
 
 const DOCX_SHAPE_TYPE = "#_x0000_t202";
@@ -30,19 +32,21 @@ const DOCX_TEXTBOX_ATTRIBUTES: Readonly<Record<string, string>> = {
   insetmode: "auto",
 };
 
-const length: StyleReader = (value) => (value === "auto" || MEASURE.test(value) ? value : NUMBER.test(value) ? Number(value) : null);
-const number: StyleReader = (value) => (NUMBER.test(value) ? Number(value) : null);
+const isMeasure = (value: string): value is Exclude<Length, "auto" | number> => VML_MEASURE.test(value);
+const length = (value: string): Length | null =>
+  value === "auto" || isMeasure(value) ? value : NUMBER.test(value) ? Number(value) : null;
+const number = (value: string): number | null => (NUMBER.test(value) ? Number(value) : null);
 const oneOf =
-  (values: readonly string[]): StyleReader =>
-  (value) =>
-    values.includes(value) ? value : null;
-const flag: StyleReader = (value) => (value === "t" || value === "true" ? true : value === "f" || value === "false" ? false : null);
-const zIndex: StyleReader = (value) => (value === "auto" ? value : INTEGER.test(value) ? Number(value) : null);
+  <V extends string>(values: readonly V[]) =>
+  (value: string): V | null =>
+    values.find((known) => known === value) ?? null;
+const flag = (value: string): boolean | null => (value === "t" || value === "true" ? true : value === "f" || value === "false" ? false : null);
+const zIndex = (value: string): "auto" | number | null => (value === "auto" ? value : INTEGER.test(value) ? Number(value) : null);
 
-const POSITIONS = oneOf(["absolute", "left", "center", "right", "inside", "outside"]);
-const RELATIVE_TO = oneOf(["margin", "page", "text", "char"]);
+const POSITIONS = oneOf(VML_POSITIONS);
+const RELATIVE_TO = oneOf(VML_RELATIVE_TO);
 
-const SHAPE_STYLE: Readonly<Record<string, readonly [keyof ShapeStyle, StyleReader]>> = {
+const SHAPE_STYLE: Readonly<Record<string, StyleEntry>> = {
   flip: ["flip", oneOf(["x", "y", "xy", "yx"])],
   height: ["height", length],
   left: ["left", length],
@@ -60,7 +64,7 @@ const SHAPE_STYLE: Readonly<Record<string, readonly [keyof ShapeStyle, StyleRead
   "mso-wrap-distance-top": ["wrapDistanceTop", number],
   "mso-wrap-edited": ["wrapEdited", flag],
   "mso-wrap-style": ["wrapStyle", oneOf(["square", "none"])],
-  position: ["position", oneOf(["static", "absolute", "relative"])],
+  position: ["position", oneOf(VML_POSITION)],
   rotation: ["rotation", number],
   top: ["top", length],
   visibility: ["visibility", oneOf(["hidden", "inherit"])],
@@ -85,7 +89,7 @@ export function textBoxOf(pict: XmlElement): TextBox | null {
   return shape === null || content === null ? null : { shape, content };
 }
 
-export function textBoxStyle(box: TextBox, notes: Note[]): Readonly<Record<string, StyleValue>> | undefined {
+export function textBoxStyle(box: TextBox, notes: Note[]): Readonly<ShapeStyleRead> | undefined {
   const { shape } = box;
   for (const [name, value] of Object.entries(shape.attributes)) {
     if (name === "id" || name === "style" || (name === "type" && value === DOCX_SHAPE_TYPE)) continue;
@@ -98,17 +102,25 @@ export function textBoxStyle(box: TextBox, notes: Note[]): Readonly<Record<strin
   for (const [name, value] of Object.entries(textbox?.attributes ?? {})) {
     if (DOCX_TEXTBOX_ATTRIBUTES[name] !== value) notes.push(dropped("v:textbox", `${name}="${value}": docx.js writes its own`));
   }
-  const style: Record<string, StyleValue> = {};
+  const style: ShapeStyleRead = {};
   for (const [name, value] of styleDeclarations(attrOf(shape, "style") ?? "")) {
     const entry = own(SHAPE_STYLE, name);
-    const read = entry === undefined ? null : entry[1](value);
-    if (entry === undefined || read === null) {
+    const read = entry === undefined ? null : declaration(entry, value);
+    if (read === null) {
       notes.push(dropped("v:shape", `style ${name}:${value}: docx.js's text box style has no value for it`));
       continue;
     }
-    style[entry[0]] = read;
+    Object.assign(style, read);
   }
   return Object.keys(style).length === 0 ? undefined : style;
+}
+
+function declaration<K extends keyof ShapeStyle>([key, parse]: readonly [K, StyleReader<K>], value: string): ShapeStyleRead | null {
+  const parsed = parse(value);
+  if (parsed === null) return null;
+  const style: ShapeStyleRead = {};
+  style[key] = parsed;
+  return style;
 }
 
 export function alternateContent(el: XmlElement, maps: (element: XmlElement) => boolean): Alternate | null {

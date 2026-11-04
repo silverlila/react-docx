@@ -15,9 +15,24 @@
  *  - docx.js writes raw styles after its own, so a raw w:styleId that is already defined, or defined by
  *    an earlier raw style, is rejected: it would be defined twice.
  *  - docx.js writes SymbolRun's char into w:char unchecked, and OOXML takes four hex digits there, so any
- *    other char is rejected. */
+ *    other char is rejected.
+ *  - docx.js names an image's media file `<hash>.<type>` without checking the type, and reads an svg's
+ *    fallback without checking it is there, so another type, or an svg without a raster fallback, is
+ *    rejected.
+ *  - docx.js writes a Textbox's style unchecked, so a value its VmlShapeStyle types do not allow, for a
+ *    field the HTML preview reads, is rejected. */
 
-import { DEFAULT_STYLE_SLOTS, PAGE_NUMBER_VALUES, RAW_XML_ROOTS, SYMBOL_CHAR } from "../schema/docx-facts";
+import {
+  DEFAULT_STYLE_SLOTS,
+  PAGE_NUMBER_VALUES,
+  RASTER_IMAGE_TYPES,
+  RAW_XML_ROOTS,
+  SYMBOL_CHAR,
+  VML_MEASURE,
+  VML_POSITION,
+  VML_POSITIONS,
+  VML_RELATIVE_TO,
+} from "../schema/docx-facts";
 import {
   ELEMENTS,
   OUTSIDE_BODY,
@@ -25,6 +40,7 @@ import {
   type ChildKind,
   type DocumentNode,
   type Kind,
+  type Props,
 } from "../schema/elements";
 import { TreeError, isRecord, type AuthorNode, type IndexedChild, type PropBag } from "./author";
 import { LIST_NUMBERING, listEntries, listLevels, numberingConfig, type ListEntry, type ListLevels } from "./lists";
@@ -53,6 +69,34 @@ const DATA_URL_PREFIX = /^data:[^,]*;base64,/;
 const STYLE_ID = /w:styleId="([^"]+)"/g;
 const COMMENT_MARKS: readonly Kind[] = ["CommentRangeStart", "CommentRangeEnd", "CommentReference"];
 const LOOSE_PARAGRAPH: AuthorNode = { type: "Paragraph", props: {}, children: [] };
+const IMAGE_TYPES: readonly string[] = [...RASTER_IMAGE_TYPES, "svg"];
+
+type StyleRule = { readonly expected: string; readonly test: (value: unknown) => boolean };
+const oneOf = (values: readonly string[]): StyleRule => ({
+  expected: `one of ${quotedList(values)}`,
+  test: (value) => isOneOf(values, value),
+});
+const NUMBER: StyleRule = { expected: "a number", test: (value) => typeof value === "number" };
+const LENGTH: StyleRule = {
+  expected: `"auto", a number or a measure such as "2in"`,
+  test: (value) => value === "auto" || typeof value === "number" || (typeof value === "string" && VML_MEASURE.test(value)),
+};
+
+const TEXTBOX_STYLE = {
+  position: oneOf(VML_POSITION),
+  positionHorizontal: oneOf(VML_POSITIONS),
+  positionVertical: oneOf(VML_POSITIONS),
+  positionHorizontalRelative: oneOf(VML_RELATIVE_TO),
+  positionVerticalRelative: oneOf(VML_RELATIVE_TO),
+  width: LENGTH,
+  height: LENGTH,
+  left: LENGTH,
+  top: LENGTH,
+  marginLeft: LENGTH,
+  marginTop: LENGTH,
+  rotation: NUMBER,
+  zIndex: { expected: `"auto" or a number`, test: (value) => value === "auto" || typeof value === "number" },
+} satisfies { readonly [K in keyof NonNullable<Props<"Textbox">["style"]>]?: StyleRule };
 
 const TEXT_PROP_CHILD: { readonly [K in Kind]?: (text: string) => Built } = {
   Paragraph: (text) => literalRun({}, text),
@@ -88,8 +132,9 @@ const PROP_RULES: { readonly [K in Kind]?: (props: PropBag, path: readonly strin
   InsertedTextRun: (props) => omit(props, "text"),
   DeletedTextRun: (props) => omit(props, "text"),
   Math: (props) => omit(props, "text"),
-  ImageRun: imageBytes,
+  ImageRun: imageProps,
   SymbolRun: assertSymbolChar,
+  Textbox: assertTextboxStyle,
 };
 
 export function canonicalize(root: AuthorNode): DocumentNode {
@@ -510,20 +555,57 @@ function assertOneHeaderFooterPerType(content: readonly IndexedChild[], path: re
   }
 }
 
+function described(value: unknown): string {
+  return typeof value === "string" ? `"${value}"` : value === null ? "null" : typeof value;
+}
+
+function quotedList(values: readonly string[]): string {
+  return values.map((value) => `"${value}"`).join(", ");
+}
+
+function isOneOf(values: readonly string[], value: unknown): boolean {
+  return values.some((known) => known === value);
+}
+
 function assertSymbolChar(props: PropBag, path: readonly string[]): PropBag {
   const { char } = props;
   if (typeof char === "string" && SYMBOL_CHAR.test(char)) return props;
-  const got = typeof char === "string" ? `"${char}"` : char === null ? "null" : typeof char;
-  throw new TreeError(path, `SymbolRun char must be four hex digits, as in "F071", got ${got}`);
+  throw new TreeError(path, `SymbolRun char must be four hex digits, as in "F071", got ${described(char)}`);
 }
 
-function imageBytes(props: PropBag, path: readonly string[]): PropBag {
-  const { fallback } = props;
-  return {
-    ...props,
-    data: bytes(props.data, path),
-    ...(isRecord(fallback) ? { fallback: { ...fallback, data: bytes(fallback.data, path) } } : {}),
-  };
+function imageProps(props: PropBag, path: readonly string[]): PropBag {
+  const { type, fallback } = props;
+  if (!isOneOf(IMAGE_TYPES, type)) {
+    throw new TreeError(path, `ImageRun type must be one of ${quotedList(IMAGE_TYPES)}, got ${described(type)}`);
+  }
+  if (type === "svg" && fallback === undefined) {
+    throw new TreeError(path, `An svg ImageRun needs a fallback: { type: one of ${quotedList(RASTER_IMAGE_TYPES)}, data }`);
+  }
+  const image = { ...props, data: bytes(props.data, path) };
+  return fallback === undefined ? omit(image, "fallback") : { ...image, fallback: rasterFallback(fallback, path) };
+}
+
+function rasterFallback(fallback: unknown, path: readonly string[]): PropBag {
+  if (!isRecord(fallback)) {
+    throw new TreeError(path, `ImageRun fallback must be { type, data } of a raster image, got ${described(fallback)}`);
+  }
+  if (!isOneOf(RASTER_IMAGE_TYPES, fallback.type)) {
+    throw new TreeError(path, `ImageRun fallback type must be one of ${quotedList(RASTER_IMAGE_TYPES)}, got ${described(fallback.type)}`);
+  }
+  return { ...fallback, data: bytes(fallback.data, path) };
+}
+
+function assertTextboxStyle(props: PropBag, path: readonly string[]): PropBag {
+  const { style } = props;
+  if (style === undefined) return props;
+  if (!isRecord(style)) throw new TreeError(path, `Textbox style must be an object, got ${described(style)}`);
+  for (const [field, rule] of Object.entries(TEXTBOX_STYLE)) {
+    const value = style[field];
+    if (value !== undefined && !rule.test(value)) {
+      throw new TreeError(path, `Textbox style.${field} must be ${rule.expected}, got ${described(value)}`);
+    }
+  }
+  return props;
 }
 
 function bytes(data: unknown, path: readonly string[]): Uint8Array {

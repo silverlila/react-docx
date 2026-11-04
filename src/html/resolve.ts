@@ -25,7 +25,7 @@ import type * as docx from "docx";
 import { levelOf, markerText, type Counters } from "../ooxml/markers";
 import type { RunOptions } from "../ooxml/run";
 import type { TreePath } from "../read/diagnostics";
-import type { ChildKind, DocumentNode, Node } from "../schema/elements";
+import type { ChildKind, DocumentNode, Node, Props } from "../schema/elements";
 import { own } from "../schema/own";
 import { xmlRoots } from "../tree/xml-roots";
 import type { MeasuredBreaks } from "./breaks";
@@ -966,11 +966,11 @@ const VML_V_ALIGNS: Readonly<Record<string, "top" | "center" | "bottom">> = { to
 
 /** A text box's VML style as a float: an absolute one is placed from its frame (page, margin, or the text
  *  it is anchored in), out of the flow, as Word shows a text box in front of its text. */
-function textboxFloat(style: Readonly<Record<string, unknown>> | undefined): ResolvedFloat | null {
+function textboxFloat(style: Props<"Textbox">["style"]): ResolvedFloat | null {
   if (style?.position !== "absolute") return null;
   const offset = (margin: unknown, plain: unknown) => (vmlLength(margin) ?? 0) + (vmlLength(plain) ?? 0);
-  const hAlign = typeof style.positionHorizontal === "string" ? own(VML_ALIGNS, style.positionHorizontal) ?? null : null;
-  const vAlign = typeof style.positionVertical === "string" ? own(VML_V_ALIGNS, style.positionVertical) ?? null : null;
+  const hAlign = style.positionHorizontal === undefined ? null : own(VML_ALIGNS, style.positionHorizontal) ?? null;
+  const vAlign = style.positionVertical === undefined ? null : own(VML_V_ALIGNS, style.positionVertical) ?? null;
   const zIndex = typeof style.zIndex === "number" ? style.zIndex : 0;
   return {
     wrap: "none",
@@ -1002,7 +1002,7 @@ function block(node: BlockNode, path: TreePath, story: Story): ResolvedBlock {
         widthPt: vmlLength(node.props.style?.width),
         heightPt: vmlLength(node.props.style?.height),
         float: textboxFloat(node.props.style),
-        rotation: typeof node.props.style?.rotation === "number" ? node.props.style.rotation : 0,
+        rotation: node.props.style?.rotation ?? 0,
         blocks: blocksOf(node.children, path, story),
       };
     default: {

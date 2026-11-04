@@ -417,6 +417,85 @@ describe("11. image data", () => {
   });
 });
 
+describe("ImageRun type and fallback", () => {
+  const image = (props: Record<string, unknown>) =>
+    doc(n("Paragraph", {}, n("ImageRun", { data: "AQID", transformation: { width: 1, height: 1 }, ...props })));
+  const at = ["Document", "Section[0]", "Paragraph[0]", "ImageRun[0]"];
+
+  test("a type docx.js has no image for throws, at that ImageRun", () => {
+    const error = treeError(() => canon(image({ type: "tiff" })));
+    expect(error.path).toEqual(at);
+    expect(error.message).toContain('ImageRun type must be one of "jpg", "png", "gif", "bmp", "svg", got "tiff"');
+    expect(treeError(() => canon(image({}))).message).toContain("got undefined");
+  });
+
+  test("an svg without a fallback throws", () => {
+    const error = treeError(() => canon(image({ type: "svg" })));
+    expect(error.path).toEqual(at);
+    expect(error.message).toContain('An svg ImageRun needs a fallback: { type: one of "jpg", "png", "gif", "bmp", data }');
+  });
+
+  test("a fallback that is not a raster image throws", () => {
+    expect(treeError(() => canon(image({ type: "svg", fallback: "AQID" }))).message).toContain(
+      'ImageRun fallback must be { type, data } of a raster image, got "AQID"'
+    );
+    const error = treeError(() => canon(image({ type: "svg", fallback: { type: "svg", data: "AQID" } })));
+    expect(error.path).toEqual(at);
+    expect(error.message).toContain('ImageRun fallback type must be one of "jpg", "png", "gif", "bmp", got "svg"');
+  });
+
+  test("a fallback left undefined is not in the canonical props", () => {
+    expect(inline(canon(image({ type: "png", fallback: undefined })))).toEqual([
+      runOf("ImageRun", { data: new Uint8Array([1, 2, 3]), transformation: { width: 1, height: 1 }, type: "png" }),
+    ]);
+  });
+});
+
+describe("Textbox style", () => {
+  const box = (style: unknown) => doc(n("Textbox", { style }, n("Paragraph")));
+  const styleOf = (tree: DocumentNode) => (blocks(tree)[0] as { props: { style: unknown } }).props.style;
+
+  test.each([
+    ["positionHorizontal", 3, "one of \"absolute\", \"left\", \"center\", \"right\", \"inside\", \"outside\", got number"],
+    ["positionVertical", "middle", 'one of "absolute", "left", "center", "right", "inside", "outside", got "middle"'],
+    ["positionHorizontalRelative", "column", 'one of "margin", "page", "text", "char", got "column"'],
+    ["position", "fixed", 'one of "static", "absolute", "relative", got "fixed"'],
+    ["rotation", "30", 'a number, got "30"'],
+    ["zIndex", "high", '"auto" or a number, got "high"'],
+    ["width", "10px", '"auto", a number or a measure such as "2in", got "10px"'],
+    ["marginLeft", null, '"auto", a number or a measure such as "2in", got null'],
+  ])("style.%s = %j throws, at that Textbox", (field, value, expected) => {
+    const error = treeError(() => canon(box({ width: "1in", [field]: value })));
+    expect(error.path).toEqual(["Document", "Section[0]", "Textbox[0]"]);
+    expect(error.message).toContain(`Textbox style.${field} must be ${expected}`);
+  });
+
+  test("a style that is not an object throws", () => {
+    expect(treeError(() => canon(box("width:1in"))).message).toContain('Textbox style must be an object, got "width:1in"');
+  });
+
+  test("a style with every value VmlShapeStyle allows is kept as authored", () => {
+    const style = {
+      position: "absolute",
+      positionHorizontal: "center",
+      positionHorizontalRelative: "page",
+      positionVertical: "inside",
+      positionVerticalRelative: "margin",
+      width: "auto",
+      height: "50%",
+      left: -1.5,
+      top: "2em",
+      marginLeft: "1in",
+      marginTop: "-3pt",
+      rotation: 30,
+      zIndex: "auto",
+      wrapStyle: "none",
+    };
+    expect(styleOf(canon(box(style)))).toEqual(style);
+    expect(styleOf(canon(box({ width: 10, zIndex: -2 })))).toEqual({ width: 10, zIndex: -2 });
+  });
+});
+
 describe("12. style folding", () => {
   const styled = (styles: Record<string, unknown>) => canon(n("Document", { styles }, n("Section")));
 

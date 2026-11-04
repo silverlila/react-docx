@@ -112,13 +112,8 @@ function imageSources(props: Props<"ImageRun">): readonly ImageSource[] {
   return fallback === undefined ? [props] : [props, fallback];
 }
 
-function fallbackOf(props: Props<"ImageRun">): (Bag & ImageSource) | undefined {
-  if (!("fallback" in props) || !isPlainObject(props.fallback)) return undefined;
-  const { data, type } = props.fallback;
-  if (!(data instanceof Uint8Array) || typeof type !== "string") {
-    throw new TypeError("printJsx: an ImageRun fallback must have Uint8Array data and a string type in a canonical tree");
-  }
-  return { ...props.fallback, data, type };
+function fallbackOf(props: Props<"ImageRun">): ImageSource | undefined {
+  return "fallback" in props ? props.fallback : undefined;
 }
 
 function sameBytes(a: Uint8Array, b: Uint8Array): boolean {

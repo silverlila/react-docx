@@ -5,13 +5,33 @@
  *  - DEFAULT_STYLE_SLOTS: each of docx.js's built-in style ids, with the IDefaultStylesOptions key that
  *    sets it and whether that key takes paragraph or character options.
  *  - RAW_XML_ROOTS: the top-level OOXML elements a RawXml fragment may hold, by slot.
- *  - SYMBOL_CHAR: a w:sym's w:char, OOXML's ST_ShortHexNumber. docx.js writes SymbolRun's char unchecked. */
+ *  - SYMBOL_CHAR: a w:sym's w:char, OOXML's ST_ShortHexNumber. docx.js writes SymbolRun's char unchecked.
+ *  - RASTER_IMAGE_TYPES: the ImageRun types other than "svg"; an svg ImageRun needs a fallback of one.
+ *  - VML_POSITIONS, VML_RELATIVE_TO, VML_POSITION, VML_MEASURE: the values docx.js's VmlShapeStyle (a
+ *    Textbox style) types allow for its positions and its lengths' string form. docx.js writes the style
+ *    unchecked. */
 
 import type * as docx from "docx";
+
+type ShapeStyle = NonNullable<ConstructorParameters<typeof docx.Textbox>[0]["style"]>;
+type Values<T> = readonly NonNullable<T>[];
 
 export const PAGE_NUMBER_VALUES = ["CURRENT", "TOTAL_PAGES", "TOTAL_PAGES_IN_SECTION", "SECTION"] as const;
 
 export const SYMBOL_CHAR = /^[0-9A-Fa-f]{4}$/;
+
+export const RASTER_IMAGE_TYPES = ["jpg", "png", "gif", "bmp"] as const satisfies Values<
+  Exclude<docx.IImageOptions["type"], "svg">
+>;
+
+export const VML_POSITIONS = ["absolute", "left", "center", "right", "inside", "outside"] as const satisfies Values<
+  ShapeStyle["positionHorizontal"] & ShapeStyle["positionVertical"]
+>;
+export const VML_RELATIVE_TO = ["margin", "page", "text", "char"] as const satisfies Values<
+  ShapeStyle["positionHorizontalRelative"] & ShapeStyle["positionVerticalRelative"]
+>;
+export const VML_POSITION = ["static", "absolute", "relative"] as const satisfies Values<ShapeStyle["position"]>;
+export const VML_MEASURE = /^-?[0-9]+(\.[0-9]+)?(mm|cm|in|pt|pc|pi|em|ex|%)$/;
 
 type DefaultStyleKey = Exclude<keyof NonNullable<docx.IStylesOptions["default"]>, "document">;
 type DefaultStyleSlot = { readonly key: DefaultStyleKey; readonly kind: "paragraph" | "character" };
