@@ -32,11 +32,10 @@ export type TabItem =
   | { readonly kind: "gap"; readonly tab: Tab; readonly leader: TabStop["leader"] };
 
 /** widthPt: the span's width, at least (`exact` false) or exactly; null for the last span. */
-export type TabSpan = { readonly widthPt: number | null; readonly exact: boolean; readonly items: readonly TabItem[] };
+type TabSpan = { readonly widthPt: number | null; readonly exact: boolean; readonly items: readonly TabItem[] };
 
-export type TabContext = {
+type TabContext = {
   readonly stops: readonly TabStop[];
-  readonly defaultTabPt: number;
   /** Where the first line's text starts, relative to the left indent. */
   readonly startPt: number;
 };

@@ -56,7 +56,7 @@ import {
   simpleField,
   type Item,
 } from "./fields";
-import { parseDrawing, parseVmlImage, readDrawing, readPicture } from "./images";
+import { parseDrawing, parseVmlImage, readPicture } from "./images";
 import { isPlainMath, readMath } from "./math";
 import { alternateContent, textBoxOf, textBoxStyle, type TextBox } from "./objects";
 import { attrOf, childNamed, elementsOf, serializeXml, textOf, type XmlElement } from "../ooxml/xml";
@@ -787,7 +787,7 @@ function atomPieces(run: XmlElement, el: XmlElement, scope: InlineScope): Piece[
   }
   switch (el.name) {
     case "w:drawing": {
-      const image = readDrawing(el, scope.runProps(run), ctx);
+      const image = readPicture(parseDrawing(el, ctx), scope.runProps(run), ctx);
       return image === null ? [] : inline([image]);
     }
     case "w:pict":

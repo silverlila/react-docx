@@ -187,7 +187,7 @@ function FloatingImage({ image, float }: { readonly image: Extract<ResolvedInlin
 function TextboxBlock({ block, breakKey }: { readonly block: Extract<ResolvedBlock, { kind: "textbox" }> } & BreakKey): ReactNode {
   const page = useContext(PageContext);
   const placed = block.float !== null && page !== null;
-  const place = placed && block.float !== null ? placement(block.float, block.widthPt ?? 0, block.heightPt ?? 0, page.geometry) : {};
+  const place = placed ? placement(block.float, block.widthPt ?? 0, block.heightPt ?? 0, page.geometry) : {};
   return (
     <div
       data-docx-path={pathAttr(block.path)}
@@ -344,7 +344,7 @@ function Gap({ item }: { readonly item: Extract<TabItem, { kind: "gap" }> }): Re
 function TabbedInlines({ block }: { readonly block: Paragraph }): ReactNode {
   const { format, marker } = block;
   const startPt = marker === null ? format.firstLinePt : format.firstLinePt < 0 ? 0 : format.firstLinePt + MIN_MARKER_GAP_PT * 3;
-  const spans = tabLayout(block.inlines, { stops: format.tabStops, defaultTabPt: format.defaultTabPt, startPt });
+  const spans = tabLayout(block.inlines, { stops: format.tabStops, startPt });
   const placed = spans.filter((span) => span.widthPt !== null);
   const rest = spans.filter((span) => span.widthPt === null);
   const items = (span: (typeof spans)[number]) =>

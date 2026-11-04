@@ -361,6 +361,3 @@ export function readPicture(read: DrawingRead, runProps: RunOptions, ctx: ReadCo
   return { type: "ImageRun", props: read.props, children: [] };
 }
 
-export function readDrawing(drawing: XmlElement, runProps: RunOptions, ctx: ReadContext): AuthorNode | null {
-  return readPicture(parseDrawing(drawing, ctx), runProps, ctx);
-}

@@ -256,7 +256,7 @@ type Story = {
 type LineRule = ComputedParagraph["lineHeight"];
 
 /** tocEntry: a table-of-contents entry, whose hyperlinks Word draws in the entry's own formatting. */
-type InlineScope = { readonly story: Story; readonly run: RunOptions; readonly line: LineRule | null; readonly tocEntry?: boolean };
+type InlineScope = { readonly story: Story; readonly run: RunOptions; readonly line: LineRule; readonly tocEntry: boolean };
 
 const TOC_ENTRY_STYLE = /^TOC[1-9]$/i;
 const HYPERLINK_STYLE = "Hyperlink";
@@ -482,14 +482,14 @@ function computeTabStops(stops: TabStops | undefined, indentLeftPt: number, firs
 
 /** A run's line height under its paragraph's rule: Word sets each line at its tallest run's single line
  *  height times the multiple, or at least the paragraph's minimum. An exact line inherits. */
-function runLineHeight(fontFamily: string, line: LineRule | null): number | null {
-  if (line === null || line.kind === "exact") return null;
+function runLineHeight(fontFamily: string, line: LineRule): number | null {
+  if (line.kind === "exact") return null;
   return lineHeightOf(fontFamily) * (line.kind === "multiple" ? line.value : 1);
 }
 
 /** A right-to-left run takes its complex-script font, size, bold and italic, as Word sets right-to-left
  *  text. Every run lists its other scripts' fonts after its own, for the characters its own font lacks. */
-function computeRun(run: RunOptions, line: LineRule | null = null): ComputedRun {
+function computeRun(run: RunOptions, line: LineRule): ComputedRun {
   const font = fontSlots(run.font);
   const rtl = run.rightToLeft ?? false;
   const latin = font.ascii ?? font.hAnsi;
@@ -1119,9 +1119,9 @@ function section(node: Node<"Section">, path: TreePath, doc: DocumentScope): Res
   node.children.forEach((child, i) => {
     const at = [...path, i];
     if (child.type === "Header") {
-      headers[child.props.type ?? "default"] = blocksOf(child.children, at, ownStory());
+      headers[child.props.type] = blocksOf(child.children, at, ownStory());
     } else if (child.type === "Footer") {
-      footers[child.props.type ?? "default"] = blocksOf(child.children, at, ownStory());
+      footers[child.props.type] = blocksOf(child.children, at, ownStory());
     } else {
       body.push(...blocksFor(child, at, { doc, counters: doc.bodyCounters, footnotes, table: null }));
     }
@@ -1143,7 +1143,7 @@ function section(node: Node<"Section">, path: TreePath, doc: DocumentScope): Res
 }
 
 /** The document's sections, resolved; `paginate` (pages.ts) breaks them into pages. */
-export function resolveSections(document: DocumentNode): readonly ResolvedSection[] {
+function resolveSections(document: DocumentNode): readonly ResolvedSection[] {
   let footnotes = 0;
   const doc: DocumentScope = {
     sheet: effectiveSheet(document.props.styles),

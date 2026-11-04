@@ -13,7 +13,7 @@
  *    pictures, notes and objects are left out, a numbered paragraph draws without its marker (its numId
  *    names no tree list), and theme fonts fall back to the style's. */
 
-import { NO_THEME_ENV, type CodecEnv } from "../ooxml/codec";
+import { NO_THEME_ENV } from "../ooxml/codec";
 import { readParagraphProperties } from "../ooxml/paragraph";
 import { readRunProperties } from "../ooxml/run";
 import { readCellProperties, readRowProperties, readTableProperties } from "../ooxml/table";
@@ -35,7 +35,7 @@ export type RunItem = RunChild | Node<"PageBreak" | "ColumnBreak" | "SymbolRun">
 type Field = { instruction: string; phase: "instruction" | "result" | "replaced" };
 
 /** The open complex fields, outermost first; text shows only when every one of them is in its result. */
-type Walk = { readonly env: CodecEnv; readonly fields: Field[] };
+type Walk = { readonly fields: Field[] };
 
 const WRAPPERS = new Set(["w:sdt", "w:smartTag", "w:customXml", "w:fldSimple", "w:ins", "w:moveTo"]);
 
@@ -118,7 +118,7 @@ function runItems(elements: readonly XmlElement[], walk: Walk): RunItem[] {
 
 /** A run as the runs it shows: its content up to each break or symbol is a TextRun with its properties. */
 function run(r: XmlElement, walk: Walk): InlineNode[] {
-  const props = readRunProperties(childNamed(r, "w:rPr"), walk.env).options;
+  const props = readRunProperties(childNamed(r, "w:rPr"), NO_THEME_ENV).options;
   const out: InlineNode[] = [];
   let content: RunChild[] = [];
   const flush = () => {
@@ -144,7 +144,7 @@ function inlines(elements: readonly XmlElement[], walk: Walk): InlineNode[] {
       const page = pageFieldOf(attrOf(el, "w:instr") ?? "");
       if (page === null) return inlines(elementsOf(el), walk);
       if (!showing(walk)) return [];
-      const props = readRunProperties(childNamed(childNamed(el, "w:r"), "w:rPr"), walk.env).options;
+      const props = readRunProperties(childNamed(childNamed(el, "w:r"), "w:rPr"), NO_THEME_ENV).options;
       return [node("TextRun", props, [node("PageNumber", { field: page })])];
     }
     if (WRAPPERS.has(el.name)) return inlines(wrapped(el), walk);
@@ -162,12 +162,12 @@ function inlines(elements: readonly XmlElement[], walk: Walk): InlineNode[] {
 }
 
 function paragraph(p: XmlElement, walk: Walk): BlockNode {
-  const props = readParagraphProperties(childNamed(p, "w:pPr"), walk.env).options;
+  const props = readParagraphProperties(childNamed(p, "w:pPr"), NO_THEME_ENV).options;
   return node("Paragraph", props, inlines(elementsOf(p), walk));
 }
 
 function cell(tc: XmlElement, walk: Walk): Node<"TableCell"> {
-  const props = readCellProperties(childNamed(tc, "w:tcPr"), walk.env).options;
+  const props = readCellProperties(childNamed(tc, "w:tcPr"), NO_THEME_ENV).options;
   const children = blocks(elementsOf(tc), walk);
   return node("TableCell", props, children.length === 0 ? [node("Paragraph", {})] : children);
 }
@@ -175,7 +175,7 @@ function cell(tc: XmlElement, walk: Walk): Node<"TableCell"> {
 function rows(elements: readonly XmlElement[], walk: Walk): Node<"TableRow">[] {
   return elements.flatMap((el): Node<"TableRow">[] => {
     if (el.name === "w:tr") {
-      const props = readRowProperties(childNamed(el, "w:trPr"), walk.env).options;
+      const props = readRowProperties(childNamed(el, "w:trPr"), NO_THEME_ENV).options;
       const cells = cellsOf(elementsOf(el), walk);
       return cells.length === 0 ? [] : [node("TableRow", props, cells)];
     }
@@ -192,13 +192,13 @@ function blocks(elements: readonly XmlElement[], walk: Walk): BlockNode[] {
     if (el.name === "w:p") return [paragraph(el, walk)];
     if (el.name === "w:tbl") {
       const tableRows = rows(elementsOf(el), walk);
-      return tableRows.length === 0 ? [] : [node("Table", readTableProperties(el, walk.env).options, tableRows)];
+      return tableRows.length === 0 ? [] : [node("Table", readTableProperties(el, NO_THEME_ENV).options, tableRows)];
     }
     return WRAPPERS.has(el.name) ? blocks(wrapped(el), walk) : [];
   });
 }
 
-const freshWalk = (): Walk => ({ env: NO_THEME_ENV, fields: [] });
+const freshWalk = (): Walk => ({ fields: [] });
 
 /** The blocks a block-level RawXml shows. */
 export function rawBlocks(xml: string): BlockNode[] {

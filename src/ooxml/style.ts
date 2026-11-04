@@ -116,7 +116,7 @@ function rawStyle(style: XmlElement, because: RawBecause, env: CodecEnv): StyleR
  *  character style Strong is docx.js's paragraph style Strong, and a styles.xml cannot hold both. */
 export function clashingStyleIds(styles: XmlElement | null): ReadonlyMap<string, string> {
   const renames = new Map<string, string>();
-  const all = styles === null ? [] : elementsOf(styles).filter((el) => el.name === "w:style");
+  const all = elementsOf(styles).filter((el) => el.name === "w:style");
   const taken = new Set(all.map((el) => attrOf(el, "w:styleId")));
   for (const el of all) {
     const id = attrOf(el, "w:styleId");

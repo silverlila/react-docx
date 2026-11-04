@@ -26,7 +26,7 @@ export type Item =
   | { readonly kind: "atom"; readonly run: XmlElement; readonly el: XmlElement }
   | { readonly kind: "element"; readonly el: XmlElement };
 
-export type PageField = (typeof PAGE_NUMBER_VALUES)[number];
+type PageField = (typeof PAGE_NUMBER_VALUES)[number];
 
 type ComplexField =
   | { readonly kind: "page"; readonly field: PageField; readonly run: XmlElement; readonly cached: boolean }
