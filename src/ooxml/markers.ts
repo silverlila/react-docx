@@ -7,14 +7,15 @@
  *  - In lvlText, `%n` (1-based) is level n−1's current count in level n−1's format; a level not counted yet
  *    shows its start. A `bullet` level's lvlText is the bullet itself and is shown as it is.
  *  - Letters repeat as Word repeats them: 27 is "aa", 28 is "bb". Formats not in NUMBER_FORMATS render as
- *    decimal; `hasNumberFormat` tells the caller so it can report it. */
+ *    decimal; `decimalFormats` tells the caller which, so it can report them. */
 
 import type * as docx from "docx";
 
 /** Running counts: `${reference}:${instance}` → the count per level. */
 export type Counters = Map<string, number[]>;
 
-const LEVEL_NUMBER = /%([1-9])/g;
+/** A `%n` placeholder in lvlText; the group is n. Stateless use only (`matchAll`, `replace`). */
+export const LEVEL_NUMBER = /%([1-9])/g;
 const ROMAN: readonly (readonly [number, string])[] = [
   [1000, "m"],
   [900, "cm"],
@@ -69,14 +70,24 @@ const NUMBER_FORMATS: Readonly<Record<string, (n: number) => string>> = {
   none: () => "",
 };
 
-export const hasNumberFormat = (format: string): boolean =>
+const hasNumberFormat = (format: string): boolean =>
   Object.prototype.hasOwnProperty.call(NUMBER_FORMATS, format);
 
 export function formatNumber(n: number, format: string): string {
   return hasNumberFormat(format) ? NUMBER_FORMATS[format](n) : String(n);
 }
 
-const levelOf = (levels: readonly docx.ILevelsOptions[], level: number) => levels.find((l) => l.level === level);
+export const levelOf = (levels: readonly docx.ILevelsOptions[], level: number): docx.ILevelsOptions | undefined =>
+  levels.find((l) => l.level === level);
+
+/** The formats of the numbers a level's marker shows that markerText renders as decimal. */
+export function decimalFormats(levels: readonly docx.ILevelsOptions[], level: number): string[] {
+  const own = levelOf(levels, level);
+  if (own === undefined || own.format === "bullet") return [];
+  return [...(own.text ?? "").matchAll(LEVEL_NUMBER)]
+    .map(([, n]) => levelOf(levels, Number(n) - 1)?.format ?? "decimal")
+    .filter((format) => !hasNumberFormat(format));
+}
 
 /** Advances the counter for (key, level), resets deeper levels, and renders the level's lvlText. */
 export function markerText(levels: readonly docx.ILevelsOptions[], counters: Counters, key: string, level: number): string {

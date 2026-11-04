@@ -5,6 +5,7 @@
  *  type gets a definition of its own, whose level 0 sits at its depth ("NumberedList@2"). */
 
 import type * as docx from "docx";
+import { LEVEL_NUMBER } from "../ooxml/markers";
 import { TreeError, isRecord, type AuthorNode, type IndexedChild } from "./author";
 
 type NumberingConfig = docx.INumberingOptions["config"][number];
@@ -14,7 +15,6 @@ type ListType = "NumberedList" | "BulletList";
 const LEVEL_COUNT = 9;
 const NUMBERED_FORMATS = ["decimal", "lowerLetter", "lowerRoman"] as const;
 const BULLET_SYMBOLS = ["•", "◦", "▪"] as const;
-const LEVEL_NUMBER = /%([1-9])/g;
 
 function level(type: ListType, n: number): Level {
   const marker =

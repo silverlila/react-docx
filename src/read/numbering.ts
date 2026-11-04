@@ -14,7 +14,7 @@
 import type * as docx from "docx";
 import { applyFates, type FateTable, type Note } from "../ooxml/codec";
 import { readLevel } from "../ooxml/level";
-import { hasNumberFormat, markerText, type Counters } from "../ooxml/markers";
+import { decimalFormats, levelOf, markerText, type Counters } from "../ooxml/markers";
 import { partOfType, type ReadContext } from "./context";
 import type { Ordinals } from "./ordinals";
 import { attrOf, childNamed, elementsOf, type XmlElement } from "../ooxml/xml";
@@ -39,8 +39,6 @@ export type NumberingReader = {
 
 type AbstractNumOptions = { readonly levels: Levels };
 type Num = { readonly abstractNumId: string; readonly overrides: readonly XmlElement[] };
-
-const LEVEL_NUMBER = /%([1-9])/g;
 
 const ABSTRACT_NUM_FATES: FateTable<AbstractNumOptions> = {
   "w:nsid": { fate: "ignored" },
@@ -119,15 +117,6 @@ function isWriterOverride(override: XmlElement, levels: Levels): boolean {
     only?.name === "w:startOverride" &&
     attrOf(only, "w:val") === writerStart(levels)
   );
-}
-
-/** The formats of the numbers a level's marker shows that markerText renders as decimal. */
-function decimalFormats(levels: Levels, level: number): string[] {
-  const own = levels.find((l) => l.level === level);
-  if (own === undefined || own.format === "bullet") return [];
-  return [...(own.text ?? "").matchAll(LEVEL_NUMBER)]
-    .map(([, n]) => levels.find((l) => l.level === Number(n) - 1)?.format ?? "decimal")
-    .filter((format) => !hasNumberFormat(format));
 }
 
 export function readNumberingPart(ctx: ReadContext): NumberingReader {
@@ -211,7 +200,7 @@ export function readNumberingPart(ctx: ReadContext): NumberingReader {
       const partCounters = counters.get(at.part) ?? new Map<string, number[]>();
       counters.set(at.part, partCounters);
       const text = markerText(list.levels, partCounters, `${list.num.abstractNumId}:${numId}`, level);
-      return { text, level: list.levels.find((l) => l.level === level) };
+      return { text, level: levelOf(list.levels, level) };
     },
   };
 }

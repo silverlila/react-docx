@@ -20,7 +20,7 @@
  *  - Paths are canonical tree paths: child indices from the Document root. */
 
 import type * as docx from "docx";
-import { markerText, type Counters } from "../ooxml/markers";
+import { levelOf, markerText, type Counters } from "../ooxml/markers";
 import type { RunOptions } from "../ooxml/run";
 import type { TreePath } from "../read/diagnostics";
 import type { ChildKind, DocumentNode, Node } from "../schema/elements";
@@ -550,10 +550,6 @@ function inline(node: InlineNode, at: TreePath, scope: InlineScope): ResolvedInl
 
 type Numbering = { readonly reference: string; readonly level: number; readonly instance?: number };
 
-function levelOf(levels: Levels | undefined, level: number): docx.ILevelsOptions | undefined {
-  return levels?.find((l) => l.level === level);
-}
-
 function marker(numbering: Numbering, markRun: RunOptions, story: Story): ResolvedMarker | null {
   const levels = story.doc.levels.get(numbering.reference);
   if (levels === undefined) return null;
@@ -575,7 +571,7 @@ function paragraph(node: Node<"Paragraph">, path: TreePath, story: Story): Resol
     overParagraph(sheet.docDefaults.paragraph, story.table?.paragraph)
   );
   const numbering = props.numbering !== undefined ? props.numbering : styled.numbering;
-  const level = numbering ? levelOf(story.doc.levels.get(numbering.reference), numbering.level) : undefined;
+  const level = numbering ? levelOf(story.doc.levels.get(numbering.reference) ?? [], numbering.level) : undefined;
   const format = overParagraph(overParagraph(styled, level?.style?.paragraph), props);
   const run = chain.reduce((r, s) => overRun(r, s.run), storyRun(story));
   const markRun = overRun(run, props.run);
