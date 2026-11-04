@@ -6,10 +6,10 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync,
 import { tmpdir } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { printJsx } from "../src/codegen/index";
+import { componentName, printJsx } from "../src/codegen/index";
 import { renderToBuffer } from "../src/index";
 import { readDocx, type Diagnostic } from "../src/read/index";
-import { ELEMENTS, type DocumentNode } from "../src/schema/elements";
+import type { DocumentNode } from "../src/schema/elements";
 import { previewHtml } from "./preview";
 
 const OUT = ".roundtrip";
@@ -41,16 +41,6 @@ function summary(name: string, dir: string, diagnostics: readonly Diagnostic[]):
     lines.push(`  top ${kind}:`, ...top.map(([element, n]) => `    ${String(n).padStart(5)}  ${element}`));
   }
   return lines.join("\n");
-}
-
-const TAKEN_NAMES: ReadonlySet<string> = new Set([...Object.keys(ELEMENTS), "Date", "URL"]);
-
-function componentName(name: string): string {
-  const pascal = name
-    .split(/[^A-Za-z0-9]+/)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join("");
-  return /^[A-Za-z]/.test(pascal) && !TAKEN_NAMES.has(pascal) ? pascal : `Doc${pascal}`;
 }
 
 function writeComponent(document: DocumentNode, name: string, dir: string): void {

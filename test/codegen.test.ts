@@ -7,7 +7,7 @@ import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createElement } from "react";
 import { beforeAll, describe, expect, test } from "vitest";
-import { printJsx, type GeneratedModule } from "../src/codegen/index";
+import { componentName, printJsx, type GeneratedModule } from "../src/codegen/index";
 import { Document, ImageRun, Paragraph, Section, renderToBuffer, renderToTree } from "../src/index";
 import { readDocx } from "../src/read/index";
 import { canonicalize } from "../src/tree/canonical";
@@ -263,5 +263,22 @@ describe("printing rules", () => {
 
   test("a component name that is taken by an import throws", () => {
     expect(() => printJsx(paragraph(), { componentName: "Paragraph" })).toThrow(/already a name/);
+  });
+});
+
+describe("a component name from a file name", () => {
+  test.each([
+    ["my resume.docx", "MyResume"],
+    ["Resume.DOCX", "Resume"],
+    ["cover-letter_v2", "CoverLetterV2"],
+    ["2024 report.docx", "Doc2024Report"],
+    ["Paragraph.docx", "DocParagraph"],
+    ["date.docx", "DocDate"],
+  ])("%s becomes %s", (fileName, expected) => {
+    expect(componentName(fileName)).toBe(expected);
+  });
+
+  test("printJsx accepts the name of a file named after an element the document uses", () => {
+    expect(() => printJsx(paragraph(), { componentName: componentName("paragraph.docx") })).not.toThrow();
   });
 });

@@ -1,7 +1,7 @@
 import type { ReactElement } from "react";
-import { ELEMENTS, renderToBlob, type DocumentNode } from "@react-docx/core";
+import { renderToBlob, type DocumentNode } from "@react-docx/core";
 import { readDocx, NotADocxError, type Diagnostic } from "@react-docx/core/reader";
-import { printJsx, type GeneratedModule } from "@react-docx/core/codegen";
+import { componentName, printJsx, type GeneratedModule } from "@react-docx/core/codegen";
 import { zipSync } from "fflate";
 
 export type LoadedFile = {
@@ -13,17 +13,6 @@ export type LoadedFile = {
   readonly module: GeneratedModule;
   readonly readMs: number;
 };
-
-const TAKEN_NAMES: ReadonlySet<string> = new Set([...Object.keys(ELEMENTS), "Date", "URL"]);
-
-export function componentName(fileName: string): string {
-  const pascal = fileName
-    .replace(/\.docx$/i, "")
-    .split(/[^A-Za-z0-9]+/)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join("");
-  return /^[A-Za-z]/.test(pascal) && !TAKEN_NAMES.has(pascal) ? pascal : `Doc${pascal}`;
-}
 
 export class LoadError extends Error {}
 
