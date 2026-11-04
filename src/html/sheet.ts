@@ -13,10 +13,10 @@
  *    it wrote, and docx.js writes no theme part. */
 
 import type * as docx from "docx";
-import { isOneOf, isOnValue, type CodecEnv, type Note } from "../ooxml/codec";
+import { NO_THEME_ENV, isOneOf, isOnValue, type Note } from "../ooxml/codec";
 import { readRunOption, type RunOptions } from "../ooxml/run";
 import { readStyleParagraph } from "../ooxml/style";
-import { attrOf, childNamed, parseXml, type XmlElement } from "../ooxml/xml";
+import { attrOf, childNamed, parseXmlRoots, type XmlElement } from "../ooxml/xml";
 import { DEFAULT_STYLE_SLOTS } from "../schema/docx-facts";
 import type { StylesProps } from "../schema/elements";
 import { DOCX_DEFAULT_STYLES } from "./docx-default-styles.generated";
@@ -51,9 +51,6 @@ const SHEET_TYPES: readonly SheetStyle["type"][] = ["paragraph", "character", "t
 
 const MAX_STYLE_HOPS = 10;
 
-const NO_FONTS = { latin: null, eastAsia: null, complex: null };
-const EMPTY_ENV: CodecEnv = { theme: { fonts: { major: NO_FONTS, minor: NO_FONTS }, colors: {} } };
-
 function sheetStyle(type: SheetStyle["type"], { basedOn, paragraph, run }: StyleOptions): SheetStyle {
   return {
     type,
@@ -76,8 +73,8 @@ function readImportedStyle(style: XmlElement): ImportedStyle | null {
     isDefault: isDefault !== null && isOnValue(isDefault),
     sheet: sheetStyle(type, {
       basedOn: attrOf(childNamed(style, "w:basedOn"), "w:val") ?? undefined,
-      paragraph: pPr === null ? undefined : readStyleParagraph(pPr, EMPTY_ENV, notes).paragraph,
-      run: (rPr === null ? null : readRunOption(rPr, EMPTY_ENV, notes)) ?? undefined,
+      paragraph: pPr === null ? undefined : readStyleParagraph(pPr, NO_THEME_ENV, notes).paragraph,
+      run: (rPr === null ? null : readRunOption(rPr, NO_THEME_ENV, notes)) ?? undefined,
     }),
   };
 }
@@ -93,8 +90,8 @@ export function effectiveSheet(styles: StylesProps | undefined): EffectiveSheet 
   for (const style of styles?.paragraphStyles ?? []) byId.set(style.id, sheetStyle("paragraph", style));
   for (const style of styles?.characterStyles ?? []) byId.set(style.id, sheetStyle("character", style));
   let defaultParagraphStyle: string | null = null;
-  for (const xml of styles?.importedStyles ?? []) {
-    const read = readImportedStyle(parseXml(xml));
+  for (const style of (styles?.importedStyles ?? []).flatMap(parseXmlRoots)) {
+    const read = readImportedStyle(style);
     if (read === null) continue;
     byId.set(read.id, read.sheet);
     if (read.isDefault && read.sheet.type === "paragraph") defaultParagraphStyle = read.id;

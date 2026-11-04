@@ -30,7 +30,7 @@ import { own } from "../schema/own";
 import { xmlRoots } from "../tree/xml-roots";
 import { lineHeightOf } from "./fonts";
 import { paginate, type MeasuredBreaks, type ResolvedPage } from "./pages";
-import { rawBlocks, rawInlines } from "./raw";
+import { rawBlocks, rawInlines, rawRunItems, type RunItem } from "./raw";
 import type { TabStop } from "./tabs";
 import { effectiveSheet, styleChain, type EffectiveSheet, type SheetParagraph } from "./sheet";
 
@@ -623,14 +623,36 @@ function runContent(child: RunChild, run: ComputedRun): ResolvedInline[] {
     case "YearShort":
     case "YearLong":
       return [{ kind: "field", field: "date", placeholder: "date", run }];
-    case "RawXml":
-      return [rawInline(firstRoot(child.props.xml))];
+    case "RawXml": {
+      const shown = rawRunItems(child.props.xml);
+      return shown.length > 0 ? shown.flatMap((item) => rawRunItem(item, run)) : [rawInline(firstRoot(child.props.xml))];
+    }
     case "CommentReference":
       return [];
     default: {
       const exhaustive: never = child;
       throw new Error(`resolveDocument: unknown run content ${JSON.stringify(exhaustive)}`);
     }
+  }
+}
+
+const symbolText = (char: string): string => String.fromCodePoint(parseInt(char, 16));
+
+/** An item read from a run-level RawXml. Its own RawXml is only ever a rendered page break, so it is not
+ *  read again. */
+function rawRunItem(item: RunItem, run: ComputedRun): ResolvedInline[] {
+  if (typeof item === "string") return runContent(item, run);
+  switch (item.type) {
+    case "PageBreak":
+      return [{ kind: "pageBreak", rendered: false }];
+    case "ColumnBreak":
+      return [{ kind: "columnBreak" }];
+    case "SymbolRun":
+      return [{ kind: "text", text: symbolText(item.props.char), run: { ...run, fontFamily: item.props.symbolfont ?? "Wingdings", otherFonts: [] } }];
+    case "RawXml":
+      return [rawInline(firstRoot(item.props.xml))];
+    default:
+      return runContent(item, run);
   }
 }
 
@@ -724,7 +746,7 @@ function inline(node: InlineNode, at: TreePath, scope: InlineScope): ResolvedInl
     case "SymbolRun": {
       const { char, symbolfont, ...props } = node.props;
       const run = runOf(scope, { ...props, font: symbolfont ?? "Wingdings" });
-      return [{ kind: "text", text: String.fromCodePoint(parseInt(char, 16)), run }];
+      return [{ kind: "text", text: symbolText(char), run }];
     }
     case "ImageRun":
       return [image(node.props)];

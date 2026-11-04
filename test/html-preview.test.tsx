@@ -115,6 +115,21 @@ describe("DocxPreview", () => {
     expect(out).toContain(`min-height:${pages[0].heightPt}pt`);
   });
 
+  test("a pageBreakBefore paragraph starts its own sheet, with no CSS page break inside the sheet", () => {
+    const out = html(
+      renderToTree(
+        <Document>
+          <Section>
+            <Paragraph>one</Paragraph>
+            <Paragraph pageBreakBefore>two</Paragraph>
+          </Section>
+        </Document>
+      )
+    );
+    expect(count(out, "data-docx-page=")).toBe(2);
+    expect(out).not.toContain("break-before");
+  });
+
   test("draws the header's first block before the body's first block", () => {
     const document = readWordShaped("resume");
     const [page] = resolveDocument(document);

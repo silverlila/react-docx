@@ -4,7 +4,9 @@
  *    so each run carries its own line height (ComputedRun.lineHeight) and the paragraph's box carries
  *    the paragraph mark's. An atLeast line is the paragraph's minimum with each run at its single height;
  *    an exact line is the paragraph's, inherited by every run.
- *  - A paragraph's box takes the paragraph mark's font, so an empty paragraph is as tall as in Word. */
+ *  - A paragraph's box takes the paragraph mark's font, so an empty paragraph is as tall as in Word.
+ *  - pageBreakBefore sets no CSS break: paginate already starts the paragraph's page, and Word ignores it
+ *    in table cells, headers and footers. */
 
 import type { CSSProperties } from "react";
 import { isOwnKey } from "../schema/own";
@@ -99,6 +101,5 @@ export function paragraphStyle(p: ComputedParagraph): CSSProperties {
     ...(left === undefined ? {} : { borderLeft: borderCss(left) }),
     ...(right === undefined ? {} : { borderRight: borderCss(right) }),
     ...(p.background === null ? {} : { backgroundColor: `#${p.background}` }),
-    ...(p.pageBreakBefore ? { breakBefore: "page" } : {}),
   };
 }

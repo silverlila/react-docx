@@ -108,6 +108,18 @@ describe("the style cascade", () => {
     expect(p.format.spaceAfterPt).toBe(10);
   });
 
+  test("every style in an importedStyles entry applies, not only the first", () => {
+    const styles =
+      '<w:style w:type="character" w:styleId="Accent"><w:name w:val="Accent"/><w:rPr><w:color w:val="FF0000"/></w:rPr></w:style>' +
+      '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:rPr><w:sz w:val="24"/></w:rPr></w:style>' +
+      '<w:style w:type="paragraph" w:styleId="Quote"><w:name w:val="Quote"/><w:rPr><w:i/></w:rPr></w:style>';
+    const blocks = body(
+      doc({ styles: { importedStyles: [styles] } }, h(Paragraph, null, h(TextRun, { style: "Accent" }, "plain")), h(Paragraph, { style: "Quote" }, "quoted"))
+    );
+    expect(textAt(paragraphAt(blocks, 0).inlines, 0).run).toMatchObject({ color: "FF0000", sizePt: 12 });
+    expect(textAt(paragraphAt(blocks, 1).inlines, 0).run).toMatchObject({ italic: true });
+  });
+
   test("a basedOn chain of three styles applies base first", () => {
     const styles = {
       paragraphStyles: [
@@ -408,6 +420,12 @@ describe("pages", () => {
     expect(texts(pages)).toEqual([["one"], [], ["three"]]);
   });
 
+  test("a section that ends with a page break leaves a blank page, which docx.js's section mark sits on, before the next", () => {
+    const pages = pagesOf(h(Section, null, h(Paragraph, null, "one", h(PageBreak))), h(Section, null, h(Paragraph, null, "two")));
+    expect(texts(pages)).toEqual([["one"], [], ["two"]]);
+    expect(pages.map((page) => [page.number, page.section])).toEqual([["1", 1], ["2", 1], ["3", 2]]);
+  });
+
   test("Word's rendered page break starts a page, but not right after an authored break", () => {
     const pages = pagesOf(
       h(
@@ -574,6 +592,36 @@ describe("raw XML the reader kept", () => {
   test("a smart tag's runs are drawn in their paragraph", () => {
     const p = paragraphAt(body(doc({}, h(Paragraph, null, "Call ", raw(`<w:smartTag w:element="place">${r("<w:t>Seattle</w:t>")}</w:smartTag>`)))), 0);
     expect(textOf(p)).toBe("Call Seattle");
+  });
+
+  const pageTexts = (pages: readonly ResolvedPage[]) => pages.map((page) => body([page]).map((b) => (b.kind === "paragraph" ? textOf(b) : b.kind)));
+  const inSection = (props: Record<string, unknown> | null, ...children: ReactNode[]) =>
+    resolveDocument(renderToTree(h(Document, null, h(Section, props, ...children))));
+
+  test("a page break inside a run breaks the page where it falls", () => {
+    const pages = inSection(null, raw(`<w:p>${r('<w:t>A</w:t><w:br w:type="page"/><w:t>B</w:t>')}</w:p>`));
+    expect(pageTexts(pages)).toEqual([["A"], ["B"]]);
+  });
+
+  test("a column break inside a run moves to the next column, not to a new line", () => {
+    const pages = inSection({ properties: { column: { count: 2 } } }, raw(`<w:p>${r('<w:t>A</w:t><w:br w:type="column"/><w:t>B</w:t>')}</w:p>`));
+    expect(pageTexts(pages)).toEqual([["A", "B"]]);
+    expect(pages[0].parts[0].columnStarts).toEqual([0, 1]);
+  });
+
+  test("a symbol whose char is not hex is left out instead of failing the preview", () => {
+    const p = paragraphAt(body(doc({}, raw(`<w:p>${r('<w:sym w:font="Wingdings" w:char="★"/><w:t>x</w:t>')}</w:p>`))), 0);
+    expect(textOf(p)).toBe("x");
+  });
+
+  test("raw XML in a run draws its text and breaks at its rendered page breaks", () => {
+    const pages = inSection(null, h(Paragraph, null, h(TextRun, null, raw("<w:t>hi</w:t><w:lastRenderedPageBreak/><w:t>there</w:t>"))));
+    expect(pageTexts(pages)).toEqual([["hi"], ["there"]]);
+  });
+
+  test("a symbol in raw XML in a run is drawn in its symbol font", () => {
+    const p = paragraphAt(body(doc({}, h(Paragraph, null, h(TextRun, { bold: true }, raw('<w:sym w:font="Symbol" w:char="F071"/>'))))), 0);
+    expect(textAt(p.inlines, 0)).toMatchObject({ text: "\uF071", run: { fontFamily: "Symbol", bold: true } });
   });
 
   test("raw XML that shows nothing stays a raw marker", () => {
@@ -757,6 +805,26 @@ describe("page-number fields in raw XML", () => {
   });
 });
 
+describe("page-number fields in raw XML, read as the reader reads them", () => {
+  const r = (inner: string) => `<w:r>${inner}</w:r>`;
+  const complex = (instruction: string, cached: string) =>
+    r('<w:fldChar w:fldCharType="begin"/>') + r(`<w:instrText xml:space="preserve">${instruction}</w:instrText>`) +
+    r('<w:fldChar w:fldCharType="separate"/>') + r(`<w:t>${cached}</w:t>`) + r('<w:fldChar w:fldCharType="end"/>');
+  const inlinesOf = (xml: string) => body(doc({}, h(RawXml, { xml }))).map((_, i, all) => paragraphAt(all, i).inlines);
+
+  test("a SECTION field shows the section's number", () => {
+    const [complexField, simple] = inlinesOf(`<w:p>${complex(" SECTION ", "7")}</w:p><w:p><w:fldSimple w:instr=" SECTION "><w:r><w:t>7</w:t></w:r></w:fldSimple></w:p>`);
+    expect(complexField).toEqual([expect.objectContaining({ kind: "field", field: "section" })]);
+    expect(simple).toEqual([expect.objectContaining({ kind: "field", field: "section" })]);
+  });
+
+  test("a PAGE field with a switch other than MERGEFORMAT shows its cached result", () => {
+    const [complexField, simple] = inlinesOf(`<w:p>${complex(" PAGE \\* roman ", "iv")}</w:p><w:p><w:fldSimple w:instr=" PAGE \\* roman "><w:r><w:t>iv</w:t></w:r></w:fldSimple></w:p>`);
+    expect(complexField).toEqual([expect.objectContaining({ kind: "text", text: "iv" })]);
+    expect(simple).toEqual([expect.objectContaining({ kind: "text", text: "iv" })]);
+  });
+});
+
 describe("floating pictures", () => {
   const floatOf = (floating: Record<string, unknown>) => {
     const p = paragraphAt(body(doc({}, h(Paragraph, null, h(ImageRun, { type: "png", data: PNG_1PX, transformation: { width: 10, height: 10 }, floating })))), 0);
@@ -924,6 +992,31 @@ describe("review fixes: pagination edge cases", () => {
     const second = pages[1].parts[0].blocks[0];
     const p = second.kind === "table" ? paragraphAt(second.rows[0].cells[0].blocks, 0) : null;
     expect(p?.format).toMatchObject({ firstLinePt: 18, spaceBeforePt: 6 });
+  });
+
+  test("a cell paragraph broken across pages keeps its space after on its last piece only", () => {
+    const pages = pagesOf(
+      new Set(),
+      h(Section, null, h(Table, null, h(TableRow, null, h(TableCell, null, h(Paragraph, { spacing: { after: 240 } }, h(TextRun, null, "one", RENDERED, "two"))))))
+    );
+    const cellParagraph = (page: ResolvedPage) => {
+      const table = page.parts[0].blocks[0];
+      return table.kind === "table" ? paragraphAt(table.rows[0].cells[0].blocks, 0) : null;
+    };
+    expect(pages.map(rowTexts)).toEqual([["one"], ["two"]]);
+    expect(pages.map((page) => cellParagraph(page)?.format.spaceAfterPt)).toEqual([0, 12]);
+  });
+
+  test("a cell paragraph holding only a rendered break keeps its empty line, on the page after the break", () => {
+    const pages = pagesOf(
+      new Set(),
+      h(
+        Section,
+        null,
+        h(Table, null, h(TableRow, null, h(TableCell, null, h(Paragraph, null, "a"), h(Paragraph, null, h(TextRun, null, RENDERED)), h(Paragraph, null, "b"))))
+      )
+    );
+    expect(pages.map(rowTexts)).toEqual([["a"], [",b"]]);
   });
 
   test("a measured break before a table's first body row is ignored rather than leave a page of header rows", () => {

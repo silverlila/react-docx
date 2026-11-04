@@ -1,25 +1,34 @@
 /** What the preview draws for RawXml: the reader keeps content verbatim where no tree kind maps it (content
  *  controls, smart tags, custom XML, simple fields, Word's tables of contents), and Word shows that
- *  content. rawBlocks and rawInlines read it into the tree kinds resolveDocument draws, with the reader's
- *  own codecs.
+ *  content. rawBlocks, rawInlines and rawRunItems read it into the tree kinds resolveDocument draws, with
+ *  the reader's own codecs.
  *
  *  - Wrappers (w:sdt, w:smartTag, w:customXml, w:fldSimple, w:ins) are read through; w:del is left out.
  *  - A complex field shows its result and hides its instruction, across paragraphs: a table of contents
- *    is one field whose result is its entries.
+ *    is one field whose result is its entries. A page-number field, as the reader recognises one
+ *    (pageFieldOf), shows the page's number instead.
+ *  - A run is read in order, so a page or column break in it falls between the text before and after.
+ *  - A w:sym whose w:char is not hex is left out, as the reader leaves it out of SymbolRun.
  *  - The fragment comes without its package, so a hyperlink to an external target keeps only its text,
  *    pictures, notes and objects are left out, a numbered paragraph draws without its marker (its numId
  *    names no tree list), and theme fonts fall back to the style's. */
 
-import type { CodecEnv } from "../ooxml/codec";
+import { NO_THEME_ENV, type CodecEnv } from "../ooxml/codec";
 import { readParagraphProperties } from "../ooxml/paragraph";
 import { readRunProperties } from "../ooxml/run";
 import { readCellProperties, readRowProperties, readTableProperties } from "../ooxml/table";
-import { attrOf, childNamed, elementsOf, parseXml, textOf, type XmlElement } from "../ooxml/xml";
+import { attrOf, childNamed, elementsOf, parseXmlRoots, textOf, type XmlElement } from "../ooxml/xml";
+import { pageFieldOf } from "../read/fields";
+import { SYMBOL_CHAR } from "../schema/docx-facts";
 import type { ChildKind, Node } from "../schema/elements";
 
 type BlockNode = Node<"Paragraph" | "Table">;
 type InlineNode = Node<ChildKind<"Paragraph">>;
 type RunChild = Node<ChildKind<"TextRun">> | string;
+
+/** A run's content in order: what a TextRun holds, and the breaks and symbols that are runs of their own. A
+ *  SymbolRun here carries only its char and font. */
+export type RunItem = RunChild | Node<"PageBreak" | "ColumnBreak" | "SymbolRun">;
 
 /** A complex field: its instruction so far, and whether its result is showing. A page-number field's
  *  result is replaced by the page's own number, so its cached result is hidden. */
@@ -27,15 +36,6 @@ type Field = { instruction: string; phase: "instruction" | "result" | "replaced"
 
 /** The open complex fields, outermost first; text shows only when every one of them is in its result. */
 type Walk = { readonly env: CodecEnv; readonly fields: Field[] };
-
-const PAGE_FIELDS: readonly (readonly [RegExp, string])[] = [
-  [/^\s*PAGE\b/i, "CURRENT"],
-  [/^\s*NUMPAGES\b/i, "TOTAL_PAGES"],
-  [/^\s*SECTIONPAGES\b/i, "TOTAL_PAGES_IN_SECTION"],
-];
-
-const NO_FONTS = { latin: null, eastAsia: null, complex: null };
-const ENV: CodecEnv = { theme: { fonts: { major: NO_FONTS, minor: NO_FONTS }, colors: {} } };
 
 const WRAPPERS = new Set(["w:sdt", "w:smartTag", "w:customXml", "w:fldSimple", "w:ins", "w:moveTo"]);
 
@@ -55,23 +55,22 @@ function fieldChar(el: XmlElement, walk: Walk): RunChild | null {
   if (type === "begin") {
     walk.fields.push({ instruction: "", phase: "instruction" });
   } else if (type === "separate" && open !== undefined) {
-    const page = PAGE_FIELDS.find(([pattern]) => pattern.test(open.instruction));
+    const page = pageFieldOf(open.instruction);
     const outer = walk.fields.slice(0, -1).every((field) => field.phase === "result");
-    open.phase = page === undefined ? "result" : "replaced";
-    if (page !== undefined && outer) return node("PageNumber", { field: page[1] });
+    open.phase = page === null ? "result" : "replaced";
+    if (page !== null && outer) return node("PageNumber", { field: page });
   } else if (type === "end") {
     walk.fields.pop();
   }
   return null;
 }
 
-function runChildren(r: XmlElement, walk: Walk): { children: RunChild[]; pageBreaks: number } {
-  const children: RunChild[] = [];
-  let pageBreaks = 0;
-  for (const el of elementsOf(r)) {
+function runItems(elements: readonly XmlElement[], walk: Walk): RunItem[] {
+  const items: RunItem[] = [];
+  for (const el of elements) {
     if (el.name === "w:fldChar") {
       const page = fieldChar(el, walk);
-      if (page !== null) children.push(page);
+      if (page !== null) items.push(page);
       continue;
     }
     if (el.name === "w:instrText") {
@@ -82,45 +81,59 @@ function runChildren(r: XmlElement, walk: Walk): { children: RunChild[]; pageBre
     if (!showing(walk)) continue;
     switch (el.name) {
       case "w:t":
-        children.push(textOf(el));
+        items.push(textOf(el));
         break;
       case "w:tab":
-        children.push(node("Tab", {}));
+        items.push(node("Tab", {}));
         break;
-      case "w:br":
-        if (attrOf(el, "w:type") === "page") pageBreaks++;
-        else children.push(node("CarriageReturn", {}));
+      case "w:br": {
+        const type = attrOf(el, "w:type");
+        items.push(node(type === "page" ? "PageBreak" : type === "column" ? "ColumnBreak" : "CarriageReturn", {}));
         break;
+      }
       case "w:cr":
-        children.push(node("CarriageReturn", {}));
+        items.push(node("CarriageReturn", {}));
         break;
       case "w:noBreakHyphen":
-        children.push(node("NoBreakHyphen", {}));
+        items.push(node("NoBreakHyphen", {}));
         break;
       case "w:softHyphen":
-        children.push(node("SoftHyphen", {}));
+        items.push(node("SoftHyphen", {}));
         break;
       case "w:lastRenderedPageBreak":
-        children.push(node("RawXml", { xml: "<w:lastRenderedPageBreak/>" }));
+        items.push(node("RawXml", { xml: "<w:lastRenderedPageBreak/>" }));
         break;
+      case "w:sym": {
+        const char = attrOf(el, "w:char");
+        const font = attrOf(el, "w:font");
+        if (char !== null && SYMBOL_CHAR.test(char)) items.push(node("SymbolRun", { char, ...(font === null ? {} : { symbolfont: font }) }));
+        break;
+      }
       default:
         break;
     }
   }
-  return { children, pageBreaks };
+  return items;
 }
 
+/** A run as the runs it shows: its content up to each break or symbol is a TextRun with its properties. */
 function run(r: XmlElement, walk: Walk): InlineNode[] {
   const props = readRunProperties(childNamed(r, "w:rPr"), walk.env).options;
-  const sym = childNamed(r, "w:sym");
-  const { children, pageBreaks } = runChildren(r, walk);
   const out: InlineNode[] = [];
-  if (sym !== null && showing(walk) && attrOf(sym, "w:char") !== null) {
-    const font = attrOf(sym, "w:font");
-    out.push(node("SymbolRun", { ...props, char: attrOf(sym, "w:char"), ...(font === null ? {} : { symbolfont: font }) }));
+  let content: RunChild[] = [];
+  const flush = () => {
+    if (content.length > 0) out.push(node("TextRun", props, content));
+    content = [];
+  };
+  for (const item of runItems(elementsOf(r), walk)) {
+    if (typeof item === "string" || (item.type !== "PageBreak" && item.type !== "ColumnBreak" && item.type !== "SymbolRun")) {
+      content.push(item);
+      continue;
+    }
+    flush();
+    out.push(item.type === "SymbolRun" ? node("SymbolRun", { ...props, ...item.props }) : item);
   }
-  if (children.length > 0) out.push(node("TextRun", props, children));
-  for (let i = 0; i < pageBreaks; i++) out.push(node("PageBreak", {}));
+  flush();
   return out;
 }
 
@@ -128,11 +141,11 @@ function inlines(elements: readonly XmlElement[], walk: Walk): InlineNode[] {
   return elements.flatMap((el): InlineNode[] => {
     if (el.name === "w:r") return run(el, walk);
     if (el.name === "w:fldSimple") {
-      const page = PAGE_FIELDS.find(([pattern]) => pattern.test(attrOf(el, "w:instr") ?? ""));
-      if (page === undefined) return inlines(elementsOf(el), walk);
+      const page = pageFieldOf(attrOf(el, "w:instr") ?? "");
+      if (page === null) return inlines(elementsOf(el), walk);
       if (!showing(walk)) return [];
       const props = readRunProperties(childNamed(childNamed(el, "w:r"), "w:rPr"), walk.env).options;
-      return [node("TextRun", props, [node("PageNumber", { field: page[1] })])];
+      return [node("TextRun", props, [node("PageNumber", { field: page })])];
     }
     if (WRAPPERS.has(el.name)) return inlines(wrapped(el), walk);
     if (el.name === "w:hyperlink") {
@@ -185,14 +198,19 @@ function blocks(elements: readonly XmlElement[], walk: Walk): BlockNode[] {
   });
 }
 
-const rootsOf = (xml: string): XmlElement[] => elementsOf(parseXml(`<fragment>${xml}</fragment>`));
+const freshWalk = (): Walk => ({ env: NO_THEME_ENV, fields: [] });
 
 /** The blocks a block-level RawXml shows. */
 export function rawBlocks(xml: string): BlockNode[] {
-  return blocks(rootsOf(xml), { env: ENV, fields: [] });
+  return blocks(parseXmlRoots(xml), freshWalk());
 }
 
 /** The inline content a paragraph-level RawXml shows. */
 export function rawInlines(xml: string): InlineNode[] {
-  return inlines(rootsOf(xml), { env: ENV, fields: [] });
+  return inlines(parseXmlRoots(xml), freshWalk());
+}
+
+/** The content a run-level RawXml shows. */
+export function rawRunItems(xml: string): RunItem[] {
+  return runItems(parseXmlRoots(xml), freshWalk());
 }

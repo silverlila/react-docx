@@ -16,7 +16,9 @@
  *    A row Word broke across pages (a rendered break after content in a cell) is split there: each page
  *    gets the row with each cell's content up to its next rendered break.
  *  - Breaks inside table cells otherwise, text boxes, headers, footers and footnotes start no page.
- *  - A continuous section adds a part, with its own columns, to the page it starts on.
+ *  - A continuous section adds a part, with its own columns, to the page it starts on. Any other section
+ *    starts a page even when the previous one is empty: docx.js ends each section but the last with an
+ *    empty paragraph holding its w:sectPr, which Word sets on that page.
  *  - Numbering: a section that restarts numbering (pageNumberStart) restarts it on its first page; others
  *    count on. Each page shows its number in its section's format.
  *  - Headers and footers: a section's first page shows its first-page header when titlePage is set, an
@@ -223,8 +225,25 @@ function cutAtSplits(inlines: ResolvedInline[], splits: readonly Split[]): { inl
   return parts;
 }
 
+/** A piece of a paragraph broken across pages: its marker, space before and first-line indent stay on its
+ *  first piece, its space after on its last. */
+function paragraphPiece(p: Paragraph, inlines: ResolvedInline[], first: boolean, last: boolean): Paragraph {
+  return {
+    ...p,
+    marker: first ? p.marker : null,
+    inlines,
+    format: {
+      ...p.format,
+      spaceBeforePt: first ? p.format.spaceBeforePt : 0,
+      firstLinePt: first ? p.format.firstLinePt : 0,
+      spaceAfterPt: last ? p.format.spaceAfterPt : 0,
+      pageBreakBefore: false,
+    },
+  };
+}
+
 /** `blocks` cut at their paragraphs' rendered breaks: what Word set on each page, in order. A paragraph
- *  broken there keeps its marker and space before on its first piece only. */
+ *  with nothing but breaks keeps its empty line, after its last break. */
 function cutAtRenderedBreaks(blocks: readonly ResolvedBlock[]): ResolvedBlock[][] {
   const groups: ResolvedBlock[][] = [[]];
   for (const block of blocks) {
@@ -233,15 +252,17 @@ function cutAtRenderedBreaks(blocks: readonly ResolvedBlock[]): ResolvedBlock[][
       continue;
     }
     const { segments, breaks } = splitInlines(block.inlines);
-    let started = false;
+    if (breaks.length === 0) {
+      groups[groups.length - 1].push(block);
+      continue;
+    }
+    const pieces: { group: ResolvedBlock[]; inlines: ResolvedInline[] }[] = [];
     segments.forEach((inlines, i) => {
       if (i > 0 && breaks[i - 1] === "rendered") groups.push([]);
-      if (inlines.length === 0 && breaks.length > 0) return;
-      groups[groups.length - 1].push(
-        started ? { ...block, marker: null, inlines, format: { ...block.format, spaceBeforePt: 0, firstLinePt: 0 } } : { ...block, inlines }
-      );
-      started = true;
+      if (inlines.length > 0) pieces.push({ group: groups[groups.length - 1], inlines });
     });
+    if (pieces.length === 0) pieces.push({ group: groups[groups.length - 1], inlines: [] });
+    pieces.forEach(({ group, inlines }, k) => group.push(paragraphPiece(block, inlines, k === 0, k === pieces.length - 1)));
   }
   return groups;
 }
@@ -379,23 +400,7 @@ function paginateSections(sections: readonly ResolvedSection[], measured: Measur
         if (i === 0) measuredBreak(key);
         else newPage();
         const whole = breaks.length === 0 && parts.length === 1;
-        emit(
-          whole
-            ? { ...p, inlines: part.inlines }
-            : {
-                ...p,
-                marker: first ? p.marker : null,
-                inlines: part.inlines,
-                format: {
-                  ...p.format,
-                  spaceBeforePt: first ? p.format.spaceBeforePt : 0,
-                  firstLinePt: first ? p.format.firstLinePt : 0,
-                  spaceAfterPt: last ? p.format.spaceAfterPt : 0,
-                  pageBreakBefore: false,
-                },
-              },
-          key
-        );
+        emit(whole ? { ...p, inlines: part.inlines } : paragraphPiece(p, part.inlines, first, last), key);
       });
     });
   };
@@ -466,9 +471,7 @@ function paginateSections(sections: readonly ResolvedSection[], measured: Measur
   sections.forEach((s, i) => {
     section = i + 1;
     if (i === 0 || !s.continuous) {
-      const reuse = pages.length > 0 && !hasContent(current());
-      if (reuse) pages.pop();
-      else number++;
+      number++;
       if (s.pageNumberStart !== null) number = s.pageNumberStart;
       indexInSection = 0;
       pages.push({ section, indexInSection, number, parts: [draftPart(s.columns)], laidOut: false });
