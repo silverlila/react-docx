@@ -10,7 +10,7 @@
 import type { CodecEnv, Note } from "../ooxml/codec";
 import { createDiagnostics, type DiagnosticCollector, type LocatedDiagnostic, type TreePath } from "./diagnostics";
 import { createOrdinals, type Ordinals } from "./ordinals";
-import type { OpcPackage } from "./package";
+import { targetOfType, type OpcPackage } from "./package";
 import type { XmlElement } from "./xml";
 
 export type Report = Omit<LocatedDiagnostic, "part" | "at">;
@@ -67,10 +67,7 @@ function contextAt(shared: Shared, part: string, at: TreePath): ReadContext {
 /** The main part's internal relationship target whose type ends with `typeSuffix` ("/styles", …), falling
  *  back to `fallback`, the path Word and docx.js use. */
 export function partOfType(pkg: OpcPackage, typeSuffix: string, fallback: string): string {
-  for (const rel of pkg.relsOf(pkg.mainPart).values()) {
-    if (!rel.external && rel.type.endsWith(typeSuffix)) return rel.target;
-  }
-  return fallback;
+  return targetOfType(pkg.relsOf(pkg.mainPart), typeSuffix) ?? fallback;
 }
 
 /** A context at the main part with the empty path. */

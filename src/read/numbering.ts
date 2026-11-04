@@ -21,7 +21,7 @@ import { attrOf, childNamed, elementsOf, type XmlElement } from "./xml";
 
 type Levels = readonly docx.ILevelsOptions[];
 
-export type ListRef = { readonly reference: string; readonly instance: number; readonly levels: Levels };
+export type ListRef = { readonly reference: string; readonly instance: number };
 
 /** A list marker written as text: the marker and the level it was rendered from. */
 export type Marker = { readonly text: string; readonly level: docx.ILevelsOptions | undefined };
@@ -172,7 +172,7 @@ export function readNumberingPart(ctx: ReadContext): NumberingReader {
     return own;
   };
   const listOf = (numId: string): { readonly num: Num; readonly levels: Levels } | null => {
-    const num = numId === "0" ? undefined : nums.get(numId);
+    const num = nums.get(numId);
     const abstract = num === undefined ? undefined : abstracts.get(num.abstractNumId);
     return num === undefined || abstract === undefined ? null : { num, levels: levelsOf(num.abstractNumId, abstract) };
   };
@@ -193,7 +193,7 @@ export function readNumberingPart(ctx: ReadContext): NumberingReader {
           here.report({ kind: "dropped", element: override.name, detail });
         }
       }
-      return { reference, instance: instanceOf(ctx.ordinals, reference, numId), levels: list.levels };
+      return { reference, instance: instanceOf(ctx.ordinals, reference, numId) };
     },
     config() {
       return [...used].map(([reference, abstractNumId]) => ({ reference, levels: levels.get(abstractNumId) ?? [] }));

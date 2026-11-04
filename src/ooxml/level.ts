@@ -18,40 +18,27 @@ import {
   stringVal,
   wholeNumberAt,
   wholeNumberVal,
+  ALIGNMENTS,
+  noOption,
   type CodecEnv,
   type CodecResult,
   type Draft,
   type FateTable,
   type Note,
+  type ValueOf,
   type ValueReader,
 } from "./codec";
 import { readRunProperties } from "./run";
 import { NUMBER_FORMATS } from "./section";
 import { dropNumbering, readStyleParagraph } from "./style";
 
-type ValueOf<T> = T[keyof T];
 type LevelOptions = Omit<docx.ILevelsOptions, "level">;
 
 const MAX_LEVEL = 9;
 
 const LEVEL_FORMATS: readonly ValueOf<typeof docx.LevelFormat>[] = [...NUMBER_FORMATS, "custom"];
 const SUFFIXES: readonly ValueOf<typeof docx.LevelSuffix>[] = ["nothing", "space", "tab"];
-const ALIGNMENTS: readonly ValueOf<typeof docx.AlignmentType>[] = [
-  "start",
-  "center",
-  "end",
-  "both",
-  "mediumKashida",
-  "distribute",
-  "numTab",
-  "highKashida",
-  "lowKashida",
-  "thaiDistribute",
-  "left",
-  "right",
-];
 
-const noOption = (why: string) => ({ fate: "dropped", why }) as const;
 
 const to = <K extends keyof LevelOptions>(key: K, read: ValueReader<NonNullable<Draft<LevelOptions>[K]>>) =>
   mapTo<LevelOptions, K>(key, read);

@@ -46,7 +46,7 @@ export type FateTable<T> = Readonly<Record<string, Fate<T>>>;
  *  something). */
 export type ValueReader<V> = (el: XmlElement, env: CodecEnv, notes: Note[]) => V | null;
 
-type ValueOf<T> = T[keyof T];
+export type ValueOf<T> = T[keyof T];
 type BorderStyle = ValueOf<typeof docx.BorderStyle>;
 type ShadingType = ValueOf<typeof docx.ShadingType>;
 
@@ -57,6 +57,28 @@ const HEX_BYTE = /^[0-9A-Fa-f]{2}$/;
 const WHOLE_NUMBER = /^-?[0-9]+$/;
 
 export const dropped = (element: string, detail: string): Note => ({ fate: "dropped", element, detail });
+
+export const noOption = (why: string) => ({ fate: "dropped", why }) as const;
+
+const UNIVERSAL_MEASURE = /^-?[0-9]+(\.[0-9]+)?(mm|cm|in|pt|pc|pi)$/;
+export const isUniversalMeasure = (value: string): value is docx.UniversalMeasure => UNIVERSAL_MEASURE.test(value);
+
+export const ALIGNMENTS: readonly ValueOf<typeof docx.AlignmentType>[] = [
+  "start",
+  "center",
+  "end",
+  "both",
+  "mediumKashida",
+  "distribute",
+  "numTab",
+  "highKashida",
+  "lowKashida",
+  "thaiDistribute",
+  "left",
+  "right",
+];
+
+export const HEIGHT_RULES: readonly ValueOf<typeof docx.HeightRule>[] = ["auto", "atLeast", "exact"];
 
 export const resolved = (element: string, detail: string): Note => ({ fate: "resolved", element, detail });
 

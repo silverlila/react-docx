@@ -101,7 +101,7 @@ function readRels(root: XmlElement | null, folder: string): Map<string, Rel> {
   return rels;
 }
 
-function targetOfType(rels: ReadonlyMap<string, Rel>, typeSuffix: string): string | null {
+export function targetOfType(rels: ReadonlyMap<string, Rel>, typeSuffix: string): string | null {
   for (const rel of rels.values()) if (!rel.external && rel.type.endsWith(typeSuffix)) return rel.target;
   return null;
 }

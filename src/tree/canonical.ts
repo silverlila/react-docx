@@ -324,7 +324,7 @@ function literalRun(props: PropBag, text: string): Built {
   return isProtected(text) ? textRun({ ...props, text }, []) : textRun(props, [text]);
 }
 
-function mergeStrings<T>(items: readonly (T | string)[]): (T | string)[] {
+export function mergeStrings<T>(items: readonly (T | string)[]): (T | string)[] {
   const merged: (T | string)[] = [];
   for (const item of items) {
     const last: T | string | undefined = merged[merged.length - 1];

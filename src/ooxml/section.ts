@@ -20,12 +20,14 @@ import {
   onOff,
   readBorder,
   wholeNumberAt,
+  noOption,
   type CodecEnv,
   type CodecResult,
   type Draft,
   type Fate,
   type FateTable,
   type Note,
+  type ValueOf,
   type ValueReader,
 } from "./codec";
 import { twipsAt } from "./table";
@@ -42,7 +44,6 @@ export type SectionRead = CodecResult<{ properties?: docx.ISectionPropertiesOpti
   }[];
 };
 
-type ValueOf<T> = T[keyof T];
 
 const ORIENTATIONS: readonly ValueOf<typeof docx.PageOrientation>[] = ["portrait", "landscape"];
 const PAGE_NUMBER_SEPARATORS: readonly ValueOf<typeof docx.PageNumberSeparator>[] = [
@@ -143,7 +144,6 @@ export const NUMBER_FORMATS: readonly ValueOf<typeof docx.NumberFormat>[] = [
   "dollarText",
 ];
 
-const noOption = (why: string) => ({ fate: "dropped", why }) as const;
 
 const isEmpty = (options: object): boolean => Object.keys(options).length === 0;
 

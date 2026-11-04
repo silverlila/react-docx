@@ -34,17 +34,19 @@ import {
   stringVal,
   wholeNumberAt,
   wholeNumberVal,
+  isUniversalMeasure,
+  noOption,
   type CodecEnv,
   type CodecResult,
   type Draft,
   type FateTable,
   type Note,
+  type ValueOf,
   type ValueReader,
 } from "./codec";
 
 export type RunOptions = Omit<docx.IRunOptions, "children" | "text" | "break">;
 
-type ValueOf<T> = T[keyof T];
 type FontKey = "ascii" | "hAnsi" | "eastAsia" | "cs";
 type RunFont = string | docx.IFontAttributesProperties;
 type RunFlag =
@@ -147,9 +149,6 @@ const THEME_FONTS = new Map<string, readonly [keyof ThemeFonts, keyof ThemeFontS
   ["minorBidi", ["minor", "complex"]],
 ]);
 
-const UNIVERSAL_MEASURE = /^-?[0-9]+(\.[0-9]+)?(mm|cm|in|pt|pc|pi)$/;
-
-const isUniversalMeasure = (value: string): value is docx.UniversalMeasure => UNIVERSAL_MEASURE.test(value);
 
 const to = <K extends keyof RunOptions>(key: K, read: ValueReader<NonNullable<Draft<RunOptions>[K]>>) =>
   mapTo<RunOptions, K>(key, read);
@@ -159,7 +158,6 @@ const offIsWritable = (key: RunFlag): boolean =>
 
 const flag = (key: RunFlag) => to(key, onOff(offIsWritable(key)));
 
-const noOption = (why: string) => ({ fate: "dropped", why }) as const;
 
 /** docx.js writes characterSpacing and kern only when they are not zero. */
 const nonZero =
@@ -313,6 +311,13 @@ function settle<K extends keyof RunOptions>(options: Draft<RunOptions>, key: K, 
   if (value === undefined) delete options[key];
   else options[key] = value;
 }
+
+/** Run properties as an option, or null when there are none: a paragraph mark's or a style's. */
+export const readRunOption: ValueReader<RunOptions> = (el, env, notes) => {
+  const run = readRunProperties(el, env);
+  notes.push(...run.notes);
+  return Object.keys(run.options).length === 0 ? null : run.options;
+};
 
 export function readRunProperties(rPr: XmlElement | null, env: CodecEnv): CodecResult<RunOptions> {
   const { options, notes } = applyFates(rPr, RPR_FATES, env);

@@ -10,7 +10,7 @@
  *    character style read from Word gains both on its first write (decision 10). */
 
 import type * as docx from "docx";
-import { attrOf, childNamed, elementsOf, serializeXml, type XmlElement } from "../read/xml";
+import { attrOf, childNamed, hasRelationship, serializeXml, type XmlElement } from "../read/xml";
 import { xmlRoots } from "../tree/xml-roots";
 import {
   applyFates,
@@ -21,6 +21,7 @@ import {
   onOff,
   stringVal,
   wholeNumberVal,
+  noOption,
   type CodecEnv,
   type CodecResult,
   type Draft,
@@ -30,8 +31,7 @@ import {
   type ValueReader,
 } from "./codec";
 import { readParagraphProperties, type ParagraphOptions, type ParagraphRead } from "./paragraph";
-import { readRunProperties, type RunOptions } from "./run";
-import { readTableProperties, type TableOptions } from "./table";
+import { readRunOption, type RunOptions } from "./run";
 
 export type StyleRead =
   | {
@@ -54,7 +54,6 @@ export type StyleParagraph = {
 type StyleOptions = Omit<docx.IParagraphStyleOptions, "id">;
 type RawBecause = Extract<StyleRead, { kind: "raw" }>["because"];
 
-const noOption = (why: string) => ({ fate: "dropped", why }) as const;
 
 const NOT_A_TABLE_STYLE = "only a table style has table properties";
 
@@ -67,13 +66,6 @@ export function readStyleParagraph(pPr: XmlElement, env: CodecEnv, notes: Note[]
   if (read.sectPr !== null) notes.push(dropped("w:sectPr", "only a body paragraph ends a section"));
   return { paragraph, numPr: read.numPr };
 }
-
-/** Run properties as an option, or null when there are none. */
-const readRun: ValueReader<RunOptions> = (el, env, notes) => {
-  const run = readRunProperties(el, env);
-  notes.push(...run.notes);
-  return Object.keys(run.options).length === 0 ? null : run.options;
-};
 
 const to = <K extends keyof StyleOptions>(key: K, read: ValueReader<NonNullable<Draft<StyleOptions>[K]>>) =>
   mapTo<StyleOptions, K>(key, read);
@@ -98,7 +90,7 @@ const COMMON_FATES: FateTable<StyleOptions> = {
   "w:personalCompose": noOption("docx.js has no personalCompose option"),
   "w:personalReply": noOption("docx.js has no personalReply option"),
   "w:rsid": { fate: "ignored" },
-  "w:rPr": to("run", readRun),
+  "w:rPr": to("run", readRunOption),
   "w:tblPr": noOption(NOT_A_TABLE_STYLE),
   "w:trPr": noOption(NOT_A_TABLE_STYLE),
   "w:tcPr": noOption(NOT_A_TABLE_STYLE),
@@ -111,10 +103,6 @@ const CHARACTER_STYLE_FATES: FateTable<StyleOptions> = {
   ...COMMON_FATES,
   "w:pPr": noOption("a character style has no paragraph properties"),
 };
-
-function hasRelationship(el: XmlElement): boolean {
-  return Object.keys(el.attributes).some((name) => name.startsWith("r:")) || elementsOf(el).some(hasRelationship);
-}
 
 function rawBecause(style: XmlElement, type: string): RawBecause | null {
   if (type === "table" || type === "numbering") return type;
@@ -165,7 +153,6 @@ export type PreviewStyle = {
     readonly basedOn?: string;
     readonly paragraph?: Omit<ParagraphOptions, "style">;
     readonly run?: RunOptions;
-    readonly table?: TableOptions;
   };
 };
 
@@ -187,9 +174,7 @@ export function readStyleForPreview(style: XmlElement, env: CodecEnv): PreviewSt
   const pPr = childNamed(style, "w:pPr");
   const paragraph = pPr === null ? null : readStyleParagraph(pPr, env, notes).paragraph;
   const rPr = childNamed(style, "w:rPr");
-  const run = rPr === null ? null : readRun(rPr, env, notes);
-  const tblPr = childNamed(style, "w:tblPr");
-  const table = tblPr === null ? null : readTableProperties({ name: "w:tbl", attributes: {}, children: [tblPr] }, env).options;
+  const run = rPr === null ? null : readRunOption(rPr, env, notes);
   const isDefault = attrOf(style, "w:default");
   return {
     id,
@@ -199,7 +184,6 @@ export function readStyleForPreview(style: XmlElement, env: CodecEnv): PreviewSt
       ...(basedOn === null ? {} : { basedOn }),
       ...(paragraph === null ? {} : { paragraph }),
       ...(run === null ? {} : { run }),
-      ...(table === null ? {} : { table }),
     },
   };
 }
@@ -214,7 +198,7 @@ const DOC_DEFAULTS_FATES: FateTable<docx.IDocumentDefaultsOptions> = {
     fate: "mapped",
     read: (el, out, env, notes) => {
       const rPr = childNamed(el, "w:rPr");
-      const run = rPr === null ? null : readRun(rPr, env, notes);
+      const run = rPr === null ? null : readRunOption(rPr, env, notes);
       if (run !== null) out.run = run;
     },
   },

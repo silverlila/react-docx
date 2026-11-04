@@ -38,6 +38,7 @@ import { readRunProperties, type RunOptions } from "../ooxml/run";
 import { readCellProperties, readRowProperties, readTableProperties } from "../ooxml/table";
 import { PAGE_NUMBER_VALUES, RAW_XML_ROOTS } from "../schema/docx-facts";
 import type { AuthorNode } from "../tree/author";
+import { mergeStrings } from "../tree/canonical";
 import { xmlRoots } from "../tree/xml-roots";
 import { MOVE_RANGES, isChange, isDeletion, trackedRuns } from "./changes";
 import type { ReadContext } from "./context";
@@ -866,16 +867,6 @@ function breakPieces(run: XmlElement, el: XmlElement, scope: InlineScope): Piece
 }
 
 // Grouping pieces into runs
-
-function mergeStrings(children: Children): (AuthorNode | string)[] {
-  const merged: (AuthorNode | string)[] = [];
-  for (const child of children) {
-    const last = merged[merged.length - 1];
-    if (typeof child === "string" && typeof last === "string") merged[merged.length - 1] = last + child;
-    else merged.push(child);
-  }
-  return merged;
-}
 
 /** One TextRun, split around any text canonicalize would read as a PageNumber value. */
 function textRuns(props: RunOptions, children: Children): AuthorNode[] {

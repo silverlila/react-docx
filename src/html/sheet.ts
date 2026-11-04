@@ -16,7 +16,6 @@ import type * as docx from "docx";
 import type { CodecEnv } from "../ooxml/codec";
 import type { RunOptions } from "../ooxml/run";
 import { readStyleForPreview } from "../ooxml/style";
-import type { TableOptions } from "../ooxml/table";
 import { parseXml } from "../read/xml";
 import { DEFAULT_STYLE_SLOTS } from "../schema/docx-facts";
 import type { StylesProps } from "../schema/elements";
@@ -30,7 +29,6 @@ export type SheetStyle = {
   readonly basedOn?: string;
   readonly paragraph?: SheetParagraph;
   readonly run?: RunOptions;
-  readonly table?: TableOptions;
 };
 
 export type EffectiveSheet = {

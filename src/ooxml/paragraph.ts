@@ -27,15 +27,19 @@ import {
   stringVal,
   wholeNumberAt,
   wholeNumberVal,
+  ALIGNMENTS,
+  HEIGHT_RULES,
+  noOption,
   type CodecEnv,
   type CodecResult,
   type Draft,
   type Fate,
   type FateTable,
   type Note,
+  type ValueOf,
   type ValueReader,
 } from "./codec";
-import { readRunProperties, type RunOptions } from "./run";
+import { readRunOption } from "./run";
 
 export type ParagraphOptions = Omit<docx.IParagraphOptions, "children" | "text" | "heading" | "numbering" | "bullet">;
 
@@ -44,7 +48,6 @@ export type ParagraphRead = CodecResult<ParagraphOptions> & {
   readonly sectPr: XmlElement | null;
 };
 
-type ValueOf<T> = T[keyof T];
 type ParagraphFlag =
   | "keepNext"
   | "keepLines"
@@ -59,20 +62,6 @@ type FrameBase = Omit<docx.IXYFrameOptions, "type" | "position">;
 
 const WRITTEN_ONLY_WHEN_ON: readonly ParagraphFlag[] = ["pageBreakBefore", "overflowPunctuation"];
 
-const ALIGNMENTS: readonly ValueOf<typeof docx.AlignmentType>[] = [
-  "start",
-  "center",
-  "end",
-  "both",
-  "mediumKashida",
-  "distribute",
-  "numTab",
-  "highKashida",
-  "lowKashida",
-  "thaiDistribute",
-  "left",
-  "right",
-];
 
 const TAB_STOP_TYPES: readonly ValueOf<typeof docx.TabStopType>[] = [
   "left",
@@ -93,7 +82,6 @@ const LINE_RULES: readonly ValueOf<typeof docx.LineRuleType>[] = ["atLeast", "ex
 const FRAME_ANCHORS: readonly ValueOf<typeof docx.FrameAnchorType>[] = ["margin", "page", "text"];
 const FRAME_WRAPS: readonly ValueOf<typeof docx.FrameWrap>[] = ["around", "auto", "none", "notBeside", "through", "tight"];
 const DROP_CAPS: readonly ValueOf<typeof docx.DropCapType>[] = ["none", "drop", "margin"];
-const HEIGHT_RULES: readonly ValueOf<typeof docx.HeightRule>[] = ["auto", "atLeast", "exact"];
 const HORIZONTAL_ALIGNS: readonly ValueOf<typeof docx.HorizontalPositionAlign>[] = [
   "center",
   "inside",
@@ -117,7 +105,6 @@ const offIsWritable = (key: ParagraphFlag): boolean =>
 
 const flag = (key: ParagraphFlag) => to(key, onOff(offIsWritable(key)));
 
-const noOption = (why: string) => ({ fate: "dropped", why }) as const;
 
 /** w:numPr and w:sectPr are not options: readParagraphProperties returns them beside the options. */
 const RETURNED_BESIDE: Fate<ParagraphOptions> = { fate: "mapped", read: () => undefined };
@@ -256,13 +243,6 @@ const readFrame: ValueReader<docx.IFrameOptions> = (el, _env, notes) => {
   return null;
 };
 
-/** The paragraph mark's run properties. */
-const readMarkRun: ValueReader<RunOptions> = (el, env, notes) => {
-  const run = readRunProperties(el, env);
-  notes.push(...run.notes);
-  return Object.keys(run.options).length === 0 ? null : run.options;
-};
-
 export const PPR_FATES: FateTable<ParagraphOptions> = {
   "w:pStyle": to("style", stringVal),
   "w:keepNext": flag("keepNext"),
@@ -295,7 +275,7 @@ export const PPR_FATES: FateTable<ParagraphOptions> = {
   "w:outlineLvl": to("outlineLevel", wholeNumberVal),
   "w:divId": noOption("docx.js has no divId option"),
   "w:cnfStyle": { fate: "ignored" },
-  "w:rPr": to("run", readMarkRun),
+  "w:rPr": to("run", readRunOption),
   "w:sectPr": RETURNED_BESIDE,
   "w:pPrChange": noOption("docx.js cannot write tracked paragraph formatting"),
 };

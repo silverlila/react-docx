@@ -30,12 +30,16 @@ import {
   stringVal,
   wholeNumberAt,
   wholeNumberVal,
+  HEIGHT_RULES,
+  isUniversalMeasure,
+  noOption,
   type CodecEnv,
   type CodecResult,
   type Draft,
   type Fate,
   type FateTable,
   type Note,
+  type ValueOf,
   type ValueReader,
 } from "./codec";
 
@@ -43,7 +47,6 @@ export type TableOptions = Omit<docx.ITableOptions, "rows">;
 export type RowOptions = Omit<docx.ITableRowOptions, "children">;
 export type CellOptions = Omit<docx.ITableCellOptions, "children">;
 
-type ValueOf<T> = T[keyof T];
 type WidthType = ValueOf<typeof docx.WidthType>;
 type Measure = docx.ITableWidthProperties["size"];
 type CellMargins = NonNullable<TableOptions["margins"]>;
@@ -70,19 +73,14 @@ const VERTICAL_POSITIONS: readonly ValueOf<typeof docx.RelativeVerticalPosition>
   "top",
 ];
 const OVERLAPS: readonly ValueOf<typeof docx.OverlapType>[] = ["never", "overlap"];
-const HEIGHT_RULES: readonly ValueOf<typeof docx.HeightRule>[] = ["auto", "atLeast", "exact"];
 const VERTICAL_MERGES: readonly ValueOf<typeof docx.VerticalMergeType>[] = ["continue", "restart"];
 const CELL_VERTICAL_ALIGNS: readonly NonNullable<CellOptions["verticalAlign"]>[] = ["top", "center", "bottom"];
 const TEXT_DIRECTIONS: readonly ValueOf<typeof docx.TextDirection>[] = ["btLr", "lrTb", "tbRl"];
 
 const WHOLE_NUMBER = /^-?[0-9]+$/;
 const PERCENT = /^-?[0-9]+(\.[0-9]+)?%$/;
-const UNIVERSAL_MEASURE = /^-?[0-9]+(\.[0-9]+)?(mm|cm|in|pt|pc|pi)$/;
 const FIFTIETHS_PER_PERCENT = 50;
 
-const isUniversalMeasure = (value: string): value is docx.UniversalMeasure => UNIVERSAL_MEASURE.test(value);
-
-const noOption = (why: string) => ({ fate: "dropped", why }) as const;
 
 /** docx.js's twipsMeasureValue throws on a negative number, so one is dropped here instead. */
 export function twipsAt(el: XmlElement, attribute: string, notes: Note[]): number | null {
