@@ -20,7 +20,7 @@ import { readCellProperties, readRowProperties, readTableProperties } from "../o
 import { attrOf, childNamed, elementsOf, parseXmlRoots, textOf, type XmlElement } from "../ooxml/xml";
 import { pageFieldOf } from "../read/fields";
 import { SYMBOL_CHAR } from "../schema/docx-facts";
-import type { ChildKind, Node } from "../schema/elements";
+import type { ChildKind, Kind, Node, Props } from "../schema/elements";
 
 type BlockNode = Node<"Paragraph" | "Table">;
 type InlineNode = Node<ChildKind<"Paragraph">>;
@@ -39,8 +39,8 @@ type Walk = { readonly fields: Field[] };
 
 const WRAPPERS = new Set(["w:sdt", "w:smartTag", "w:customXml", "w:fldSimple", "w:ins", "w:moveTo"]);
 
-const node = <T extends string>(type: T, props: object, children: readonly unknown[] = []) =>
-  ({ type, props, children }) as never;
+const node = <K extends Kind>(type: K, props: Props<K>, children: Node<K>["children"] = []): Node<K> =>
+  ({ type, props, children }) as Node<K>;
 
 function wrapped(el: XmlElement): readonly XmlElement[] {
   return el.name === "w:sdt" ? elementsOf(childNamed(el, "w:sdtContent")) : elementsOf(el);
