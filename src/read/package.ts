@@ -14,6 +14,7 @@
 
 import { strFromU8, unzipSync } from "fflate";
 import type { Theme, ThemeColors, ThemeFonts, ThemeFontSet } from "../ooxml/codec";
+import { isOwnKey, own } from "../schema/own";
 import { attrOf, childNamed, elementsOf, parseXml, textOf, type XmlElement } from "../ooxml/xml";
 
 export class NotADocxError extends Error {
@@ -140,10 +141,9 @@ function readCore(root: XmlElement | null): CoreProperties {
 
 export function openPackage(bytes: Uint8Array): OpcPackage {
   const files = unzip(bytes);
-  if (!Object.prototype.hasOwnProperty.call(files, CONTENT_TYPES)) throw new NotADocxError(`The zip has no ${CONTENT_TYPES}.`);
+  if (!isOwnKey(files, CONTENT_TYPES)) throw new NotADocxError(`The zip has no ${CONTENT_TYPES}.`);
 
-  const fileAt = (path: string): Uint8Array | null =>
-    Object.prototype.hasOwnProperty.call(files, path) ? files[path] : null;
+  const fileAt = (path: string): Uint8Array | null => own(files, path) ?? null;
   const parsed = new Map<string, XmlElement | null>();
   const part = (path: string): XmlElement | null => {
     if (!parsed.has(path)) {

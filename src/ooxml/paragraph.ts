@@ -27,12 +27,12 @@ import {
   wholeNumberAt,
   wholeNumberVal,
   ALIGNMENTS,
+  HANDLED_BESIDE,
   HEIGHT_RULES,
   noOption,
   type CodecEnv,
   type CodecResult,
   type Draft,
-  type Fate,
   type FateTable,
   type Note,
   type ValueOf,
@@ -103,9 +103,6 @@ const offIsWritable = (key: ParagraphFlag): boolean => !WRITTEN_ONLY_WHEN_ON.inc
 
 const flag = (key: ParagraphFlag) => to(key, onOff(offIsWritable(key)));
 
-
-/** w:numPr and w:sectPr are not options: readParagraphProperties returns them beside the options. */
-const RETURNED_BESIDE: Fate<ParagraphOptions> = { fate: "mapped", read: () => undefined };
 
 const side = (key: keyof docx.IBordersOptions) => mapTo<docx.IBordersOptions, typeof key>(key, readBorder);
 
@@ -248,7 +245,7 @@ export const PPR_FATES: FateTable<ParagraphOptions> = {
   "w:pageBreakBefore": flag("pageBreakBefore"),
   "w:framePr": to("frame", readFrame),
   "w:widowControl": flag("widowControl"),
-  "w:numPr": RETURNED_BESIDE,
+  "w:numPr": HANDLED_BESIDE,
   "w:suppressLineNumbers": flag("suppressLineNumbers"),
   "w:pBdr": to("border", (el, env, notes) => readBorders(el, env, notes) ?? null),
   "w:shd": to("shading", readShading),
@@ -274,7 +271,7 @@ export const PPR_FATES: FateTable<ParagraphOptions> = {
   "w:divId": noOption("docx.js has no divId option"),
   "w:cnfStyle": { fate: "ignored" },
   "w:rPr": to("run", readRunOption),
-  "w:sectPr": RETURNED_BESIDE,
+  "w:sectPr": HANDLED_BESIDE,
   "w:pPrChange": noOption("docx.js cannot write tracked paragraph formatting"),
 };
 

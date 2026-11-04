@@ -15,8 +15,9 @@
  *    docx.js's defaults (2612 / 2610 in MS Gothic) are left out, as an author would. */
 
 import type * as docx from "docx";
-import { dropped, isOnValue, type Note } from "../ooxml/codec";
+import { dropped, isOnValue, type Mutable, type Note } from "../ooxml/codec";
 import { PAGE_NUMBER_VALUES } from "../schema/docx-facts";
+import { isOwnKey } from "../schema/own";
 import type { AuthorNode } from "../tree/author";
 import type { ReadContext } from "./context";
 import { attrOf, childNamed, elementsOf, textOf, type XmlElement } from "../ooxml/xml";
@@ -38,7 +39,6 @@ export type SimpleFieldRead =
   | { readonly kind: "node"; readonly node: AuthorNode }
   | { readonly kind: "other" };
 
-type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 type TocOptions = docx.ITableOfContentsOptions;
 type KeysOfType<T, V> = { [K in keyof T]-?: NonNullable<T[K]> extends V ? K : never }[keyof T];
 
@@ -59,13 +59,10 @@ const SYMBOL_HEX = /^[0-9A-Fa-f]{4}$/;
 
 const node = (type: string, props: Readonly<Record<string, unknown>> = {}): AuthorNode => ({ type, props, children: [] });
 
-const isKeyOf = <T extends object>(record: T, key: string): key is Extract<keyof T, string> =>
-  Object.prototype.hasOwnProperty.call(record, key);
-
 export function pageFieldOf(instruction: string): PageField | null {
   const [first = "", ...switches] = instruction.trim().split(/\s+/);
   const key = first.toUpperCase();
-  if (!isKeyOf(PAGE_FIELDS, key)) return null;
+  if (!isOwnKey(PAGE_FIELDS, key)) return null;
   const rest = switches.join(" ");
   return rest === "" || rest.toUpperCase() === MERGEFORMAT ? PAGE_FIELDS[key] : null;
 }
@@ -299,9 +296,9 @@ function tocOptions(instruction: string): TocOptions | null {
     const [, name, value] = match;
     if (seen.has(name)) return null;
     seen.add(name);
-    if (isKeyOf(TOC_FLAG_SWITCHES, name) && value === undefined) {
+    if (isOwnKey(TOC_FLAG_SWITCHES, name) && value === undefined) {
       options[TOC_FLAG_SWITCHES[name]] = true;
-    } else if (isKeyOf(TOC_TEXT_SWITCHES, name) && value) {
+    } else if (isOwnKey(TOC_TEXT_SWITCHES, name) && value) {
       options[TOC_TEXT_SWITCHES[name]] = value;
     } else if (name === "t" && value) {
       const styles = stylesWithLevels(value);

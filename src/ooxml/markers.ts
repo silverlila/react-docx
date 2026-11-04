@@ -10,6 +10,7 @@
  *    decimal; `decimalFormats` tells the caller which, so it can report them. */
 
 import type * as docx from "docx";
+import { isOwnKey } from "../schema/own";
 
 /** Running counts: `${reference}:${instance}` → the count per level. */
 export type Counters = Map<string, number[]>;
@@ -70,11 +71,8 @@ const NUMBER_FORMATS: Readonly<Record<string, (n: number) => string>> = {
   none: () => "",
 };
 
-const hasNumberFormat = (format: string): boolean =>
-  Object.prototype.hasOwnProperty.call(NUMBER_FORMATS, format);
-
 export function formatNumber(n: number, format: string): string {
-  return hasNumberFormat(format) ? NUMBER_FORMATS[format](n) : String(n);
+  return isOwnKey(NUMBER_FORMATS, format) ? NUMBER_FORMATS[format](n) : String(n);
 }
 
 export const levelOf = (levels: readonly docx.ILevelsOptions[], level: number): docx.ILevelsOptions | undefined =>
@@ -86,7 +84,7 @@ export function decimalFormats(levels: readonly docx.ILevelsOptions[], level: nu
   if (own === undefined || own.format === "bullet") return [];
   return [...(own.text ?? "").matchAll(LEVEL_NUMBER)]
     .map(([, n]) => levelOf(levels, Number(n) - 1)?.format ?? "decimal")
-    .filter((format) => !hasNumberFormat(format));
+    .filter((format) => !isOwnKey(NUMBER_FORMATS, format));
 }
 
 /** Advances the counter for (key, level), resets deeper levels, and renders the level's lvlText. */

@@ -8,6 +8,7 @@
  *  - A deleted run's w:delText and w:delInstrText are read as w:t and w:instrText, so the run walk reads
  *    deleted text and deleted page fields as it reads live ones. */
 
+import { isOwnKey } from "../schema/own";
 import type { ReadContext } from "./context";
 import { attrOf, elementsOf, type XmlElement } from "../ooxml/xml";
 
@@ -37,13 +38,13 @@ export const MOVE_RANGES: ReadonlySet<string> = new Set([
 
 const DELETED_AS_LIVE: Readonly<Record<string, string>> = { "w:delText": "w:t", "w:delInstrText": "w:instrText" };
 
-export const isChange = (name: string): boolean => Object.prototype.hasOwnProperty.call(CHANGES, name);
+export const isChange = (name: string): boolean => isOwnKey(CHANGES, name);
 
 export const isDeletion = (name: string): boolean => isChange(name) && CHANGES[name].kind === "DeletedTextRun";
 
 function asLive(run: XmlElement): XmlElement {
   const children = run.children.map((child) =>
-    typeof child !== "string" && Object.prototype.hasOwnProperty.call(DELETED_AS_LIVE, child.name)
+    typeof child !== "string" && isOwnKey(DELETED_AS_LIVE, child.name)
       ? { ...child, name: DELETED_AS_LIVE[child.name] }
       : child
   );
@@ -59,7 +60,7 @@ export function trackedRuns(el: XmlElement, ctx: ReadContext): TrackedRuns | nul
   const author = attrOf(el, "w:author");
   const date = attrOf(el, "w:date");
   const props = {
-    id: ctx.ordinals.next("change", attrOf(el, "w:id") ?? ""),
+    id: ctx.ordinals("change", attrOf(el, "w:id") ?? ""),
     ...(author === null ? {} : { author }),
     ...(date === null ? {} : { date }),
   };

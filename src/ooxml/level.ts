@@ -19,6 +19,7 @@ import {
   wholeNumberAt,
   wholeNumberVal,
   ALIGNMENTS,
+  NUMBER_FORMATS,
   noOption,
   type CodecEnv,
   type CodecResult,
@@ -29,7 +30,6 @@ import {
   type ValueReader,
 } from "./codec";
 import { readRunProperties } from "./run";
-import { NUMBER_FORMATS } from "./section";
 import { dropNumbering, readStyleParagraph } from "./style";
 
 type LevelOptions = Omit<docx.ILevelsOptions, "level">;

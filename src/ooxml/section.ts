@@ -18,7 +18,10 @@ import {
   oneOfVal,
   onOff,
   readBorder,
+  twipsAt,
   wholeNumberAt,
+  HANDLED_BESIDE,
+  NUMBER_FORMATS,
   noOption,
   type CodecEnv,
   type CodecResult,
@@ -29,7 +32,6 @@ import {
   type ValueOf,
   type ValueReader,
 } from "./codec";
-import { twipsAt } from "./table";
 
 type SectionProperties = docx.ISectionPropertiesOptions;
 type Page = NonNullable<SectionProperties["page"]>;
@@ -76,72 +78,6 @@ const SECTION_TYPES: readonly ValueOf<typeof docx.SectionType>[] = [
   "oddPage",
 ];
 const REFERENCE_TYPES: readonly HeaderFooterReference["type"][] = ["default", "first", "even"];
-
-/** w:pgNumType's w:fmt: docx.js's NumberFormat. */
-export const NUMBER_FORMATS: readonly ValueOf<typeof docx.NumberFormat>[] = [
-  "decimal",
-  "upperRoman",
-  "lowerRoman",
-  "upperLetter",
-  "lowerLetter",
-  "ordinal",
-  "cardinalText",
-  "ordinalText",
-  "hex",
-  "chicago",
-  "ideographDigital",
-  "japaneseCounting",
-  "aiueo",
-  "iroha",
-  "decimalFullWidth",
-  "decimalHalfWidth",
-  "japaneseLegal",
-  "japaneseDigitalTenThousand",
-  "decimalEnclosedCircle",
-  "decimalFullWidth2",
-  "aiueoFullWidth",
-  "irohaFullWidth",
-  "decimalZero",
-  "bullet",
-  "ganada",
-  "chosung",
-  "decimalEnclosedFullstop",
-  "decimalEnclosedParen",
-  "decimalEnclosedCircleChinese",
-  "ideographEnclosedCircle",
-  "ideographTraditional",
-  "ideographZodiac",
-  "ideographZodiacTraditional",
-  "taiwaneseCounting",
-  "ideographLegalTraditional",
-  "taiwaneseCountingThousand",
-  "taiwaneseDigital",
-  "chineseCounting",
-  "chineseLegalSimplified",
-  "chineseCountingThousand",
-  "koreanDigital",
-  "koreanCounting",
-  "koreanLegal",
-  "koreanDigital2",
-  "vietnameseCounting",
-  "russianLower",
-  "russianUpper",
-  "none",
-  "numberInDash",
-  "hebrew1",
-  "hebrew2",
-  "arabicAlpha",
-  "arabicAbjad",
-  "hindiVowels",
-  "hindiConsonants",
-  "hindiNumbers",
-  "hindiCounting",
-  "thaiLetters",
-  "thaiNumbers",
-  "thaiCounting",
-  "bahtText",
-  "dollarText",
-];
 
 
 const isEmpty = (options: object): boolean => Object.keys(options).length === 0;
@@ -268,12 +204,9 @@ const readColumns: ValueReader<docx.IColumnsAttributes> = (el, _env, notes) => {
   return column;
 };
 
-/** Read beside the options, into SectionRead.references. */
-const RETURNED_BESIDE: Fate<SectionProperties> = { fate: "mapped", read: () => undefined };
-
 export const SECTPR_FATES: FateTable<SectionProperties> = {
-  "w:headerReference": RETURNED_BESIDE,
-  "w:footerReference": RETURNED_BESIDE,
+  "w:headerReference": HANDLED_BESIDE,
+  "w:footerReference": HANDLED_BESIDE,
   "w:footnotePr": noOption("docx.js has no section footnote properties option"),
   "w:endnotePr": noOption("docx.js cannot write endnotes"),
   "w:type": to("type", oneOfVal(SECTION_TYPES)),

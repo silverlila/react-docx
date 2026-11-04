@@ -15,6 +15,7 @@
  *  - Codecs import docx only as types, because the HTML bundle uses them (decision 15). */
 
 import type * as docx from "docx";
+import { own } from "../schema/own";
 import { attrOf, elementsOf, isOn, type XmlElement } from "./xml";
 
 export type ThemeFontSet = {
@@ -40,7 +41,7 @@ export type Note = {
 
 export type CodecResult<T> = { readonly options: T; readonly notes: readonly Note[] };
 
-type Mutable<T> = { -readonly [K in keyof T]: T[K] };
+export type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 
 /** The options object a codec builds before returning it as T. */
 export type Draft<T> = Partial<Mutable<T>>;
@@ -72,6 +73,9 @@ export const dropped = (element: string, detail: string): Note => ({ fate: "drop
 
 export const noOption = (why: string) => ({ fate: "dropped", why }) as const;
 
+/** A child the caller reads itself, beside applyFates: mapped, so it gets no note, but read into nothing here. */
+export const HANDLED_BESIDE = { fate: "mapped", read: () => undefined } as const;
+
 const UNIVERSAL_MEASURE = /^-?[0-9]+(\.[0-9]+)?(mm|cm|in|pt|pc|pi)$/;
 export const isUniversalMeasure = (value: string): value is docx.UniversalMeasure => UNIVERSAL_MEASURE.test(value);
 
@@ -92,6 +96,72 @@ export const ALIGNMENTS: readonly ValueOf<typeof docx.AlignmentType>[] = [
 
 export const HEIGHT_RULES: readonly ValueOf<typeof docx.HeightRule>[] = ["auto", "atLeast", "exact"];
 
+/** docx.js's NumberFormat: w:pgNumType's w:fmt, and a level's w:numFmt. */
+export const NUMBER_FORMATS: readonly ValueOf<typeof docx.NumberFormat>[] = [
+  "decimal",
+  "upperRoman",
+  "lowerRoman",
+  "upperLetter",
+  "lowerLetter",
+  "ordinal",
+  "cardinalText",
+  "ordinalText",
+  "hex",
+  "chicago",
+  "ideographDigital",
+  "japaneseCounting",
+  "aiueo",
+  "iroha",
+  "decimalFullWidth",
+  "decimalHalfWidth",
+  "japaneseLegal",
+  "japaneseDigitalTenThousand",
+  "decimalEnclosedCircle",
+  "decimalFullWidth2",
+  "aiueoFullWidth",
+  "irohaFullWidth",
+  "decimalZero",
+  "bullet",
+  "ganada",
+  "chosung",
+  "decimalEnclosedFullstop",
+  "decimalEnclosedParen",
+  "decimalEnclosedCircleChinese",
+  "ideographEnclosedCircle",
+  "ideographTraditional",
+  "ideographZodiac",
+  "ideographZodiacTraditional",
+  "taiwaneseCounting",
+  "ideographLegalTraditional",
+  "taiwaneseCountingThousand",
+  "taiwaneseDigital",
+  "chineseCounting",
+  "chineseLegalSimplified",
+  "chineseCountingThousand",
+  "koreanDigital",
+  "koreanCounting",
+  "koreanLegal",
+  "koreanDigital2",
+  "vietnameseCounting",
+  "russianLower",
+  "russianUpper",
+  "none",
+  "numberInDash",
+  "hebrew1",
+  "hebrew2",
+  "arabicAlpha",
+  "arabicAbjad",
+  "hindiVowels",
+  "hindiConsonants",
+  "hindiNumbers",
+  "hindiCounting",
+  "thaiLetters",
+  "thaiNumbers",
+  "thaiCounting",
+  "bahtText",
+  "dollarText",
+];
+
 export const resolved = (element: string, detail: string): Note => ({ fate: "resolved", element, detail });
 
 export function applyFates<T>(
@@ -102,7 +172,7 @@ export function applyFates<T>(
   const options: Draft<T> = {};
   const notes: Note[] = [];
   for (const child of elementsOf(el)) {
-    const fate = Object.prototype.hasOwnProperty.call(table, child.name) ? table[child.name] : undefined;
+    const fate = own(table, child.name);
     if (fate === undefined) {
       notes.push(dropped(child.name, NO_OPTION));
       continue;
@@ -168,21 +238,29 @@ export function oneOfAt<V extends string>(el: XmlElement, attribute: string, val
   return null;
 }
 
-function requiredVal(el: XmlElement, notes: Note[]): string | null {
-  const value = attrOf(el, "w:val");
-  if (value === null) notes.push(dropped(el.name, "it has no w:val"));
+/** docx.js's twipsMeasureValue throws on a negative number, so one is dropped here instead. */
+export function twipsAt(el: XmlElement, attribute: string, notes: Note[]): number | null {
+  const value = wholeNumberAt(el, attribute, notes);
+  if (value === null || value >= 0) return value;
+  notes.push(dropped(el.name, `${attribute}="${value}" is negative, and docx.js writes only positive twips here`));
+  return null;
+}
+
+export function requiredAttr(el: XmlElement, attribute: string, notes: Note[]): string | null {
+  const value = attrOf(el, attribute);
+  if (value === null) notes.push(dropped(el.name, `it has no ${attribute}`));
   return value;
 }
 
-export const stringVal: ValueReader<string> = (el, _env, notes) => requiredVal(el, notes);
+export const stringVal: ValueReader<string> = (el, _env, notes) => requiredAttr(el, "w:val", notes);
 
 export const wholeNumberVal: ValueReader<number> = (el, _env, notes) =>
-  requiredVal(el, notes) === null ? null : wholeNumberAt(el, "w:val", notes);
+  requiredAttr(el, "w:val", notes) === null ? null : wholeNumberAt(el, "w:val", notes);
 
 export const oneOfVal =
   <V extends string>(values: readonly V[]): ValueReader<V> =>
   (el, _env, notes) =>
-    requiredVal(el, notes) === null ? null : oneOfAt(el, "w:val", values, notes);
+    requiredAttr(el, "w:val", notes) === null ? null : oneOfAt(el, "w:val", values, notes);
 
 /** themeColor → clrScheme key. */
 export const THEME_COLOR_KEYS: Readonly<Record<string, string>> = {
@@ -241,9 +319,9 @@ export function colorOf(el: XmlElement, env: CodecEnv, notes: Note[], source: Co
   const { theme, tint, shade } = COLOR_SOURCES[source];
   const themeColor = attrOf(el, theme);
   if (themeColor !== null) {
-    const key = Object.prototype.hasOwnProperty.call(THEME_COLOR_KEYS, themeColor) ? THEME_COLOR_KEYS[themeColor] : null;
-    const base = key !== null && Object.prototype.hasOwnProperty.call(env.theme.colors, key) ? env.theme.colors[key] : null;
-    if (base !== null && HEX.test(base)) {
+    const key = own(THEME_COLOR_KEYS, themeColor);
+    const base = key === undefined ? undefined : own(env.theme.colors, key);
+    if (base !== undefined && HEX.test(base)) {
       const hex = themeHex(base, attrOf(el, tint), attrOf(el, shade));
       notes.push(resolved(el.name, `${theme}="${themeColor}" → ${hex}`));
       return hex;

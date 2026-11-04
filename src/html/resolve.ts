@@ -24,6 +24,7 @@ import { levelOf, markerText, type Counters } from "../ooxml/markers";
 import type { RunOptions } from "../ooxml/run";
 import type { TreePath } from "../read/diagnostics";
 import type { ChildKind, DocumentNode, Node } from "../schema/elements";
+import { own } from "../schema/own";
 import { xmlRoots } from "../tree/xml-roots";
 import { effectiveSheet, styleChain, type EffectiveSheet, type SheetParagraph } from "./sheet";
 
@@ -250,9 +251,6 @@ const IMAGE_MEDIA_TYPES: Readonly<Record<string, string>> = {
   svg: "image/svg+xml",
 };
 
-const lookup = <V>(table: Readonly<Record<string, V>>, key: string): V | undefined =>
-  Object.prototype.hasOwnProperty.call(table, key) ? table[key] : undefined;
-
 // ── Units ────────────────────────────────────────────────────────────────────────────────────────────
 
 /** A docx.js measure in points: a number in `perPoint` units (twips, half-points, …) or a universal
@@ -275,7 +273,7 @@ function shadingColor(shading: docx.IShadingAttributesProperties | undefined): s
 
 function computeBorder(border: docx.IBorderOptions | undefined): ComputedBorder | null {
   if (border === undefined) return null;
-  const style = lookup(BORDER_STYLES, border.style);
+  const style = own(BORDER_STYLES, border.style);
   if (style === null) return null;
   return {
     style: style ?? "solid",
@@ -343,7 +341,7 @@ function overParagraph(base: SheetParagraph, over: SheetParagraph | undefined): 
 function computeRun(run: RunOptions): ComputedRun {
   const font = fontSlots(run.font);
   const underline = run.underline === undefined ? null : run.underline.type ?? "single";
-  const highlight = run.highlight === undefined ? undefined : lookup(HIGHLIGHTS, run.highlight);
+  const highlight = run.highlight === undefined ? undefined : own(HIGHLIGHTS, run.highlight);
   return {
     // A single family, with no fallback list: a preview simplification.
     fontFamily: font.ascii ?? font.hAnsi ?? FALLBACK_RUN.font,
@@ -383,7 +381,7 @@ function computeParagraph(p: SheetParagraph, markRun: ComputedRun): ComputedPara
   const firstLine =
     indent.hanging !== undefined ? -pointsOf(indent.hanging, TWIPS_PER_PT) : pointsOf(indent.firstLine ?? 0, TWIPS_PER_PT);
   return {
-    align: (p.alignment === undefined ? undefined : lookup(ALIGNMENTS, p.alignment)) ?? "left",
+    align: (p.alignment === undefined ? undefined : own(ALIGNMENTS, p.alignment)) ?? "left",
     spaceBeforePt: (p.spacing?.before ?? 0) / TWIPS_PER_PT,
     spaceAfterPt: (p.spacing?.after ?? 0) / TWIPS_PER_PT,
     lineHeight: lineHeightOf(p.spacing),

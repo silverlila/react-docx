@@ -13,6 +13,7 @@
 
 import type { ChildNode } from "domhandler";
 import { parseDocument } from "htmlparser2";
+import { own } from "../schema/own";
 
 export type XmlElement = {
   readonly name: string;
@@ -90,7 +91,7 @@ export const childrenNamed = (el: XmlElement | null, name: string): XmlElement[]
   elementsOf(el).filter((child) => child.name === name);
 
 export const attrOf = (el: XmlElement | null, name: string): string | null =>
-  el !== null && Object.prototype.hasOwnProperty.call(el.attributes, name) ? el.attributes[name] : null;
+  el === null ? null : (own(el.attributes, name) ?? null);
 
 export const isOn = (el: XmlElement | null): boolean => el !== null && !OFF.has(attrOf(el, "w:val") ?? "true");
 

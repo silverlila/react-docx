@@ -18,6 +18,7 @@ import type * as docx from "docx";
 import { dropped, isOneOf, isOnValue, resolved, type Note } from "../ooxml/codec";
 import type { RunOptions } from "../ooxml/run";
 import type { ImageProps } from "../schema/elements";
+import { isOwnKey } from "../schema/own";
 import type { AuthorNode } from "../tree/author";
 import type { ReadContext } from "./context";
 import { styleDeclarations } from "./objects";
@@ -86,8 +87,6 @@ const PIC_PARTS = new Set(["pic:nvPicPr", "pic:blipFill", "pic:spPr"]);
 const BLIP_FILL_PARTS = new Set(["a:blip", "a:stretch", "a:srcRect"]);
 const DOC_PR_ATTRIBUTES = new Set(["id", "name", "descr", "title"]);
 
-const has = (record: object, key: string): boolean => Object.prototype.hasOwnProperty.call(record, key);
-
 const refused = (notes: readonly Note[], note: Note): DrawingRead => ({ kind: "refused", notes: [...notes, note] });
 
 /** A whole-number attribute, or null when absent or not whole. */
@@ -121,7 +120,7 @@ function rasterOf(relId: string | null, element: string, ctx: ReadContext, notes
   const part = mediaOf(relId, element, ctx, notes, media);
   if (part === null) return null;
   const extension = part.path.slice(part.path.lastIndexOf(".") + 1).toLowerCase();
-  if (!has(RASTER_TYPES, extension)) {
+  if (!isOwnKey(RASTER_TYPES, extension)) {
     notes.push(dropped(element, `${part.path}: docx.js writes only png, jpg, gif and bmp pictures`));
     return null;
   }
@@ -323,7 +322,7 @@ function checkContainer(container: XmlElement, outline: Outline | undefined, not
 export function parseDrawing(drawing: XmlElement, ctx: ReadContext): DrawingRead {
   const notes: Note[] = [];
   const [container, ...rest] = elementsOf(drawing);
-  if (container === undefined || !has(CONTAINER_PARTS, container.name) || rest.length > 0) {
+  if (container === undefined || !isOwnKey(CONTAINER_PARTS, container.name) || rest.length > 0) {
     return refused(notes, dropped(drawing.name, "it holds no single wp:inline or wp:anchor"));
   }
   const graphicData = childNamed(childNamed(container, "a:graphic"), "a:graphicData");

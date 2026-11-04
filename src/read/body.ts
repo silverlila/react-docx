@@ -37,6 +37,7 @@ import { readParagraphProperties, type ParagraphOptions, type ParagraphRead } fr
 import { readRunProperties, type RunOptions } from "../ooxml/run";
 import { readCellProperties, readRowProperties, readTableProperties } from "../ooxml/table";
 import { PAGE_NUMBER_VALUES, RAW_XML_ROOTS } from "../schema/docx-facts";
+import { isOwnKey, own } from "../schema/own";
 import type { AuthorNode } from "../tree/author";
 import { mergeStrings } from "../tree/canonical";
 import { xmlRoots } from "../tree/xml-roots";
@@ -177,7 +178,7 @@ function fallback(el: XmlElement, slot: Slot, ctx: ReadContext, rawAllowed = tru
     return { kind: "raw", node: rawXml(check.xml) };
   }
   const why = check === null ? "no tree kind maps it" : check.reason;
-  const unwrap = Object.prototype.hasOwnProperty.call(WRAPPED_CONTENT, el.name) ? WRAPPED_CONTENT[el.name] : null;
+  const unwrap = own(WRAPPED_CONTENT, el.name) ?? null;
   if (unwrap !== null) {
     ctx.report({ kind: "dropped", element: el.name, detail: `${why}; its content is read without it` });
     return { kind: "content", elements: unwrap(el) };
@@ -240,7 +241,7 @@ export function withoutGoBack(root: XmlElement, ctx: ReadContext): XmlElement {
 /** A bookmark start or end with its w:id moved past docx.js's own bookmark ids: the same source id in one
  *  part always gets the same new id, wherever its start and end are kept. */
 function renumberedBookmark(el: XmlElement, ctx: ReadContext): XmlElement {
-  const id = BOOKMARK_ID_BASE + ctx.ordinals.next("bookmark", `${ctx.part}#${attrOf(el, "w:id") ?? ""}`);
+  const id = BOOKMARK_ID_BASE + ctx.ordinals("bookmark", `${ctx.part}#${attrOf(el, "w:id") ?? ""}`);
   return { ...el, attributes: { ...el.attributes, "w:id": String(id) } };
 }
 
@@ -447,9 +448,7 @@ function readTableLevel(elements: readonly XmlElement[], ctx: BodyContext, level
       ctx.report({ kind: "dropped", element: el.name, detail: `a table's ${level.holds} cannot be RawXml; its content is read without it` });
       readTableLevel(WRAPPED_CONTENT[el.name](el), ctx, level, out);
     } else {
-      const detail = Object.prototype.hasOwnProperty.call(TABLE_DROPPED, el.name)
-        ? TABLE_DROPPED[el.name]
-        : `this level of a table holds only ${level.holds}`;
+      const detail = own(TABLE_DROPPED, el.name) ?? `this level of a table holds only ${level.holds}`;
       ctx.report({ kind: "dropped", element: el.name, detail });
     }
   }
@@ -783,8 +782,8 @@ function runFallbackPieces(run: XmlElement, el: XmlElement, scope: InlineScope):
 function atomPieces(run: XmlElement, el: XmlElement, scope: InlineScope): Piece[] {
   const { ctx } = scope;
   const content = (value: AuthorNode | string): Piece[] => [{ kind: "run", run, value }];
-  if (Object.prototype.hasOwnProperty.call(RUN_KINDS, el.name)) return content(node(RUN_KINDS[el.name]));
-  if (Object.prototype.hasOwnProperty.call(DROPPED_IN_RUN, el.name)) {
+  if (isOwnKey(RUN_KINDS, el.name)) return content(node(RUN_KINDS[el.name]));
+  if (isOwnKey(DROPPED_IN_RUN, el.name)) {
     ctx.report({ kind: "dropped", element: el.name, detail: DROPPED_IN_RUN[el.name] });
     return [];
   }

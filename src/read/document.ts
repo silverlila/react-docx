@@ -16,7 +16,7 @@
  *    the lists only a style uses come after the body's (decision 5). */
 
 import type * as docx from "docx";
-import { colorOf, wholeNumberAt, type Note } from "../ooxml/codec";
+import { colorOf, wholeNumberAt, type Mutable, type Note } from "../ooxml/codec";
 import { readSectionProperties } from "../ooxml/section";
 import type { AuthorNode } from "../tree/author";
 import { bodyContext, readBlocks, withoutGoBack, type BodyContext } from "./body";
@@ -27,7 +27,6 @@ import { NotADocxError } from "./package";
 import { readStylesPart } from "./styles";
 import { attrOf, childNamed, elementsOf, isOn, textOf, type XmlElement } from "../ooxml/xml";
 
-type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 type DocumentProps = Mutable<Omit<docx.IPropertiesOptions, "sections" | "styles">> & {
   styles?: ReturnType<typeof readStylesPart>;
 };

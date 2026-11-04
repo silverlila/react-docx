@@ -10,6 +10,7 @@
 
 import type * as docx from "docx";
 import { dropped, type Note } from "../ooxml/codec";
+import { own } from "../schema/own";
 import { attrOf, childNamed, childrenNamed, elementsOf, type XmlElement } from "../ooxml/xml";
 
 type ShapeStyle = NonNullable<ConstructorParameters<typeof docx.Textbox>[0]["style"]>;
@@ -110,9 +111,9 @@ export function textBoxStyle(box: TextBox, notes: Note[]): Readonly<Record<strin
   }
   const style: Record<string, StyleValue> = {};
   for (const [name, value] of styleDeclarations(attrOf(shape, "style") ?? "")) {
-    const entry = Object.prototype.hasOwnProperty.call(SHAPE_STYLE, name) ? SHAPE_STYLE[name] : null;
-    const read = entry === null ? null : entry[1](value);
-    if (entry === null || read === null) {
+    const entry = own(SHAPE_STYLE, name);
+    const read = entry === undefined ? null : entry[1](value);
+    if (entry === undefined || read === null) {
       notes.push(dropped("v:shape", `style ${name}:${value}: docx.js's text box style has no value for it`));
       continue;
     }

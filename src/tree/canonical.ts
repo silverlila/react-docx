@@ -21,7 +21,6 @@ import {
   OUTSIDE_BODY,
   isKind,
   type ChildKind,
-  type Content,
   type DocumentNode,
   type Kind,
 } from "../schema/elements";
@@ -52,12 +51,6 @@ const DATA_URL_PREFIX = /^data:[^,]*;base64,/;
 const STYLE_ID = /w:styleId="([^"]+)"/g;
 const COMMENT_MARKS: readonly Kind[] = ["CommentRangeStart", "CommentRangeEnd", "CommentReference"];
 const LOOSE_PARAGRAPH: AuthorNode = { type: "Paragraph", props: {}, children: [] };
-
-const RAW_XML_SLOT: { readonly [C in Content]?: Exclude<keyof typeof RAW_XML_ROOTS, "style"> } = {
-  block: "block",
-  inline: "inline",
-  run: "run",
-};
 
 const TEXT_PROP_CHILD: { readonly [K in Kind]?: (text: string) => Built } = {
   Paragraph: (text) => literalRun({}, text),
@@ -429,8 +422,8 @@ function assertFragment({ xml, label, allowedRoots, where }: Fragment, path: rea
 function assertRawXmlFits(parent: Parent, node: AuthorNode, path: readonly string[]): void {
   const { xml } = node.props;
   if (typeof xml !== "string") throw new TreeError(path, `RawXml xml must be a string, got ${typeof xml}`);
-  const slot = RAW_XML_SLOT[ELEMENTS[parent.kind].content];
-  if (slot === undefined) throw new TreeError(path, `<RawXml> is not allowed in <${parent.name}>`);
+  const slot = ELEMENTS[parent.kind].content;
+  if (slot !== "block" && slot !== "inline" && slot !== "run") throw new TreeError(path, `<RawXml> is not allowed in <${parent.name}>`);
   const allowedRoots = RAW_XML_ROOTS[slot];
   assertFragment({ xml, label: "RawXml", allowedRoots, where: `<${parent.name}>` }, path);
 }

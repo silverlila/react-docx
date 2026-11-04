@@ -1,6 +1,7 @@
 /** Computed formatting → React inline styles. Lengths are written in pt, colours as "#hex". */
 
 import type { CSSProperties } from "react";
+import { isOwnKey } from "../schema/own";
 import type { ComputedBorder, ComputedParagraph, ComputedRun } from "./resolve";
 
 /** docx.js underline types → the CSS line style closest to each. */
@@ -30,7 +31,7 @@ function textDecoration(r: ComputedRun): CSSProperties {
   const lines = [...(r.underline === null ? [] : ["underline"]), ...(r.strike || r.doubleStrike ? ["line-through"] : [])];
   if (lines.length === 0) return { textDecorationLine: "none" };
   const style =
-    r.underline !== null && Object.prototype.hasOwnProperty.call(UNDERLINE_STYLES, r.underline)
+    r.underline !== null && isOwnKey(UNDERLINE_STYLES, r.underline)
       ? UNDERLINE_STYLES[r.underline]
       : r.doubleStrike
         ? "double"

@@ -15,6 +15,7 @@ import type * as docx from "docx";
 import { applyFates, type FateTable, type Note } from "../ooxml/codec";
 import { readLevel } from "../ooxml/level";
 import { decimalFormats, levelOf, markerText, type Counters } from "../ooxml/markers";
+import { own } from "../schema/own";
 import { partOfType, type ReadContext } from "./context";
 import type { Ordinals } from "./ordinals";
 import { attrOf, childNamed, elementsOf, type XmlElement } from "../ooxml/xml";
@@ -100,7 +101,7 @@ export function numberingOption(
  *  two w:nums on one abstractNum with no override is open (00-context.md); if it does, this is the one
  *  function to change. */
 function instanceOf(ordinals: Ordinals, reference: string, numId: string): number {
-  return ordinals.next(`instance:${reference}`, numId) - 1;
+  return ordinals(`instance:${reference}`, numId) - 1;
 }
 
 /** The level-0 start override docx.js writes for a list with these levels. */
@@ -145,7 +146,7 @@ export function readNumberingPart(ctx: ReadContext): NumberingReader {
       }
       nums.set(numId, { abstractNumId, overrides: elementsOf(el).filter((child) => child.name === "w:lvlOverride") });
     } else {
-      const fate = Object.prototype.hasOwnProperty.call(OTHER_CHILDREN, el.name) ? OTHER_CHILDREN[el.name] : "dropped";
+      const fate = own(OTHER_CHILDREN, el.name) ?? "dropped";
       here.notes([{ fate, element: el.name, detail: "docx.js has no numbering option for it" }]);
     }
   }
@@ -173,7 +174,7 @@ export function readNumberingPart(ctx: ReadContext): NumberingReader {
     refOf(numId) {
       const list = listOf(numId);
       if (list === null) return null;
-      const reference = `list-${ctx.ordinals.next("abstractNum", list.num.abstractNumId)}`;
+      const reference = `list-${ctx.ordinals("abstractNum", list.num.abstractNumId)}`;
       used.set(reference, list.num.abstractNumId);
       if (!checked.has(numId)) {
         checked.add(numId);

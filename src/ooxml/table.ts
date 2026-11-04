@@ -26,9 +26,12 @@ import {
   onOff,
   readBorder,
   readShading,
+  requiredAttr,
   stringVal,
+  twipsAt,
   wholeNumberAt,
   wholeNumberVal,
+  HANDLED_BESIDE,
   HEIGHT_RULES,
   isUniversalMeasure,
   noOption,
@@ -81,24 +84,10 @@ const PERCENT = /^-?[0-9]+(\.[0-9]+)?%$/;
 const FIFTIETHS_PER_PERCENT = 50;
 
 
-/** docx.js's twipsMeasureValue throws on a negative number, so one is dropped here instead. */
-export function twipsAt(el: XmlElement, attribute: string, notes: Note[]): number | null {
-  const value = wholeNumberAt(el, attribute, notes);
-  if (value === null || value >= 0) return value;
-  notes.push(dropped(el.name, `${attribute}="${value}" is negative, and docx.js writes only positive twips here`));
-  return null;
-}
-
-function requiredAttribute(el: XmlElement, attribute: string, notes: Note[]): string | null {
-  const value = attrOf(el, attribute);
-  if (value === null) notes.push(dropped(el.name, `it has no ${attribute}`));
-  return value;
-}
-
 /** A w:w measure: a whole number (fiftieths of a percent when the type is pct), a percentage or a
  *  universal measure. */
 function measureAt(el: XmlElement, type: WidthType, notes: Note[]): Measure | null {
-  const value = requiredAttribute(el, "w:w", notes);
+  const value = requiredAttr(el, "w:w", notes);
   if (value === null) return null;
   if (PERCENT.test(value)) return `${Number(value.slice(0, -1))}%`;
   if (WHOLE_NUMBER.test(value)) return type === "pct" ? `${Number(value) / FIFTIETHS_PER_PERCENT}%` : Number(value);
@@ -237,13 +226,10 @@ function readOverlap(el: XmlElement | null, notes: Note[]): ValueOf<typeof docx.
 const to = <K extends keyof TableOptions>(key: K, read: ValueReader<NonNullable<Draft<TableOptions>[K]>>) =>
   mapTo<TableOptions, K>(key, read);
 
-/** Read after the other children, from w:tblPr, because it belongs to w:tblpPr's float. */
-const READ_AFTER: Fate<TableOptions> = { fate: "mapped", read: () => undefined };
-
 export const TBLPR_FATES: FateTable<TableOptions> = {
   "w:tblStyle": to("style", stringVal),
   "w:tblpPr": to("float", readFloat),
-  "w:tblOverlap": READ_AFTER,
+  "w:tblOverlap": HANDLED_BESIDE,
   "w:bidiVisual": to("visuallyRightToLeft", onOff(true)),
   "w:tblStyleRowBandSize": noOption("docx.js has no table-style band size option"),
   "w:tblStyleColBandSize": noOption("docx.js has no table-style band size option"),
@@ -277,7 +263,7 @@ function readGrid(tblGrid: XmlElement | null, notes: Note[]): number[] | null {
       notes.push(dropped(child.name, "docx.js writes only w:gridCol widths in a table grid"));
       continue;
     }
-    const width = requiredAttribute(child, "w:w", notes) === null ? null : twipsAt(child, "w:w", notes);
+    const width = requiredAttr(child, "w:w", notes) === null ? null : twipsAt(child, "w:w", notes);
     if (width === null) complete = false;
     else widths.push(width);
   }
@@ -306,7 +292,7 @@ const toRow = <K extends keyof RowOptions>(key: K, read: ValueReader<NonNullable
   mapTo<RowOptions, K>(key, read);
 
 const readHeight: ValueReader<NonNullable<RowOptions["height"]>> = (el, _env, notes) => {
-  if (requiredAttribute(el, "w:val", notes) === null) return null;
+  if (requiredAttr(el, "w:val", notes) === null) return null;
   const value = twipsAt(el, "w:val", notes);
   if (value === null) return null;
   const rule = attrOf(el, "w:hRule") === null ? "atLeast" : oneOfAt(el, "w:hRule", HEIGHT_RULES, notes);

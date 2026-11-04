@@ -20,11 +20,11 @@ import {
   onOff,
   stringVal,
   wholeNumberVal,
+  HANDLED_BESIDE,
   noOption,
   type CodecEnv,
   type CodecResult,
   type Draft,
-  type Fate,
   type FateTable,
   type Note,
   type ValueReader,
@@ -69,9 +69,6 @@ export function readStyleParagraph(pPr: XmlElement, env: CodecEnv, notes: Note[]
 const to = <K extends keyof StyleOptions>(key: K, read: ValueReader<NonNullable<Draft<StyleOptions>[K]>>) =>
   mapTo<StyleOptions, K>(key, read);
 
-/** Read beside the options by readStyle, because its w:numPr is returned on its own. */
-const READ_BESIDE: Fate<StyleOptions> = { fate: "mapped", read: () => undefined };
-
 const COMMON_FATES: FateTable<StyleOptions> = {
   "w:name": to("name", stringVal),
   "w:aliases": noOption("docx.js has no style aliases option"),
@@ -96,7 +93,7 @@ const COMMON_FATES: FateTable<StyleOptions> = {
   "w:tblStylePr": noOption(NOT_A_TABLE_STYLE),
 };
 
-const PARAGRAPH_STYLE_FATES: FateTable<StyleOptions> = { ...COMMON_FATES, "w:pPr": READ_BESIDE };
+const PARAGRAPH_STYLE_FATES: FateTable<StyleOptions> = { ...COMMON_FATES, "w:pPr": HANDLED_BESIDE };
 
 const CHARACTER_STYLE_FATES: FateTable<StyleOptions> = {
   ...COMMON_FATES,

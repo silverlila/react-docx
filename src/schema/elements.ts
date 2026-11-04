@@ -14,6 +14,7 @@
  *    Comment or Footnote (OUTSIDE_BODY) would never be written. */
 
 import type * as docx from "docx";
+import { isOwnKey } from "./own";
 
 type Spec<P> = {
   readonly docx: string | null;
@@ -244,8 +245,7 @@ export type Node<K extends Kind = Kind> = K extends Kind
   : never;
 export type DocumentNode = Node<"Document">;
 
-export const isKind = (type: string): type is Kind =>
-  Object.prototype.hasOwnProperty.call(ELEMENTS, type);
+export const isKind = (type: string): type is Kind => isOwnKey(ELEMENTS, type);
 
 export const OUTSIDE_BODY: readonly Kind[] = ["Header", "Footer", "Comment", "Footnote"];
 

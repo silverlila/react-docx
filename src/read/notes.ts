@@ -89,7 +89,7 @@ export function readNotesParts(ctx: ReadContext): NotesReader {
   }
   const comments = byId(ctx.readPart(commentsPart), "w:comment", ctx.within(commentsPart, []));
   const referenced = new Set<string>();
-  const commentOrdinal = (id: string): number => ctx.ordinals.next(COMMENT_SPACE, id) - 1;
+  const commentOrdinal = (id: string): number => ctx.ordinals(COMMENT_SPACE, id) - 1;
 
   return {
     footnotesPart,
