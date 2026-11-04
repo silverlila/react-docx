@@ -1,5 +1,5 @@
-/** paginate: resolved sections → the pages Word lays them out on, where that is known without measuring
- *  text.
+/** resolveDocument: a canonical tree → the pages Word lays it out on. resolveSections (resolve.ts) resolves
+ *  its sections; paginate breaks them into pages, where that is known without measuring text.
  *
  *  - A page starts at each authored page break, at a paragraph with pageBreakBefore, at each section that
  *    is not continuous, and at each page break Word recorded when it last laid the document out
@@ -31,6 +31,7 @@
 
 import { formatNumber } from "../ooxml/markers";
 import type { TreePath } from "../read/diagnostics";
+import type { DocumentNode } from "../schema/elements";
 import { NO_BREAKS, formatKey, parseKey, type MeasuredBreaks, type Split } from "./breaks";
 import type {
   PageGeometry,
@@ -40,7 +41,8 @@ import type {
   ResolvedInline,
   ResolvedRow,
   ResolvedSection,
-} from "./resolve";
+} from "./model";
+import { resolveSections } from "./resolve";
 
 /** columnStarts: the index in `blocks` where each column starts, when the document says where its columns
  *  break; null leaves a multi-column part to balance its columns. keys: each block's break key
@@ -548,4 +550,9 @@ export function paginate(
       footer: footers[draft.section - 1][type] ?? [],
     };
   });
+}
+
+/** The document as the pages Word lays it out on, with breaks found by measuring, if any. */
+export function resolveDocument(document: DocumentNode, measured?: MeasuredBreaks): readonly ResolvedPage[] {
+  return paginate(resolveSections(document), document.props.evenAndOddHeaderAndFooters ?? false, measured);
 }

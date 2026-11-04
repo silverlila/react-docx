@@ -16,13 +16,7 @@
  *    characters with the default stop as the paragraph's tab-size.
  *  - A span is the last one when it has no width: it stays inline, and its text wraps. */
 
-import type { ResolvedInline } from "./resolve";
-
-export type TabStop = {
-  readonly posPt: number;
-  readonly align: "left" | "center" | "right" | "decimal";
-  readonly leader: "none" | "dot" | "hyphen" | "underscore" | "heavy" | "middleDot";
-};
+import type { ResolvedInline, TabStop } from "./model";
 
 type Tab = Extract<ResolvedInline, { kind: "tab" }>;
 

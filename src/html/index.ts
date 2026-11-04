@@ -5,7 +5,7 @@
  *  document keeps. */
 
 export { DocxPreview, type DocxPreviewProps } from "./preview";
-export { resolveDocument, type ResolvedBlock, type ResolvedInline } from "./resolve";
-export type { ResolvedPage, ResolvedPart } from "./pages";
+export type { ResolvedBlock, ResolvedInline } from "./model";
+export { resolveDocument, type ResolvedPage, type ResolvedPart } from "./pages";
 export { renderToTree } from "../tree/render";
 export type { DocumentNode } from "../schema/elements";

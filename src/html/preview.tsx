@@ -25,20 +25,20 @@ import type { TreePath } from "../read/diagnostics";
 import type { DocumentNode } from "../schema/elements";
 import { NO_BREAKS, measureBreaks, type MeasuredBreaks } from "./breaks";
 import { borderCss, paragraphStyle, runStyle } from "./css";
-import type { ResolvedPage, ResolvedPart } from "./pages";
-import { hasTabs, tabLayout, type TabItem, type TabStop } from "./tabs";
-import {
-  resolveDocument,
-  type ComputedParagraph,
-  type FieldKind,
-  type PageGeometry,
-  type ResolvedFloat,
-  type ResolvedBlock,
-  type ResolvedCell,
-  type ResolvedFootnote,
-  type ResolvedInline,
-  type ResolvedMarker,
-} from "./resolve";
+import type {
+  ComputedParagraph,
+  FieldKind,
+  PageGeometry,
+  ResolvedFloat,
+  ResolvedBlock,
+  ResolvedCell,
+  ResolvedFootnote,
+  ResolvedInline,
+  ResolvedMarker,
+  TabStop,
+} from "./model";
+import { resolveDocument, type ResolvedPage, type ResolvedPart } from "./pages";
+import { hasTabs, tabLayout, type TabItem } from "./tabs";
 
 export type DocxPreviewProps = { readonly document: DocumentNode } & Omit<React.ComponentPropsWithoutRef<"div">, "children">;
 

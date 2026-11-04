@@ -11,7 +11,7 @@
 import type { CSSProperties } from "react";
 import { isOwnKey } from "../schema/own";
 import { fontFamilyCss, lineHeightOf } from "./fonts";
-import type { ComputedBorder, ComputedParagraph, ComputedRun } from "./resolve";
+import type { ComputedBorder, ComputedParagraph, ComputedRun } from "./model";
 
 const UNDERLINE_STYLES: Readonly<Record<string, CSSProperties["textDecorationStyle"]>> = {
   double: "double",
