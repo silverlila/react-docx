@@ -38,7 +38,7 @@ import { withRenamedStyles } from "../ooxml/style";
 import { readCellProperties, readRowProperties, readTableProperties } from "../ooxml/table";
 import { PAGE_NUMBER_VALUES, RAW_XML_ROOTS, SYMBOL_CHAR } from "../schema/docx-facts";
 import { isOwnKey, own } from "../schema/own";
-import type { AuthorNode } from "../tree/author";
+import { node, type AuthorNode } from "../tree/author";
 import { mergeStrings } from "../tree/canonical";
 import { xmlRoots } from "../tree/xml-roots";
 import { MOVE_RANGES, isChange, isDeletion, trackedRuns } from "./changes";
@@ -127,12 +127,6 @@ const WRAPPED_CONTENT: Readonly<Record<string, (el: XmlElement) => XmlElement[]>
   "w:smartTag": (el) => elementsOf(el).filter((child) => child.name !== "w:smartTagPr"),
   "w:customXml": (el) => elementsOf(el).filter((child) => child.name !== "w:customXmlPr"),
 };
-
-const node = (type: string, props: Readonly<Record<string, unknown>> = {}, children: Children = []): AuthorNode => ({
-  type,
-  props,
-  children,
-});
 
 const rawXml = (xml: string): AuthorNode => node("RawXml", { xml });
 

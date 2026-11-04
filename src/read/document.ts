@@ -22,7 +22,7 @@
 import type * as docx from "docx";
 import { colorOf, wholeNumberAt, type Mutable, type Note } from "../ooxml/codec";
 import { readSectionProperties } from "../ooxml/section";
-import type { AuthorNode } from "../tree/author";
+import { node, type AuthorNode } from "../tree/author";
 import { bodyContext, readBlocks, withoutGoBack, type BodyContext } from "./body";
 import { partOfType, type ReadContext } from "./context";
 import { commentNode, readNotesParts } from "./notes";
@@ -52,12 +52,6 @@ const DROPPED_PARTS: Readonly<Record<string, string>> = {
   "word/commentsExtensible.xml": "comment threading dates: docx.js cannot write them",
   "word/endnotes.xml": "docx.js cannot write endnotes",
 };
-
-const node = (type: string, props: Readonly<Record<string, unknown>>, children: readonly AuthorNode[]): AuthorNode => ({
-  type,
-  props,
-  children,
-});
 
 function withoutSectPr(p: XmlElement, pPr: XmlElement): XmlElement {
   const properties = { ...pPr, children: pPr.children.filter((child) => typeof child === "string" || child.name !== "w:sectPr") };

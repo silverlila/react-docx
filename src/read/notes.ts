@@ -2,7 +2,7 @@
  *  themselves, so the run holding it is removed on read. docx.js writes separator footnotes itself and
  *  writes only referenced footnotes. It writes no w:date for an undated Comment. */
 
-import type { AuthorNode } from "../tree/author";
+import { node, type AuthorNode } from "../tree/author";
 import { partOfType, type ReadContext } from "./context";
 import { attrOf, elementsOf, type XmlElement } from "../ooxml/xml";
 
@@ -23,12 +23,6 @@ export type NotesReader = {
 
 const SEPARATORS = ["separator", "continuationSeparator", "continuationNotice"];
 const COMMENT_SPACE = "comment";
-
-const node = (type: string, props: Readonly<Record<string, unknown>>, children: readonly AuthorNode[]): AuthorNode => ({
-  type,
-  props,
-  children,
-});
 
 const holds = (el: XmlElement, name: string): boolean => elementsOf(el).some((child) => child.name === name);
 

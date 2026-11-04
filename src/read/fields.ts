@@ -18,7 +18,7 @@ import type * as docx from "docx";
 import { dropped, isOnValue, type Mutable, type Note } from "../ooxml/codec";
 import { PAGE_NUMBER_VALUES, SYMBOL_CHAR } from "../schema/docx-facts";
 import { isOwnKey } from "../schema/own";
-import type { AuthorNode } from "../tree/author";
+import { node, type AuthorNode } from "../tree/author";
 import type { ReadContext } from "./context";
 import { attrOf, childNamed, elementsOf, textOf, type XmlElement } from "../ooxml/xml";
 
@@ -54,8 +54,6 @@ const PAGEREF = /^PAGEREF (\S+)( \\h)?( \\p)?$/;
 const MERGEFIELD = /^ MERGEFIELD (\S+) $/;
 const TOC_SWITCH = / \\([a-z])(?: "([^"]*)")?/y;
 const WHOLE_NUMBER = /^[0-9]+$/;
-
-const node = (type: string, props: Readonly<Record<string, unknown>> = {}): AuthorNode => ({ type, props, children: [] });
 
 export function pageFieldOf(instruction: string): PageField | null {
   const [first = "", ...switches] = instruction.trim().split(/\s+/);
