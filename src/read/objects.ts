@@ -22,7 +22,7 @@ export type TextBox = {
   readonly content: XmlElement;
 };
 
-export type Alternate = { readonly used: "Choice" | "Fallback"; readonly elements: readonly XmlElement[] };
+type Alternate = { readonly used: "Choice" | "Fallback"; readonly elements: readonly XmlElement[] };
 
 const NO_OPTION = "docx.js has no option for it";
 const NUMBER = /^-?[0-9]+(\.[0-9]+)?$/;

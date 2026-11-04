@@ -226,7 +226,7 @@ function readOverlap(el: XmlElement | null, notes: Note[]): ValueOf<typeof docx.
 const to = <K extends keyof TableOptions>(key: K, read: ValueReader<NonNullable<Draft<TableOptions>[K]>>) =>
   mapTo<TableOptions, K>(key, read);
 
-export const TBLPR_FATES: FateTable<TableOptions> = {
+const TBLPR_FATES: FateTable<TableOptions> = {
   "w:tblStyle": to("style", stringVal),
   "w:tblpPr": to("float", readFloat),
   "w:tblOverlap": HANDLED_BESIDE,
@@ -299,7 +299,7 @@ const readHeight: ValueReader<NonNullable<RowOptions["height"]>> = (el, _env, no
   return rule === null ? null : { value, rule };
 };
 
-export const TRPR_FATES: FateTable<RowOptions> = {
+const TRPR_FATES: FateTable<RowOptions> = {
   "w:cnfStyle": { fate: "ignored" },
   "w:divId": noOption("docx.js has no divId option"),
   "w:gridBefore": noOption("docx.js has no gridBefore option"),
@@ -326,7 +326,7 @@ const toCell = <K extends keyof CellOptions>(key: K, read: ValueReader<NonNullab
 const readVerticalMerge: ValueReader<NonNullable<CellOptions["verticalMerge"]>> = (el, _env, notes) =>
   attrOf(el, "w:val") === null ? "continue" : oneOfAt(el, "w:val", VERTICAL_MERGES, notes);
 
-export const TCPR_FATES: FateTable<CellOptions> = {
+const TCPR_FATES: FateTable<CellOptions> = {
   "w:cnfStyle": { fate: "ignored" },
   "w:tcW": toCell("width", readWidth),
   "w:gridSpan": toCell("columnSpan", wholeNumberVal),

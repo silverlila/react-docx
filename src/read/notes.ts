@@ -15,7 +15,7 @@ import type { AuthorNode } from "../tree/author";
 import { partOfType, type ReadContext } from "./context";
 import { attrOf, elementsOf, type XmlElement } from "../ooxml/xml";
 
-export type CommentRead = {
+type CommentRead = {
   readonly id: number;
   /** The w:comment, for its attributes. */
   readonly comment: XmlElement;

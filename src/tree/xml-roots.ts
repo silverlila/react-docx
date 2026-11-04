@@ -11,7 +11,7 @@
  *  - docx.js's writer-side parser also decodes HTML entities but the reader's parser does not, so only
  *    XML's five entities and character references are accepted. */
 
-export type XmlRoots =
+type XmlRoots =
   | { readonly kind: "roots"; readonly roots: readonly string[] }
   | { readonly kind: "malformed"; readonly reason: string }
   | { readonly kind: "unwritable"; readonly reason: string }

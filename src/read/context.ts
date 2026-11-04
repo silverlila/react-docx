@@ -13,7 +13,7 @@ import { createOrdinals, type Ordinals } from "./ordinals";
 import { targetOfType, type OpcPackage } from "./package";
 import type { XmlElement } from "../ooxml/xml";
 
-export type Report = Omit<LocatedDiagnostic, "part" | "at">;
+type Report = Omit<LocatedDiagnostic, "part" | "at">;
 
 export type ReadContext = {
   readonly pkg: OpcPackage;
@@ -31,7 +31,7 @@ export type ReadContext = {
   within(part: string | null, at: TreePath): ReadContext;
 };
 
-export type ReadSession = {
+type ReadSession = {
   readonly ctx: ReadContext;
   readonly diagnostics: DiagnosticCollector;
   readonly consumed: ReadonlySet<string>;

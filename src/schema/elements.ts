@@ -248,28 +248,3 @@ export type DocumentNode = Node<"Document">;
 export const isKind = (type: string): type is Kind => isOwnKey(ELEMENTS, type);
 
 export const OUTSIDE_BODY: readonly Kind[] = ["Header", "Footer", "Comment", "Footnote"];
-
-const MATH_SLOTS = "named slots need a slot-component design (out of scope); author as <RawXml> OMML meanwhile";
-
-export const NOT_MAPPED: Readonly<Record<string, string>> = {
-  Comments: "the comments part container; built from <Comment> children of Document",
-  AnnotationReference: "written by docx.js inside comment parts",
-  FootnoteReferenceElement: "written by docx.js inside footnote parts",
-  Separator: "a footnote separator, written by docx.js",
-  ContinuationSeparator: "a footnote continuation separator, written by docx.js",
-  EndnoteReference: "docx.js has no endnotes part (out of scope)",
-  LastRenderedPageBreak: "a layout cache Word writes and recomputes",
-  PageNumberElement: "written by docx.js for PageNumber field values",
-  MathFraction: MATH_SLOTS,
-  MathSum: MATH_SLOTS,
-  MathIntegral: MATH_SLOTS,
-  MathSuperScript: MATH_SLOTS,
-  MathSubScript: MATH_SLOTS,
-  MathSubSuperScript: MATH_SLOTS,
-  MathRadical: MATH_SLOTS,
-  MathFunction: MATH_SLOTS,
-  MathRoundBrackets: MATH_SLOTS,
-  MathCurlyBrackets: MATH_SLOTS,
-  MathAngledBrackets: MATH_SLOTS,
-  MathSquareBrackets: MATH_SLOTS,
-};

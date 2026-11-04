@@ -2,9 +2,10 @@ import { strToU8, zipSync } from "fflate";
 import { describe, expect, test } from "vitest";
 import { renderToBuffer } from "../src/index";
 import { NotADocxError, openPackage } from "../src/read/package";
-import { attrOf, childNamed, isOn, parseXml, parseXmlFragment, serializeXml, textOf } from "../src/ooxml/xml";
+import { attrOf, childNamed, isOn, parseXml, serializeXml, textOf } from "../src/ooxml/xml";
 import { CASES } from "./support/cases";
 import { PICTURE, docx, part } from "./support/docx-fixture";
+import { parseXmlFragment } from "./support/xml-fragment";
 
 const IMAGE = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
 const HYPERLINK = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink";
@@ -150,8 +151,8 @@ describe("openPackage", () => {
       "word/document.xml",
       "word/media/image1.png",
     ]);
-    expect(pkg.hasPart("word/media/image1.png")).toBe(true);
-    expect(pkg.hasPart("word/styles.xml")).toBe(false);
+    expect(pkg.media("word/media/image1.png")).toEqual(PICTURE);
+    expect(pkg.media("word/styles.xml")).toBeNull();
     expect(pkg.part("word/styles.xml")).toBeNull();
   });
 });

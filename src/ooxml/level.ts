@@ -50,7 +50,7 @@ const readText: ValueReader<string> = (el, env, notes) => {
   return null;
 };
 
-export const LVL_FATES: FateTable<LevelOptions> = {
+const LVL_FATES: FateTable<LevelOptions> = {
   "w:start": to("start", wholeNumberVal),
   "w:numFmt": to("format", oneOfVal(LEVEL_FORMATS)),
   "w:lvlRestart": noOption("docx.js has no lvlRestart option"),

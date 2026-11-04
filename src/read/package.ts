@@ -21,9 +21,9 @@ export class NotADocxError extends Error {
   name = "NotADocxError";
 }
 
-export type Rel = { readonly type: string; readonly target: string; readonly external: boolean };
+type Rel = { readonly type: string; readonly target: string; readonly external: boolean };
 
-export type CoreProperties = {
+type CoreProperties = {
   readonly title?: string;
   readonly subject?: string;
   readonly creator?: string;
@@ -38,7 +38,6 @@ export type OpcPackage = {
   part(path: string): XmlElement | null;
   relsOf(partPath: string): ReadonlyMap<string, Rel>;
   media(path: string): Uint8Array | null;
-  hasPart(path: string): boolean;
   readonly paths: readonly string[];
   readonly theme: Theme;
   readonly core: CoreProperties;
@@ -165,7 +164,6 @@ export function openPackage(bytes: Uint8Array): OpcPackage {
     part,
     relsOf,
     media: fileAt,
-    hasPart: (path) => fileAt(path) !== null,
     paths: Object.keys(files).filter((path) => !path.endsWith("/")),
     theme: { fonts: readThemeFonts(themeElements), colors: readThemeColors(themeElements) },
     core: readCore(part(CORE)),

@@ -65,7 +65,7 @@ const RENDER: Record<ReactLine, Render> = {
   "33": (element, container) => renderSync((reconciler33 ??= Reconciler33(hostConfig19)), element, container),
 };
 
-export function renderToHost(element: React.ReactElement): HostChild | null {
+function renderToHost(element: React.ReactElement): HostChild | null {
   const container: HostContainer = { rootInstance: null };
   RENDER[reactLine(React.version)](element, container);
   return container.rootInstance;

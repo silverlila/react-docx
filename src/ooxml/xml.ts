@@ -22,7 +22,6 @@ export type XmlElement = {
 };
 
 const OFF = new Set(["0", "false", "off"]);
-const FRAGMENT_ROOT = "x";
 
 function contentOf(nodes: readonly ChildNode[]): (XmlElement | string)[] {
   const content: (XmlElement | string)[] = [];
@@ -58,10 +57,6 @@ export function parseXml(text: string): XmlElement {
   const [root] = topLevelElements(text);
   if (root === undefined) throw new Error(`parseXml: no element in ${JSON.stringify(text.slice(0, 80))}`);
   return root;
-}
-
-export function parseXmlFragment(text: string): readonly XmlElement[] {
-  return elementsOf(parseXml(`<${FRAGMENT_ROOT}>${text}</${FRAGMENT_ROOT}>`));
 }
 
 function escapeText(text: string): string {

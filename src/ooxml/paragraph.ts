@@ -116,7 +116,7 @@ const PBDR_FATES: FateTable<docx.IBordersOptions> = {
 };
 
 /** w:pBdr's top, bottom, left and right sides, or undefined when none is read. */
-export function readBorders(el: XmlElement | null, env: CodecEnv, notes: Note[]): docx.IBordersOptions | undefined {
+function readBorders(el: XmlElement | null, env: CodecEnv, notes: Note[]): docx.IBordersOptions | undefined {
   const read = applyFates(el, PBDR_FATES, env);
   notes.push(...read.notes);
   return Object.keys(read.options).length === 0 ? undefined : read.options;
@@ -238,7 +238,7 @@ const readFrame: ValueReader<docx.IFrameOptions> = (el, _env, notes) => {
   return null;
 };
 
-export const PPR_FATES: FateTable<ParagraphOptions> = {
+const PPR_FATES: FateTable<ParagraphOptions> = {
   "w:pStyle": to("style", stringVal),
   "w:keepNext": flag("keepNext"),
   "w:keepLines": flag("keepLines"),

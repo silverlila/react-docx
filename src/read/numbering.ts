@@ -22,10 +22,10 @@ import { attrOf, childNamed, elementsOf, type XmlElement } from "../ooxml/xml";
 
 type Levels = readonly docx.ILevelsOptions[];
 
-export type ListRef = { readonly reference: string; readonly instance: number };
+type ListRef = { readonly reference: string; readonly instance: number };
 
 /** A list marker written as text: the marker and the level it was rendered from. */
-export type Marker = { readonly text: string; readonly level: docx.ILevelsOptions | undefined };
+type Marker = { readonly text: string; readonly level: docx.ILevelsOptions | undefined };
 
 export type NumberingReader = {
   /** null for numId "0" or an unknown numId. Registers the reference/instance on first use (document order). */
@@ -66,7 +66,7 @@ const OTHER_CHILDREN: Readonly<Record<string, Note["fate"]>> = {
 
 /** The numbering option of a paragraph or paragraph style: false for numId "0" ("not a list, even if the
  *  style is"), which docx.js writes as that numId. */
-export type NumberingOption =
+type NumberingOption =
   | { readonly reference: string; readonly level: number; readonly instance: number; readonly custom?: true }
   | false;
 

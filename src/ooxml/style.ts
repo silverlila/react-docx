@@ -32,7 +32,7 @@ import {
 import { readParagraphProperties, type ParagraphOptions, type ParagraphRead } from "./paragraph";
 import { readRunOption } from "./run";
 
-export type StyleRead =
+type StyleRead =
   | {
       readonly kind: "paragraph";
       readonly options: docx.IParagraphStyleOptions;
@@ -42,10 +42,10 @@ export type StyleRead =
   | { readonly kind: "character"; readonly options: docx.ICharacterStyleOptions; readonly notes: readonly Note[] }
   | { readonly kind: "raw"; readonly xml: string; readonly because: "default" | "table" | "numbering" };
 
-export type StyleDropped = { readonly kind: "dropped"; readonly because: string };
+type StyleDropped = { readonly kind: "dropped"; readonly because: string };
 
 /** The paragraph options a style, a numbering level or the document defaults can hold. */
-export type StyleParagraph = {
+type StyleParagraph = {
   readonly paragraph: Omit<ParagraphOptions, "style">;
   readonly numPr: ParagraphRead["numPr"];
 };

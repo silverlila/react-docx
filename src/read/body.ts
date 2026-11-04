@@ -70,7 +70,7 @@ type Piece =
   | { readonly kind: "inline"; readonly node: AuthorNode };
 
 /** The document-wide readers the walk uses beside the package. */
-export type BodyParts = { readonly numbering: NumberingReader; readonly notes: NotesReader };
+type BodyParts = { readonly numbering: NumberingReader; readonly notes: NotesReader };
 
 /** A ReadContext that carries the document-wide readers into every context made from it. */
 export type BodyContext = Omit<ReadContext, "within"> & {
@@ -88,9 +88,9 @@ type InlineMode = "live" | "deleted";
 /** One inline container's walk: its context and the properties of each run, read once per run. */
 type InlineScope = { readonly ctx: BodyContext; readonly mode: InlineMode; runProps(run: XmlElement): RunOptions };
 
-export type RawXmlCheck = { readonly kind: "raw"; readonly xml: string } | { readonly kind: "refused"; readonly reason: string };
+type RawXmlCheck = { readonly kind: "raw"; readonly xml: string } | { readonly kind: "refused"; readonly reason: string };
 
-export type BlockOptions = {
+type BlockOptions = {
   /** False where block RawXml cannot stand (footnotes, comments, text boxes). Defaults to true. */
   readonly rawBlocks?: boolean;
   /** The index of the container's first block among its parent's children: a Section's body blocks come
@@ -152,7 +152,7 @@ const rawXml = (xml: string): AuthorNode => node("RawXml", { xml });
 /** The one gate for every RawXml the reader emits: no r: attribute anywhere, phase 1's xmlRoots accepts the
  *  serialized fragment, and every root is one RAW_XML_ROOTS allows in `slot` (canonicalize would throw
  *  otherwise). */
-export function rawXmlOf(elements: readonly XmlElement[], slot: Slot): RawXmlCheck {
+function rawXmlOf(elements: readonly XmlElement[], slot: Slot): RawXmlCheck {
   const xml = elements.map(serializeXml).join("");
   const roots = xmlRoots(xml);
   if (roots.kind === "relationship") {
@@ -479,7 +479,7 @@ function readCell(tc: XmlElement, ctx: BodyContext): AuthorNode {
 // Inline content
 
 /** The inline children of a w:p, w:hyperlink or other inline container. */
-export function readInline(elements: readonly XmlElement[], ctx: BodyContext, mode: InlineMode = "live"): AuthorNode[] {
+function readInline(elements: readonly XmlElement[], ctx: BodyContext, mode: InlineMode = "live"): AuthorNode[] {
   const props = new Map<XmlElement, RunOptions>();
   const scope: InlineScope = {
     ctx,

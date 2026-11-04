@@ -178,7 +178,7 @@ type Story = {
 type InlineScope = { readonly story: Story; readonly run: RunOptions };
 
 /** The OOXML application defaults, used when nothing sets a run's font or size. */
-export const FALLBACK_RUN = { font: "Times New Roman", size: 20 } as const;
+const FALLBACK_RUN = { font: "Times New Roman", size: 20 } as const;
 
 /** docx.js's section defaults (sectionPageSizeDefaults, sectionMarginDefaults), in twips. */
 const PAGE_DEFAULTS = { width: 11906, height: 16838, top: 1440, right: 1440, bottom: 1440, left: 1440 } as const;

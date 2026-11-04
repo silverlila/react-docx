@@ -27,14 +27,14 @@ export type Item =
   | { readonly kind: "atom"; readonly run: XmlElement; readonly el: XmlElement }
   | { readonly kind: "element"; readonly el: XmlElement };
 
-export type PageField = (typeof PAGE_NUMBER_VALUES)[number];
+type PageField = (typeof PAGE_NUMBER_VALUES)[number];
 
-export type ComplexField =
+type ComplexField =
   | { readonly kind: "page"; readonly field: PageField; readonly run: XmlElement; readonly cached: boolean }
   | { readonly kind: "node"; readonly node: AuthorNode }
   | { readonly kind: "other"; readonly raw: readonly XmlElement[]; readonly result: readonly Item[] };
 
-export type SimpleFieldRead =
+type SimpleFieldRead =
   | { readonly kind: "page"; readonly field: PageField; readonly run: XmlElement | null; readonly cached: boolean }
   | { readonly kind: "node"; readonly node: AuthorNode }
   | { readonly kind: "other" };
@@ -59,7 +59,7 @@ const SYMBOL_HEX = /^[0-9A-Fa-f]{4}$/;
 
 const node = (type: string, props: Readonly<Record<string, unknown>> = {}): AuthorNode => ({ type, props, children: [] });
 
-export function pageFieldOf(instruction: string): PageField | null {
+function pageFieldOf(instruction: string): PageField | null {
   const [first = "", ...switches] = instruction.trim().split(/\s+/);
   const key = first.toUpperCase();
   if (!isOwnKey(PAGE_FIELDS, key)) return null;

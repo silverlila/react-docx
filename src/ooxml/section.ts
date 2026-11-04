@@ -37,7 +37,7 @@ type SectionProperties = docx.ISectionPropertiesOptions;
 type Page = NonNullable<SectionProperties["page"]>;
 type HeaderFooterReference = SectionRead["references"][number];
 
-export type SectionRead = CodecResult<{ properties?: docx.ISectionPropertiesOptions }> & {
+type SectionRead = CodecResult<{ properties?: docx.ISectionPropertiesOptions }> & {
   readonly references: readonly {
     readonly kind: "header" | "footer";
     readonly type: "default" | "first" | "even";
@@ -204,7 +204,7 @@ const readColumns: ValueReader<docx.IColumnsAttributes> = (el, _env, notes) => {
   return column;
 };
 
-export const SECTPR_FATES: FateTable<SectionProperties> = {
+const SECTPR_FATES: FateTable<SectionProperties> = {
   "w:headerReference": HANDLED_BESIDE,
   "w:footerReference": HANDLED_BESIDE,
   "w:footnotePr": noOption("docx.js has no section footnote properties option"),

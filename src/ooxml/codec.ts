@@ -263,7 +263,7 @@ export const oneOfVal =
     requiredAttr(el, "w:val", notes) === null ? null : oneOfAt(el, "w:val", values, notes);
 
 /** themeColor → clrScheme key. */
-export const THEME_COLOR_KEYS: Readonly<Record<string, string>> = {
+const THEME_COLOR_KEYS: Readonly<Record<string, string>> = {
   dark1: "dk1",
   text1: "dk1",
   light1: "lt1",
@@ -289,7 +289,7 @@ const COLOR_SOURCES = {
   "w:fill": { theme: "w:themeFill", tint: "w:themeFillTint", shade: "w:themeFillShade" },
 } as const;
 
-export type ColorSource = keyof typeof COLOR_SOURCES;
+type ColorSource = keyof typeof COLOR_SOURCES;
 
 function byteFraction(hex: string | null): number | null {
   return hex !== null && HEX_BYTE.test(hex) ? parseInt(hex, 16) / 255 : null;

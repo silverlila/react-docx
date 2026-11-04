@@ -24,7 +24,7 @@ import { DOCX_DEFAULT_STYLES } from "./docx-default-styles.generated";
 /** The paragraph options a style or the document defaults can set, a list's numbering among them. */
 export type SheetParagraph = docx.IParagraphStylePropertiesOptions & { readonly pageBreakBefore?: boolean };
 
-export type SheetStyle = {
+type SheetStyle = {
   readonly type: "paragraph" | "character" | "table";
   readonly basedOn?: string;
   readonly paragraph?: SheetParagraph;

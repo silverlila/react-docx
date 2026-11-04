@@ -12,9 +12,9 @@ import { isOwnKey } from "../schema/own";
 import type { ReadContext } from "./context";
 import { attrOf, elementsOf, type XmlElement } from "../ooxml/xml";
 
-export type ChangeKind = "InsertedTextRun" | "DeletedTextRun";
+type ChangeKind = "InsertedTextRun" | "DeletedTextRun";
 
-export type TrackedRuns = {
+type TrackedRuns = {
   readonly kind: ChangeKind;
   /** id, author and date: the change's props before the run's own. */
   readonly props: Readonly<Record<string, unknown>>;

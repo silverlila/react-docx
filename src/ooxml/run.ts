@@ -246,7 +246,7 @@ const readRevision: ValueReader<docx.IRunPropertiesChangeOptions> = (el, env, no
   return { id, author, date, ...previous.options };
 };
 
-export const RPR_FATES: FateTable<RunOptions> = {
+const RPR_FATES: FateTable<RunOptions> = {
   "w:rStyle": to("style", stringVal),
   "w:rFonts": to("font", readFonts),
   "w:b": flag("bold"),

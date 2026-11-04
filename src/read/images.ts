@@ -33,7 +33,7 @@ type AltText = NonNullable<docx.IImageOptions["altText"]>;
 type Outline = NonNullable<docx.IImageOptions["outline"]>;
 type Position<R, A> = { readonly relative?: R; readonly align?: A; readonly offset?: number };
 
-export type DrawingRead =
+type DrawingRead =
   | { readonly kind: "image"; readonly props: ImageProps; readonly media: readonly string[]; readonly notes: readonly Note[] }
   | { readonly kind: "refused"; readonly notes: readonly Note[] };
 
