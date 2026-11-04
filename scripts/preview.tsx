@@ -1,13 +1,8 @@
-/** pnpm run preview <file.docx | module.tsx> [out.html]
+/** tsx compiles a .tsx outside tsconfig.json's `include` with the classic JSX runtime, which calls a
+ *  global `React`; printJsx output imports none (it targets the automatic runtime), so a global stands in.
  *
- *  Writes a standalone HTML preview of a document, to `out.html` or to .preview/<name>.html, and prints
- *  its path.
- *  - A .docx is read with readDocx.
- *  - A .tsx, .jsx or .ts module is imported, and its default export (a component or an element) is
- *    rendered with renderToTree. A module printed by printJsx (e.g. .roundtrip/<name>/<Name>.tsx) imports
- *    "@react-docx/core", which resolves to dist/ through the package's self-reference: run
- *    `pnpm run build` first.
- *  previewHtml is shared with scripts/roundtrip.ts. */
+ *  A module printed by printJsx imports "@react-docx/core", which resolves to dist/ through the package's
+ *  self-reference, so run `pnpm run build` before previewing one. */
 
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, join, resolve } from "node:path";
@@ -23,7 +18,6 @@ const MODULE_EXTENSIONS = [".tsx", ".jsx", ".ts"];
 
 const BODY_STYLE = { margin: 0, background: "#e8e8e8", padding: "24pt 0" } as const;
 
-/** A whole HTML page showing `tree`, titled `title`. */
 export function previewHtml(tree: DocumentNode, title: string): string {
   const page = renderToStaticMarkup(
     <html>
@@ -39,11 +33,7 @@ export function previewHtml(tree: DocumentNode, title: string): string {
   return `<!doctype html>${page}`;
 }
 
-/** Imports a module and renders its default export, a component or an element, to a tree. */
 async function moduleTree(file: string): Promise<DocumentNode> {
-  // tsx compiles a .tsx outside tsconfig.json's `include` (src/**/*) with the classic JSX runtime, which
-  // calls a global `React`. printJsx output imports no React (it is written for the automatic runtime),
-  // so the global stands in for that import.
   Object.assign(globalThis, { React });
   const mod: { default?: unknown } = await import(pathToFileURL(resolve(file)).href);
   const exported = mod.default;
@@ -73,7 +63,6 @@ async function main([file, out]: readonly string[]): Promise<number> {
   return 0;
 }
 
-// Run only as the script itself, not when scripts/roundtrip.ts imports previewHtml.
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   main(process.argv.slice(2)).then(
     (code) => process.exit(code),

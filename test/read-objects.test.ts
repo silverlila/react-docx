@@ -37,7 +37,6 @@ const located = (diagnostics: readonly Diagnostic[], kind: string, element: stri
 const diagnostic = (kind: string, element: string, detail: string) =>
   expect.objectContaining({ kind, element, detail: expect.stringContaining(detail) });
 
-/** A one-picture package: the body plus rId5 → word/media/<name>. */
 const withMedia = (body: string, name = "image1.png", bytes: Uint8Array = PICTURE): FixtureParts => ({
   body,
   rels: `<Relationship Id="rId5" Type="${IMAGE}" Target="media/${name}"/>`,
@@ -53,7 +52,6 @@ const pic = (blipFill = "") =>
       '<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="952500" cy="476250"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic>'
   );
 const chart = graphic(CHART_URI, '<c:chart r:id="rId9"/>');
-/** An inline drawing of 952500 × 476250 EMU, which is 100 × 50 px. */
 const inlineDrawing = (inside: string) =>
   `<w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="952500" cy="476250"/><wp:docPr id="1" name="Picture 1"/>${inside}</wp:inline></w:drawing>`;
 const vmlPicture = '<w:pict><v:shape id="p1" style="width:72pt;height:36pt"><v:imagedata r:id="rId5"/></v:shape></w:pict>';

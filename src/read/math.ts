@@ -1,6 +1,4 @@
-/** OMML: only an m:oMath made of m:r holding m:t, m:rPr or w:rPr maps to Math; docx.js's MathRun takes no
- *  run properties. Other OMML (fractions, scripts, m:oMathPara) has no relationships and is kept as
- *  RawXml. */
+/** docx.js's MathRun takes no run properties. */
 
 import type { AuthorNode } from "../tree/author";
 import type { ReadContext } from "./context";

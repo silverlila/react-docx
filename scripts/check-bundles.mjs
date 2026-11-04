@@ -1,9 +1,5 @@
-/** pnpm run check:bundles (AC14): proves requirement 8 on the built dist/.
- *
- *  For each entry and format, it follows relative imports (tsup's shared ./chunk-*.mjs) transitively and
- *  collects the bare package specifiers the bundle loads at runtime. `import`/`export … from`, dynamic
- *  `import()` and `require()` are all followed in both formats, so a CommonJS shim inside an ES module
- *  counts too. It prints each entry's set, and exits 1 with the import chain of every forbidden package. */
+/** tsup emits shared ./chunk-*.mjs files, so imports are followed transitively, and a CommonJS require()
+ *  shim inside an ES module counts as a load. */
 
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
@@ -12,7 +8,6 @@ import { fileURLToPath } from "node:url";
 const DIST = fileURLToPath(new URL("../dist/", import.meta.url));
 const FORMATS = [".mjs", ".js"];
 
-/** The packages each entry must never load. "*" forbids every package. */
 const FORBIDDEN = {
   index: ["fflate", "htmlparser2", "domhandler"],
   reader: ["docx", "xml-js"],
@@ -20,7 +15,6 @@ const FORBIDDEN = {
   codegen: "*",
 };
 
-/** Why a forbidden package matters, where the generic message would not say. */
 const NOTES = {
   "codegen react": "src/codegen imports react for types only, so it should vanish from the bundle",
 };
@@ -31,7 +25,6 @@ const SPECIFIERS = [
   /\brequire\(\s*["']([^"']+)["']\s*\)/g,
 ];
 
-/** `react/jsx-runtime` → `react`; `@scope/pkg/sub` → `@scope/pkg`. */
 function packageName(specifier) {
   const parts = specifier.split("/");
   return specifier.startsWith("@") ? parts.slice(0, 2).join("/") : parts[0];
@@ -42,7 +35,6 @@ function specifiersIn(file) {
   return [...new Set(SPECIFIERS.flatMap((pattern) => [...code.matchAll(pattern)].map((match) => match[1])))];
 }
 
-/** Every bare specifier `entry` loads, each with the chain of files that leads to it. */
 function bareImports(entry) {
   const parents = new Map([[entry, null]]);
   const bare = new Map();

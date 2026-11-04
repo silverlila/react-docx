@@ -1,10 +1,3 @@
-/** Documents written the way Word writes them, for the round-trip suite (AC9).
- *
- *  Every fixture carries Word's habits: w:rsid* attributes on paragraphs and runs, a Normal style marked
- *  w:default="1", w:docDefaults fonts that point at the theme, a theme with minor font Calibri and accent1
- *  4472C4, w:proofErr, w:lastRenderedPageBreak and a _GoBack bookmark, a settings part, and Word's own
- *  w:sectPr. Each fixture adds the content its name says. */
-
 import { PNG_1PX } from "../support/cases";
 import { docx, part, type FixtureParts } from "../support/docx-fixture";
 
@@ -35,7 +28,6 @@ const LATENT_STYLES =
   '<w:latentStyles w:defLockedState="0" w:defUIPriority="99" w:defSemiHidden="0" w:defUnhideWhenUsed="0" w:defQFormat="0" w:count="376">' +
   '<w:lsdException w:name="Normal" w:uiPriority="0" w:qFormat="1"/><w:lsdException w:name="heading 1" w:uiPriority="9" w:qFormat="1"/></w:latentStyles>';
 
-/** Word's styles part: theme fonts in w:docDefaults, the four default styles, and `extra` styles. */
 const styles = (extra: string): string =>
   "<w:docDefaults><w:rPrDefault><w:rPr>" +
   '<w:rFonts w:asciiTheme="minorHAnsi" w:eastAsiaTheme="minorHAnsi" w:hAnsiTheme="minorHAnsi" w:cstheme="minorBidi"/>' +
@@ -55,14 +47,11 @@ const SECT_PR =
 
 const GO_BACK = '<w:bookmarkStart w:id="0" w:name="_GoBack"/><w:bookmarkEnd w:id="0"/>';
 
-/** A paragraph as Word writes it: rsids, optional w:pPr, then its content. */
 const p = (content: string, pPr = ""): string =>
   `<w:p w:rsidR="00A13B2C" w:rsidRDefault="00A13B2C" w:rsidP="00A13B2C">${pPr === "" ? "" : `<w:pPr>${pPr}</w:pPr>`}${content}</w:p>`;
-/** A run as Word writes it. */
 const r = (text: string, rPr = ""): string =>
   `<w:r w:rsidRPr="00A13B2C">${rPr === "" ? "" : `<w:rPr>${rPr}</w:rPr>`}<w:t xml:space="preserve">${text}</w:t></w:r>`;
 const styled = (style: string, content: string): string => p(content, `<w:pStyle w:val="${style}"/>`);
-/** One complex field run sequence with a cached result, as Word writes PAGE and NUMPAGES. */
 const field = (instruction: string, result: string): string =>
   '<w:r><w:fldChar w:fldCharType="begin"/></w:r>' +
   `<w:r><w:instrText xml:space="preserve"> ${instruction} </w:instrText></w:r>` +
@@ -72,8 +61,6 @@ const field = (instruction: string, result: string): string =>
 
 type WordParts = Omit<FixtureParts, "styles" | "theme"> & { readonly styles?: string; readonly sectPr?: string };
 
-/** The parts every fixture shares around `body`: Word's styles plus `styles`, the theme, settings, and the
- *  body's closing w:sectPr (Word's own unless `sectPr` is given). */
 const wordDocument = ({ body, styles: extraStyles = "", sectPr = SECT_PR, ...rest }: WordParts): Uint8Array =>
   docx({
     ...rest,
@@ -84,7 +71,6 @@ const wordDocument = ({ body, styles: extraStyles = "", sectPr = SECT_PR, ...res
     rels: `<Relationship Id="rIdSettings" Type="${OFFICE_RELS}/settings" Target="settings.xml"/>${rest.rels ?? ""}`,
   });
 
-/** SECT_PR with `references` (header and footer references) first and `after` before w:docGrid. */
 const sectPrWith = (references: string, after = ""): string =>
   SECT_PR.replace('<w:sectPr w:rsidR="00A13B2C">', `<w:sectPr w:rsidR="00A13B2C">${references}`).replace("<w:docGrid", `${after}<w:docGrid`);
 
@@ -119,7 +105,6 @@ const ABSTRACT_DECIMAL =
   '<w:abstractNum w:abstractNumId="1"><w:nsid w:val="2B3C4D5E"/><w:multiLevelType w:val="hybridMultilevel"/><w:tmpl w:val="0409000F"/>' +
   '<w:lvl w:ilvl="0" w:tplc="0409000F"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/><w:lvlJc w:val="left"/><w:pPr><w:ind w:left="720" w:hanging="360"/></w:pPr></w:lvl>' +
   "</w:abstractNum>";
-/** numId 1 bullets; numIds 2 and 3 count with one decimal definition, and 3 restarts it at 1. */
 const NUMBERING =
   ABSTRACT_BULLET +
   ABSTRACT_DECIMAL +
@@ -207,8 +192,6 @@ const sections = wordDocument({
   },
 });
 
-/** A 100 px square picture from rIdImage with Word's no-fill line, cropped by `srcRect` and with `xfrm`
- *  attributes when given. */
 const pic = (srcRect = "", xfrm = ""): string =>
   `<a:graphic><a:graphicData uri="${PICTURE_URI}"><pic:pic><pic:nvPicPr><pic:cNvPr id="0" name="photo.png"/><pic:cNvPicPr/></pic:nvPicPr>` +
   `<pic:blipFill><a:blip r:embed="rIdImage"><a:extLst><a:ext uri="{28A0092B-C50C-407E-A947-70E740481C1C}"><a14:useLocalDpi xmlns:a14="http://schemas.microsoft.com/office/drawing/2010/main" val="0"/></a:ext></a:extLst></a:blip>${srcRect}<a:stretch><a:fillRect/></a:stretch></pic:blipFill>` +

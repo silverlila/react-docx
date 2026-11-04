@@ -16,6 +16,18 @@
  *    and collected under the section that references them.
  *  - Word draws a border that has no w:sz at its thinnest, 2 eighths of a point.
  *  - docx.js inserts continuation cells in the rows below a cell with an authored rowSpan.
+ *  - docx.js writes a pct width of N as N%. Its TextWrappingType is numeric: 0 none, 1 square, 2 tight,
+ *    3 top and bottom; the preview draws tight as square. A VML length with no unit is px at 96 dpi.
+ *  - Word sets each line at its tallest run's single-line height times the multiple, or at least the
+ *    paragraph's minimum. An exact line is fixed, and runs inherit it.
+ *  - Word's defaults: a tab stop every 0.5in, 0.5in between columns, cell margins of 0.075in left and
+ *    right. An automatic shading fill is none (white under a pattern), an automatic pattern colour is
+ *    black, and pctN covers N% (stripes and crosses their average cover).
+ *  - In a right-to-left paragraph Word reads left and right as start and end, and sets a right-to-left
+ *    run in its complex-script font, size, bold and italic.
+ *  - Word drops a contextual-spacing paragraph's space before (after) when the paragraph before (after)
+ *    has the same style, and draws consecutive paragraphs with the same borders and indents as one box:
+ *    the top border above the first only, the bottom border below the last only.
  *  - Accepted preview simplifications: no conditional table-style formatting, no toggle-property
  *    semantics, no font fallback lists. Insertions show as plain text; deletions, comments and comment
  *    marks are not drawn. */
@@ -79,7 +91,6 @@ type Story = {
 
 type LineRule = ComputedParagraph["lineHeight"];
 
-/** tocEntry: a table-of-contents entry, whose hyperlinks Word draws in the entry's own formatting. */
 type InlineScope = { readonly story: Story; readonly run: RunOptions; readonly line: LineRule; readonly tocEntry: boolean };
 
 const TOC_ENTRY_STYLE = /^TOC[1-9]$/i;
@@ -89,10 +100,8 @@ const FALLBACK_RUN = { font: "Times New Roman", size: 20 } as const;
 
 const PAGE_DEFAULTS = { width: 11906, height: 16838, top: 1440, right: 1440, bottom: 1440, left: 1440, header: 708, footer: 708 } as const;
 
-/** Word's default tab stop interval: 0.5in. */
 const DEFAULT_TAB_STOP = 720;
 
-/** Word's default space between columns: 0.5in. */
 const DEFAULT_COLUMN_SPACE = 720;
 
 const DOCX_TABLE_BORDER: docx.IBorderOptions = { style: "single", size: 4, color: "auto" };
@@ -122,7 +131,6 @@ const ALIGNMENTS: Readonly<Record<string, ComputedParagraph["align"]>> = {
   thaiDistribute: "justify",
 };
 
-/** In a right-to-left paragraph Word reads left and right as start and end. */
 function alignOf(alignment: string | undefined, rtl: boolean): ComputedParagraph["align"] {
   const align = (alignment === undefined ? undefined : own(ALIGNMENTS, alignment)) ?? "left";
   if (align === "left") return rtl ? "start" : "left";
@@ -175,8 +183,6 @@ function pointsOf(value: Measure, perPoint: number): number {
 
 const hexOrNull = (color: string | undefined): string | null => (color !== undefined && HEX.test(color) ? color : null);
 
-/** How much of a shading pattern is its foreground colour: Word draws pctN as N%, stripes and crosses as
- *  their average cover. */
 function patternCover(type: string | undefined): number {
   if (type === undefined || type === "clear") return 0;
   if (type === "solid") return 1;
@@ -193,8 +199,6 @@ function mix(foreground: string, background: string, cover: number): string {
     .toUpperCase();
 }
 
-/** A shading's colour: its fill under its pattern drawn in its colour. An automatic fill is none (white
- *  under a pattern) and an automatic pattern colour is black. */
 function shadingColor(shading: docx.IShadingAttributesProperties | undefined): string | null {
   if (shading === undefined || shading.type === "nil") return null;
   const fill = hexOrNull(shading.fill);
@@ -257,7 +261,6 @@ function indentOf(indent: Indent | undefined): Indent {
 
 type TabStops = NonNullable<SheetParagraph["tabStops"]>;
 
-/** Tab stops add up down the cascade: a stop replaces one at its position, and a clear stop removes it. */
 function overTabStops(base: TabStops | undefined, over: TabStops | undefined): TabStops | undefined {
   if (over === undefined) return base;
   const at = new Map((base ?? []).map((stop) => [stop.position, stop]));
@@ -303,15 +306,11 @@ function computeTabStops(stops: TabStops | undefined, indentLeftPt: number, firs
   return out.sort((a, b) => a.posPt - b.posPt);
 }
 
-/** A run's line height under its paragraph's rule: Word sets each line at its tallest run's single line
- *  height times the multiple, or at least the paragraph's minimum. An exact line inherits. */
 function runLineHeight(fontFamily: string, line: LineRule): number | null {
   if (line.kind === "exact") return null;
   return lineHeightOf(fontFamily) * (line.kind === "multiple" ? line.value : 1);
 }
 
-/** A right-to-left run takes its complex-script font, size, bold and italic, as Word sets right-to-left
- *  text. Every run lists its other scripts' fonts after its own, for the characters its own font lacks. */
 function computeRun(run: RunOptions, line: LineRule): ComputedRun {
   const font = fontSlots(run.font);
   const rtl = run.rightToLeft ?? false;
@@ -461,8 +460,6 @@ function runContent(child: RunChild, run: ComputedRun): ResolvedInline[] {
 
 const symbolText = (char: string): string => String.fromCodePoint(parseInt(char, 16));
 
-/** An item read from a run-level RawXml. Its own RawXml is only ever a rendered page break, so it is not
- *  read again. */
 function rawRunItem(item: RunItem, run: ComputedRun): ResolvedInline[] {
   if (typeof item === "string") return runContent(item, run);
   switch (item.type) {
@@ -507,7 +504,6 @@ const V_ALIGNS: Readonly<Record<string, ResolvedFloat["vertical"]["align"]>> = {
   outside: "bottom",
 };
 
-/** docx.js's TextWrappingType: none, square, tight, top and bottom. */
 const WRAPS: readonly ResolvedFloat["wrap"][] = ["none", "square", "square", "topAndBottom"];
 
 function floatOf(floating: NonNullable<Node<"ImageRun">["props"]["floating"]>): ResolvedFloat {
@@ -687,7 +683,6 @@ const widthPtOf = (width: docx.ITableWidthProperties | undefined): number | null
     ? width.size / TWIPS_PER_PT
     : null;
 
-/** docx.js writes a pct width of N as N%. */
 function widthPctOf(width: docx.ITableWidthProperties | undefined): number | null {
   if (width?.type !== "pct") return null;
   const pct = typeof width.size === "number" ? width.size : parseFloat(width.size);
@@ -696,10 +691,8 @@ function widthPctOf(width: docx.ITableWidthProperties | undefined): number | nul
 
 type CellMargins = docx.ITableCellOptions["margins"];
 
-/** Word's default cell margins: 0.075in left and right. */
 const DEFAULT_CELL_MARGINS: Readonly<Record<Side, number>> = { top: 0, right: 108, bottom: 0, left: 108 };
 
-/** Each side: the cell's margin, else the table's, else Word's default. */
 function cellPadding(cell: CellMargins, table: CellMargins): Readonly<Record<Side, number>> {
   const side = (s: Side) => (cell?.[s] ?? table?.[s] ?? DEFAULT_CELL_MARGINS[s]) / TWIPS_PER_PT;
   return { top: side("top"), right: side("right"), bottom: side("bottom"), left: side("left") };
@@ -774,7 +767,6 @@ function table(node: Node<"Table">, path: TreePath, story: Story): ResolvedBlock
   };
 }
 
-/** A VML style length in points: a number is px (96 dpi), a string has a unit. */
 function vmlLength(length: unknown): number | null {
   if (typeof length === "number") return length * 0.75;
   if (typeof length !== "string") return null;
@@ -786,8 +778,6 @@ function vmlLength(length: unknown): number | null {
 const VML_ALIGNS: Readonly<Record<string, "left" | "center" | "right">> = { left: "left", center: "center", right: "right", inside: "left", outside: "right" };
 const VML_V_ALIGNS: Readonly<Record<string, "top" | "center" | "bottom">> = { top: "top", center: "center", bottom: "bottom", inside: "top", outside: "bottom" };
 
-/** A text box's VML style as a float: an absolute one is placed from its frame (page, margin, or the text
- *  it is anchored in), out of the flow, as Word shows a text box in front of its text. */
 function textboxFloat(style: Props<"Textbox">["style"]): ResolvedFloat | null {
   if (style?.position !== "absolute") return null;
   const offset = (margin: unknown, plain: unknown) => (vmlLength(margin) ?? 0) + (vmlLength(plain) ?? 0);
@@ -834,7 +824,6 @@ function block(node: BlockNode, path: TreePath, story: Story): ResolvedBlock {
   }
 }
 
-/** A block, or the blocks a RawXml shows, each with the RawXml's path. */
 function blocksFor(node: BlockNode, path: TreePath, story: Story): ResolvedBlock[] {
   if (node.type !== "RawXml") return [block(node, path, story)];
   const shown = rawBlocks(node.props.xml);
@@ -845,7 +834,6 @@ function blocksOf(children: readonly BlockNode[], at: TreePath, story: Story): R
   return adjacency(children.flatMap((child, i) => blocksFor(child, [...at, i], story)));
 }
 
-/** The block before (`step` -1) or after (1) block `i` in the flow: a placed text box stands out of it. */
 function inFlow(blocks: readonly ResolvedBlock[], i: number, step: 1 | -1): ResolvedBlock | undefined {
   for (let j = i + step; j >= 0 && j < blocks.length; j += step) {
     const b = blocks[j];
@@ -854,14 +842,11 @@ function inFlow(blocks: readonly ResolvedBlock[], i: number, step: 1 | -1): Reso
   return undefined;
 }
 
-/** What a paragraph's neighbours change: contextual spacing, then border groups. */
 const adjacency = (blocks: ResolvedBlock[]): ResolvedBlock[] => withBorderGroups(withContextualSpacing(blocks));
 
 const sameBorder = (a: ComputedBorder | undefined, b: ComputedBorder | undefined): boolean =>
   a === b || (a !== undefined && b !== undefined && a.style === b.style && a.widthPt === b.widthPt && a.color === b.color);
 
-/** Consecutive paragraphs with the same borders and indents are one box in Word: the box's top border
- *  is drawn above the first only, its bottom border below the last only. */
 function withBorderGroups(blocks: ResolvedBlock[]): ResolvedBlock[] {
   const grouped = (a: ResolvedBlock | undefined, b: ResolvedBlock | undefined): boolean => {
     if (!isParagraph(a) || !isParagraph(b)) return false;
@@ -888,8 +873,6 @@ type ParagraphBlock = Extract<ResolvedBlock, { kind: "paragraph" }>;
 
 const isParagraph = (b: ResolvedBlock | undefined): b is ParagraphBlock => b?.kind === "paragraph";
 
-/** Word drops a contextual-spacing paragraph's space before (after) when the paragraph before (after) it
- *  has the same style. */
 function withContextualSpacing(blocks: ResolvedBlock[]): ResolvedBlock[] {
   return blocks.map((b, i) => {
     if (!isParagraph(b) || !b.format.contextualSpacing) return b;
@@ -965,7 +948,6 @@ function section(node: Node<"Section">, path: TreePath, doc: DocumentScope): Res
   };
 }
 
-/** The document's sections, resolved; `paginate` (pages.ts) breaks them into pages. */
 export function resolveSections(document: DocumentNode): readonly ResolvedSection[] {
   let footnotes = 0;
   const doc: DocumentScope = {

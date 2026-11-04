@@ -1,6 +1,6 @@
 /** Word and docx.js write the footnote number mark (w:footnoteRef) and the comment mark (w:annotationRef)
- *  themselves, so the run holding it is removed on read. docx.js writes separator footnotes itself and
- *  writes only referenced footnotes. It writes no w:date for an undated Comment. */
+ *  themselves. docx.js writes separator footnotes itself and writes only referenced footnotes. It writes
+ *  no w:date for an undated Comment. */
 
 import { node, type AuthorNode } from "../tree/author";
 import { partOfType, type ReadContext } from "./context";

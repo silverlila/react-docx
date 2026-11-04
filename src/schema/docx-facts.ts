@@ -1,17 +1,11 @@
 /** Facts about docx.js 9.5.1's behaviour that canonicalization depends on.
  *
- *  - PAGE_NUMBER_VALUES: docx.PageNumber's values. docx.js turns these strings into fields when they are
- *    run children.
- *  - DEFAULT_STYLE_SLOTS: each of docx.js's built-in style ids, with the IDefaultStylesOptions key that
- *    sets it and whether that key takes paragraph or character options.
- *  - RAW_XML_ROOTS: the top-level OOXML elements a RawXml fragment may hold, by slot.
- *  - SYMBOL_CHAR: a w:sym's w:char, OOXML's ST_ShortHexNumber. docx.js writes SymbolRun's char unchecked.
- *  - RASTER_IMAGE_TYPES: the ImageRun types other than "svg"; an svg ImageRun needs a fallback of one.
- *  - VML_POSITIONS, VML_RELATIVE_TO, VML_POSITION: the values docx.js's VmlShapeStyle (a Textbox style)
- *    types allow for its positions. docx.js writes the style unchecked.
- *  - VML_MEASURE: a length's string form in a VML style, which is CSS: a CSS number ("2", "1.5", ".5",
- *    "-.5", "+2") and a unit; its groups are the number and the unit. docx.js's ${number} types also
- *    admit forms CSS has no number for, such as "1e2pt", "1.in" and "0x10in". */
+ *  - docx.js turns the PageNumber strings into fields when they are run children.
+ *  - A w:sym's w:char is OOXML's ST_ShortHexNumber; docx.js writes SymbolRun's char unchecked.
+ *  - An svg ImageRun needs a raster fallback.
+ *  - docx.js writes a VmlShapeStyle (a Textbox style) unchecked.
+ *  - A VML length is CSS: a CSS number ("2", "1.5", ".5", "-.5", "+2") and a unit. docx.js's ${number}
+ *    types also admit forms CSS has no number for, such as "1e2pt", "1.in" and "0x10in". */
 
 import type * as docx from "docx";
 

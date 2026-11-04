@@ -1,8 +1,3 @@
-/** The preview's data model: what resolveSections (resolve.ts) computes from a canonical tree, and what
- *  paginate (pages.ts), css.ts, tabs.ts and DocxPreview read. Types only, so every other module of the
- *  preview may import it and it imports none of them. Paths are canonical tree paths: child indices from
- *  the Document root. */
-
 import type { TreePath } from "../read/diagnostics";
 
 export type ComputedRun = {
@@ -20,9 +15,7 @@ export type ComputedRun = {
   readonly doubleStrike: boolean;
   /** 6-digit hex without "#"; null is automatic (inherit). */
   readonly color: string | null;
-  /** Word's highlight palette colour as hex. */
   readonly highlight: string | null;
-  /** The run shading's colour as hex. */
   readonly background: string | null;
   readonly allCaps: boolean;
   readonly smallCaps: boolean;
@@ -58,9 +51,7 @@ export type ComputedParagraph = {
   readonly borders: Partial<Record<Side, ComputedBorder>>;
   readonly background: string | null;
   readonly pageBreakBefore: boolean;
-  /** Keep with the next paragraph on one page. */
   readonly keepNext: boolean;
-  /** Keep all its lines on one page. */
   readonly keepLines: boolean;
   /** Leave no single line of it alone at the foot or head of a page. */
   readonly widowControl: boolean;
@@ -68,7 +59,6 @@ export type ComputedParagraph = {
   /** Tab stops, relative to the left indent, in position order. */
   readonly tabStops: readonly TabStop[];
   readonly defaultTabPt: number;
-  /** The paragraph style in effect, for contextual spacing. */
   readonly styleId: string | null;
   readonly contextualSpacing: boolean;
 };
@@ -78,7 +68,6 @@ export type ResolvedInline =
    *  pagination so a page break found by measuring can name a character. */
   | { readonly kind: "text"; readonly text: string; readonly run: ComputedRun; readonly at?: readonly [number, number] }
   | { readonly kind: "lineBreak" | "columnBreak" }
-  /** A tab, with its run's formatting: an underlined tab draws its gap underlined. */
   | { readonly kind: "tab"; readonly run: ComputedRun }
   /** `rendered`: where Word last broke the page on its own (w:lastRenderedPageBreak), not an authored break. */
   | { readonly kind: "pageBreak"; readonly rendered: boolean }
@@ -105,7 +94,6 @@ export type ResolvedFloat = {
   readonly behind: boolean;
   readonly horizontal: { readonly from: "page" | "margin"; readonly align: "left" | "center" | "right" | null; readonly offsetPt: number };
   readonly vertical: { readonly from: "page" | "margin" | "paragraph"; readonly align: "top" | "center" | "bottom" | null; readonly offsetPt: number };
-  /** The space kept between the picture and wrapped text. */
   readonly distancePt: Readonly<Record<Side, number>>;
 };
 
@@ -182,17 +170,13 @@ export type ResolvedColumns = { readonly count: number; readonly spacePt: number
 
 export type HeaderFooterType = "default" | "first" | "even";
 
-/** One section, resolved but not yet broken into pages (pages.ts does that). */
 export type ResolvedSection = PageGeometry & {
   readonly path: TreePath;
-  /** How the section starts: on a new page, or continuing the previous section's last page. */
   readonly continuous: boolean;
   readonly titlePage: boolean;
-  /** The section's first page number, when it restarts numbering. */
   readonly pageNumberStart: number | null;
   readonly pageNumberFormat: string;
   readonly columns: ResolvedColumns | null;
-  /** The section's own headers and footers, by type; a type it does not define is inherited (pages.ts). */
   readonly headers: Readonly<Partial<Record<HeaderFooterType, readonly ResolvedBlock[]>>>;
   readonly footers: Readonly<Partial<Record<HeaderFooterType, readonly ResolvedBlock[]>>>;
   readonly body: readonly ResolvedBlock[];

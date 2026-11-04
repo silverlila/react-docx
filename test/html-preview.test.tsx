@@ -1,4 +1,4 @@
-/** AC13: DocxPreview draws resolved documents as HTML, rendered through react-dom/server (no DOM here). */
+/** Parsing HTML closes a <p> at an <hr>, so the preview must never put a page break's <hr> inside a <p>. */
 
 import { PageNumber } from "docx";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -44,7 +44,6 @@ const cell = (text: string, verticalMerge?: "restart" | "continue") => (
   </TableCell>
 );
 
-/** Authored, not read: no phase-1 case has a vertical merge. */
 const MERGED_TABLE = renderToTree(
   <Document>
     <Section>
@@ -68,7 +67,6 @@ const MERGED_TABLE = renderToTree(
 
 const html = (document: DocumentNode): string => renderToStaticMarkup(<DocxPreview document={document} />);
 
-/** Every block resolveDocument produces, nested ones included. */
 function allBlocks(blocks: readonly ResolvedBlock[]): ResolvedBlock[] {
   return blocks.flatMap((block): ResolvedBlock[] => {
     switch (block.kind) {
@@ -203,7 +201,6 @@ describe("DocxPreview", () => {
   });
 
   test("keeps a page break's following text in the same paragraph", async () => {
-    // A <p> would be closed by the <hr> when the markup is parsed, pushing the rest of the line out of it.
     const out = html(await readCase("tab-break-pagebreak"));
     expect(out).not.toMatch(/<p[ >]/);
   });

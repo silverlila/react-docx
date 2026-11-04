@@ -41,7 +41,6 @@ type Text = Extract<ResolvedInline, { kind: "text" }>;
 const doc = (props: Record<string, unknown>, ...children: ReactNode[]) =>
   resolveDocument(renderToTree(h(Document, props, h(Section, null, ...children))));
 
-/** Every page's body blocks, in order. */
 const body = (pages: readonly ResolvedPage[]): readonly ResolvedBlock[] => pages.flatMap((page) => page.parts.flatMap((part) => part.blocks));
 
 function paragraphAt(blocks: readonly ResolvedBlock[], i: number): Paragraph {

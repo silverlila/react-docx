@@ -1,7 +1,3 @@
-/** A small TSX highlighter: comments, strings, keywords, JSX tag names, attribute names, numbers and literals.
- *  It colours; it does not parse. JSX text holding an apostrophe can colour the rest of its line as a string, and
- *  short English words that are also keywords (as, in, for) are left plain because they are common in JSX text. */
-
 export type TokenKind = "plain" | "comment" | "string" | "keyword" | "tag" | "attr" | "number" | "literal";
 export type Token = { readonly kind: TokenKind; readonly text: string };
 

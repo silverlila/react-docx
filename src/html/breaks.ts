@@ -1,31 +1,20 @@
-/** Break keys, and measureBreaks, which measures the drawn pages for the breaks they need.
+/** measureBreaks finds the page breaks the drawn pages need, so it runs only against a laid-out DOM (a
+ *  browser) and never under react-dom/server.
  *
- *  - paginate gives each body block a key (ResolvedPart.keys), which DocxPreview draws as
- *    `data-docx-key`; measureBreaks reads it back and answers with the keys of the breaks it found, which
- *    paginate takes in as MeasuredBreaks. Both sets reach callers through "./html" (ResolvedPart.keys and
- *    resolveDocument's `measured`), so the strings formatKey writes are public and must not change.
- *  - Body blocks are numbered in document order across sections; a paragraph's pieces are what its page
- *    and column breaks cut it into; a piece's texts are numbered in order, nested ones included.
- *  - measureBreaks needs a laid-out DOM (a browser); under react-dom/server it never runs. */
+ *  A page Word laid out (it ends at a rendered break, w:lastRenderedPageBreak) is left alone unless it
+ *  overflows by more than LAID_OUT_SLACK. Text is set slightly taller here than in Word, so breaking a
+ *  small overflow would push every later page off Word's; a larger one means Word broke the page without
+ *  recording it. */
 
-/** A point in a paragraph piece's text: the index of a text and a character offset into it. */
 export type Split = readonly [number, number];
 
-/** What a key names. block: the body block's number. */
 export type BreakKey =
-  /** `b<n>.<k>`: piece k of block n, and a break before it. A block other than a paragraph is one piece,
-   *  0, though the parts of a table carry table keys. */
   | { readonly kind: "piece"; readonly block: number; readonly piece: number }
-  /** `b<n>.<k>@<text>:<offset>`: the part of piece k of block n that a measured split starts. */
   | { readonly kind: "continuation"; readonly block: number; readonly piece: number; readonly from: Split }
-  /** `s<n>.<k>@<text>:<offset>`: a measured break inside piece k of block n, before that character. */
   | { readonly kind: "split"; readonly block: number; readonly piece: number; readonly at: Split }
-  /** `t<n>:<first row>:<repeated header rows>`: the part of table n on one page. */
   | { readonly kind: "table"; readonly block: number; readonly start: number; readonly repeated: number }
-  /** `r<n>:<i>`: a break before row i of table n. */
   | { readonly kind: "row"; readonly block: number; readonly row: number };
 
-/** Page breaks found by measuring the drawn pages, as formatted keys: pieces, splits and rows. */
 export type MeasuredBreaks = ReadonlySet<string>;
 
 export const NO_BREAKS: MeasuredBreaks = new Set();
@@ -57,7 +46,6 @@ const KEY_PATTERNS: readonly (readonly [RegExp, (numbers: number[]) => BreakKey]
   [/^r(\d+):(\d+)$/, ([block, row]) => ({ kind: "row", block, row })],
 ];
 
-/** The key `text` formats, or null when it is not one. */
 export function parseKey(text: string): BreakKey | null {
   for (const [pattern, build] of KEY_PATTERNS) {
     const match = pattern.exec(text);
@@ -66,25 +54,16 @@ export function parseKey(text: string): BreakKey | null {
   return null;
 }
 
-/** The key a drawn body block carries. */
 function keyOf(el: HTMLElement): BreakKey {
   const key = parseKey(el.dataset.docxKey ?? "");
   if (key === null) throw new Error(`measureBreaks: block has no break key: data-docx-key="${el.dataset.docxKey}"`);
   return key;
 }
 
-/** How much taller than its page a page Word laid out may be before it is measured: more than this, and
- *  Word broke the page without recording it. */
 const LAID_OUT_SLACK = 1.2;
 
-/** The least room a page's body needs, as a share of the page, before it is measured: less, and what
- *  crowds it out is drawn here as Word does not (a floating picture drawn in line). */
 const MIN_ROOM = 0.2;
 
-/** Where to break paragraph `el` between lines: after the last of its lines from `sliceTop` that ends by
- *  `foot`. Returns the key naming the first character of the next line, and that line's top; null when
- *  no line of the slice can stay, or the paragraph keeps its lines together. With widow control, no line
- *  is left alone on either side of the break. `toPage` maps a viewport y to the page's. */
 function splitLine(el: HTMLElement, sliceTop: number, foot: number, toPage: (clientY: number) => number): { key: string; top: number } | null {
   const piece = keyOf(el);
   if ((piece.kind !== "piece" && piece.kind !== "continuation") || el.dataset.docxKeepLines !== undefined) return null;
@@ -121,12 +100,6 @@ function splitLine(el: HTMLElement, sliceTop: number, foot: number, toPage: (cli
   return { key, top: lines[cut].top };
 }
 
-/** The breaks the drawn pages need: on each page taller than its page, the body blocks are packed into
- *  page-high slices, breaking before the first block (or table row) that crosses a slice's foot. A block
- *  kept with the next one goes with it; a block taller than a page stays where it starts. A page Word
- *  laid out (it ends at a rendered break) is left as it is unless it overflows by more than
- *  LAID_OUT_SLACK: a little, and the text is set taller here than in Word, and breaking it would push
- *  every later page off Word's. */
 export function measureBreaks(root: HTMLElement): string[] {
   const found: string[] = [];
   for (const page of root.querySelectorAll<HTMLElement>("[data-docx-page]")) {
@@ -140,7 +113,6 @@ export function measureBreaks(root: HTMLElement): string[] {
     const body = page.querySelector("[data-docx-body]");
     if (body === null) continue;
     const footer = page.querySelector<HTMLElement>("[data-docx-footer]")?.offsetHeight ?? 0;
-    // Footnotes go on the page that references them: a slice needs room for its own.
     const notes = new Map<string, number>();
     for (const note of page.querySelectorAll<HTMLElement>("[data-docx-footnote]")) notes.set(note.dataset.docxFootnote ?? "", note.offsetHeight);
     const allNotes = page.querySelector<HTMLElement>("[data-docx-footnotes]")?.offsetHeight ?? 0;
@@ -153,8 +125,6 @@ export function measureBreaks(root: HTMLElement): string[] {
     const foot = pageHeight - parseFloat(style.paddingBottom) - footer;
     let room = foot - sliceTop;
     if (room < pageHeight * MIN_ROOM) continue;
-    // A later slice becomes a page of its own, whose header may differ from this page's (a first-page
-    // header): its body is taken to start at the top margin.
     const headerZone = page.querySelector<HTMLElement>("[data-docx-header]");
     const marginTop = parseFloat(style.paddingTop) + (headerZone === null ? 0 : parseFloat(getComputedStyle(headerZone).minHeight) || 0);
     const laterRoom = foot - marginTop >= pageHeight * MIN_ROOM ? foot - marginTop : room;
@@ -183,7 +153,6 @@ export function measureBreaks(root: HTMLElement): string[] {
       const el = blocks[i];
       const key = keyOf(el);
       if (key.kind !== "table") {
-        // A paragraph that crosses the foot breaks between its lines when it can, else moves whole.
         while (!fits(y(el, "bottom"), refsOf(el))) {
           const split = splitLine(el, sliceTop, sliceTop + room - notesHeight(), (clientY) => (clientY - box.top) / scale);
           if (split !== null) {
@@ -203,7 +172,6 @@ export function measureBreaks(root: HTMLElement): string[] {
       for (let k = head; k < rows.length; k++) {
         const refs = refsOf(rows[k]);
         if (!fits(y(rows[k], "bottom"), refs)) {
-          // Breaking before the first body row would leave only the header rows: move the table instead.
           if (k === head) {
             if (i > first && y(el, "top") > sliceTop + 1) breakBefore(i);
           } else {

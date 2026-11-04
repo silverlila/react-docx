@@ -1,7 +1,5 @@
-/** docx.js cannot express Word's default style, table styles or numbering styles, so they are kept as raw
- *  importedStyles. A style with one of docx.js's built-in ids (Heading1, Title, …) is folded by
- *  canonicalize into styles.default.<key>. A paragraph style's numPr needs `custom: true`, or docx.js
- *  writes pStyle ListParagraph into the style's own w:pPr. */
+/** docx.js cannot express Word's default style, table styles or numbering styles. A paragraph style's
+ *  numPr needs `custom: true`, or docx.js writes pStyle ListParagraph into the style's own w:pPr. */
 
 import type * as docx from "docx";
 import type { Mutable } from "../ooxml/codec";

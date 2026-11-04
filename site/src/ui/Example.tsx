@@ -5,7 +5,6 @@ import { DocumentCanvas } from "./DocumentCanvas";
 import { DownloadIcon } from "./icons";
 import { downloadBlob } from "../download";
 
-/** An example's source beside the document that very source renders. Both come from one file. */
 export function Example({
   component: Component,
   source,
@@ -15,7 +14,6 @@ export function Example({
   component: ComponentType;
   source: string;
   file: string;
-  /** The document under the code at full width, cropped to its content, instead of a full page beside it. */
   stacked?: boolean;
 }) {
   const tree = useMemo(() => renderToTree(<Component />), [Component]);

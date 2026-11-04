@@ -402,8 +402,6 @@ describe("phase-1 cases", () => {
       return typeof numbering === "object" && numbering !== null ? [numbering as Listed] : [];
     });
 
-  /** Each list paragraph's level, its reference renamed list-N by first appearance, and the index of the
-   *  first paragraph sharing its (reference, instance). */
   function listShape(document: TreeNode) {
     const references = new Map<string, string>();
     const instances: string[] = [];

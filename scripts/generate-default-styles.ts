@@ -1,11 +1,3 @@
-/** pnpm run generate:styles
- *
- *  Writes src/html/docx-default-styles.generated.ts: the styles docx.js writes into every document (its
- *  w:docDefaults and its 13 default styles), as readDocx reads them back from an empty docx.js document.
- *  The HTML preview applies them under the document's own styles (decision 14).
- *  test/html-resolve.test.ts repeats these steps and fails when the committed file drifts, e.g. after a
- *  docx.js upgrade. */
-
 import { readFileSync, writeFileSync } from "node:fs";
 import { renderToBuffer } from "../src/index";
 import { readDocx } from "../src/read/index";

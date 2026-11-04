@@ -2,11 +2,11 @@
  *
  *  - docx.js writes every picture with the same boilerplate (wp:cNvGraphicFramePr, pic:nvPicPr, a:stretch,
  *    an empty a:srcRect, a rect a:prstGeom, a:noFill, the blip's cstate, a zero wp:simplePos, the
- *    wp:effectExtent it computes); it is accepted without a note.
+ *    wp:effectExtent it computes).
  *  - Size is px × 9525 EMU; floating offsets are in EMU. A VML length without a unit is px (96 dpi).
  *  - `<a:ln><a:noFill/></a:ln>` draws no line, the same as docx.js's picture without an outline.
  *  - a:xfrm rot is in 60000ths of a degree. docx.js writes rotation × 60000 unrounded, so about 6% of whole
- *    angles come out as float noise (31905 → rot="31904.999999999996"); they are rounded back.
+ *    angles come out as float noise (31905 → rot="31904.999999999996").
  *  - docx.js needs an align or an offset on wp:positionH/V, and writes an image's run without properties. */
 
 import type * as docx from "docx";

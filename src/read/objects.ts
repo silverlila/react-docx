@@ -1,7 +1,5 @@
-/** A text box is a w:pict whose v:shape holds v:textbox/w:txbxContent. Its style declarations map to
- *  VmlShapeStyle; those with no key or value are dropped. docx.js writes its own shape id, shape type
- *  #_x0000_t202 and v:textbox attributes on a text box, so those are accepted; anything else on the
- *  v:shape is dropped. */
+/** A text box is a w:pict whose v:shape holds v:textbox/w:txbxContent. docx.js writes its own shape id,
+ *  shape type #_x0000_t202 and v:textbox attributes on a text box. */
 
 import type * as docx from "docx";
 import { DECIMAL, INTEGER, NO_OPTION, dropped, type Note } from "../ooxml/codec";

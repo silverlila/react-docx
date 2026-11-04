@@ -1,3 +1,5 @@
+/** scrollIntoView misplaces targets under CSS zoom, so scrolling to a block is computed by hand. */
+
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ComponentType, type KeyboardEvent, type ReactNode } from "react";
 import type { Diagnostic } from "@react-docx/core/reader";
 import { GITHUB_URL, mount } from "../shell";
@@ -23,10 +25,8 @@ const SAMPLES: readonly { name: string; label: string; component: ComponentType 
 ];
 
 const ACCEPT = ".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-/** Above this size the JSX is shown without colours: highlighting half a megabyte of source stalls the tab. */
 const HIGHLIGHT_LIMIT = 250_000;
 
-/** Lets the browser paint the "Reading…" state before the synchronous read blocks the thread. */
 const nextFrame = () => new Promise<void>((resolve) => setTimeout(resolve, 30));
 
 function PreviewPage() {
@@ -64,7 +64,6 @@ function PreviewPage() {
   );
 }
 
-/** Calls `onFile` for a file dropped anywhere on the page, and reports whether a drag is over it. */
 function useWindowDrop(onFile: (file: File) => void): boolean {
   const [dragging, setDragging] = useState(false);
   const latest = useRef(onFile);
@@ -194,7 +193,6 @@ function Workspace({ file, onOpen }: { file: LoadedFile; onOpen: (file: File) =>
   const effectiveZoom = zoom ?? fitting.fit;
   const id = useId();
 
-  // A new file starts on its preview, fitted.
   useEffect(() => {
     setTab("preview");
     setZoom(null);
@@ -237,7 +235,6 @@ function Workspace({ file, onOpen }: { file: LoadedFile; onOpen: (file: File) =>
           tabs={tabs}
           value={tab}
           onChange={(next) => {
-            // Each view starts at its top; the previous view's scroll position means nothing in the next one.
             setTab(next);
             window.scrollTo({ top: 0 });
           }}
@@ -376,7 +373,6 @@ function DownloadButtons({ file }: { file: LoadedFile }) {
   );
 }
 
-/** The sheets, zoomed. `target` is a block's tree path to scroll to and flash once drawn. */
 function PreviewSheets({
   file,
   zoom,
@@ -394,8 +390,6 @@ function PreviewSheets({
     const element = root.current?.querySelector<HTMLElement>(`[data-docx-path="${target}"]`);
     onShown();
     if (!element) return;
-    // The page scrolls, under a sticky header and toolbar: put the target a third of the way down what is left.
-    // (scrollIntoView misplaces targets under CSS zoom.)
     const covered = document.querySelector(".toolbar")?.getBoundingClientRect().bottom ?? 0;
     const top = window.scrollY + element.getBoundingClientRect().top;
     window.scrollTo({ top: top - covered - (window.innerHeight - covered) / 3 });

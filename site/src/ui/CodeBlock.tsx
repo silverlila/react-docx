@@ -43,7 +43,6 @@ export function Code({ code, language = "tsx" }: { code: string; language?: "tsx
   );
 }
 
-/** A dark code panel with a copy button. `title` (a file name) puts the button in a header row. */
 export function CodeBlock({ code, title, language }: { code: string; title?: string; language?: "tsx" | "sh" }) {
   return (
     <div className="code">

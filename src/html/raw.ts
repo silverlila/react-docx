@@ -1,17 +1,11 @@
-/** What the preview draws for RawXml: the reader keeps content verbatim where no tree kind maps it (content
- *  controls, smart tags, custom XML, simple fields, Word's tables of contents), and Word shows that
- *  content. rawBlocks, rawInlines and rawRunItems read it into the tree kinds resolveDocument draws, with
- *  the reader's own codecs.
+/** What the preview draws for RawXml content, as Word shows it.
  *
- *  - Wrappers (w:sdt, w:smartTag, w:customXml, w:fldSimple, w:ins) are read through; w:del is left out.
+ *  - w:sdt, w:smartTag, w:customXml, w:fldSimple and w:ins are read through; w:del is dropped.
  *  - A complex field shows its result and hides its instruction, across paragraphs: a table of contents
- *    is one field whose result is its entries. A page-number field, as the reader recognises one
- *    (pageFieldOf), shows the page's number instead.
- *  - A run is read in order, so a page or column break in it falls between the text before and after.
- *  - A w:sym whose w:char is not hex is left out, as the reader leaves it out of SymbolRun.
- *  - The fragment comes without its package, so a hyperlink to an external target keeps only its text,
- *    pictures, notes and objects are left out, a numbered paragraph draws without its marker (its numId
- *    names no tree list), and theme fonts fall back to the style's. */
+ *    is one field whose result is its entries.
+ *  - A fragment arrives without its package, so an external hyperlink keeps only its text, pictures,
+ *    notes and objects are lost, a numbered paragraph has no marker, and theme fonts fall back to the
+ *    style's. */
 
 import { NO_THEME_ENV } from "../ooxml/codec";
 import { readParagraphProperties } from "../ooxml/paragraph";
@@ -26,15 +20,10 @@ type BlockNode = Node<"Paragraph" | "Table">;
 type InlineNode = Node<ChildKind<"Paragraph">>;
 type RunChild = Node<ChildKind<"TextRun">> | string;
 
-/** A run's content in order: what a TextRun holds, and the breaks and symbols that are runs of their own. A
- *  SymbolRun here carries only its char and font. */
 export type RunItem = RunChild | Node<"PageBreak" | "ColumnBreak" | "SymbolRun">;
 
-/** A complex field: its instruction so far, and whether its result is showing. A page-number field's
- *  result is replaced by the page's own number, so its cached result is hidden. */
 type Field = { instruction: string; phase: "instruction" | "result" | "replaced" };
 
-/** The open complex fields, outermost first; text shows only when every one of them is in its result. */
 type Walk = { readonly fields: Field[] };
 
 const WRAPPERS = new Set(["w:sdt", "w:smartTag", "w:customXml", "w:fldSimple", "w:ins", "w:moveTo"]);
@@ -48,7 +37,6 @@ function wrapped(el: XmlElement): readonly XmlElement[] {
 
 const showing = (walk: Walk): boolean => walk.fields.every((field) => field.phase === "result");
 
-/** A page-number field reaching its result, as the PageNumber it shows; null for any other field char. */
 function fieldChar(el: XmlElement, walk: Walk): RunChild | null {
   const type = attrOf(el, "w:fldCharType");
   const open = walk.fields[walk.fields.length - 1];
@@ -116,7 +104,6 @@ function runItems(elements: readonly XmlElement[], walk: Walk): RunItem[] {
   return items;
 }
 
-/** A run as the runs it shows: its content up to each break or symbol is a TextRun with its properties. */
 function run(r: XmlElement, walk: Walk): InlineNode[] {
   const props = readRunProperties(childNamed(r, "w:rPr"), NO_THEME_ENV).options;
   const out: InlineNode[] = [];
@@ -200,17 +187,14 @@ function blocks(elements: readonly XmlElement[], walk: Walk): BlockNode[] {
 
 const freshWalk = (): Walk => ({ fields: [] });
 
-/** The blocks a block-level RawXml shows. */
 export function rawBlocks(xml: string): BlockNode[] {
   return blocks(parseXmlRoots(xml), freshWalk());
 }
 
-/** The inline content a paragraph-level RawXml shows. */
 export function rawInlines(xml: string): InlineNode[] {
   return inlines(parseXmlRoots(xml), freshWalk());
 }
 
-/** The content a run-level RawXml shows. */
 export function rawRunItems(xml: string): RunItem[] {
   return runItems(parseXmlRoots(xml), freshWalk());
 }

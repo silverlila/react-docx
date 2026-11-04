@@ -9,8 +9,6 @@
  *    the caller as "other" and kept as RawXml.
  *  - docx.js writes those field runs with no run properties, so a field whose runs have any is not in
  *    its shape: mapping it would lose them.
- *  - A complex field is found from its begin to the end that brings the nesting depth back to zero. Its
- *    instruction is the w:instrText at depth one before its w:fldChar separate.
  *  - CheckBox: docx.js writes the content from the options, so w:sdtContent is ignored. States equal to
  *    docx.js's defaults (2612 / 2610 in MS Gothic) are left out, as an author would. */
 

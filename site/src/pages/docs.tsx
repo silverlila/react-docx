@@ -21,7 +21,6 @@ const NAV: readonly { group: string; items: readonly [id: string, label: string]
   { group: "In the browser", items: [["preview", "DocxPreview"], ["limits", "Known limits"]] },
 ];
 
-/** The id of the section nearest the top of the viewport, for the sidebar's current item. */
 function useCurrentSection(ids: readonly string[]): string {
   const [current, setCurrent] = useState(ids[0]);
   useEffect(() => {

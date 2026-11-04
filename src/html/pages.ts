@@ -27,7 +27,10 @@
  *    whose header has none at all shows none.
  *  - Breaks found by measuring the drawn pages (MeasuredBreaks, breaks.ts) start a page where the page has
  *    content.
- *  - Each page lists the footnotes it references. An empty last page is dropped. */
+ *  - Each page lists the footnotes it references. An empty last page is dropped.
+ *  - Word records a rendered break at the start of a continuous section's part that follows a
+ *    multi-column part, and at the start of a multi-column part's first column. In one column, a column
+ *    break is a page break. */
 
 import { formatNumber } from "../ooxml/markers";
 import type { TreePath } from "../read/diagnostics";
@@ -80,9 +83,7 @@ type DraftPart = {
   readonly columns: ResolvedColumns | null;
   readonly blocks: ResolvedBlock[];
   readonly keys: string[];
-  /** Where each column after the first starts. */
   readonly columnStarts: number[];
-  /** A continuous section's part that follows a multi-column part: Word marks its start as rendered. */
   readonly afterColumns: boolean;
 };
 
@@ -91,7 +92,6 @@ type Draft = {
   readonly indexInSection: number;
   readonly number: number;
   readonly parts: DraftPart[];
-  /** The page ends where Word ended it when it last laid the document out (a rendered break). */
   laidOut: boolean;
 };
 
@@ -130,7 +130,6 @@ function breakOf(inline: ResolvedInline): Break | null {
   return inline.kind === "columnBreak" ? "column" : null;
 }
 
-/** `inlines` with each text numbered in order, nested ones included, for split keys to name. */
 function numberTexts(inlines: readonly ResolvedInline[]): ResolvedInline[] {
   let index = 0;
   const walk = (list: readonly ResolvedInline[]): ResolvedInline[] =>
@@ -142,7 +141,6 @@ function numberTexts(inlines: readonly ResolvedInline[]): ResolvedInline[] {
   return walk(inlines);
 }
 
-/** The split points measured for piece `piece` of block `block`, in text order. */
 function splitsOf(measured: MeasuredBreaks, block: number, piece: number): Split[] {
   const out: Split[] = [];
   for (const text of measured) {
@@ -152,7 +150,6 @@ function splitsOf(measured: MeasuredBreaks, block: number, piece: number): Split
   return out.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
 }
 
-/** `inlines` before and from character `offset` of text `index`. */
 function cutAt(inlines: readonly ResolvedInline[], [index, offset]: Split): [ResolvedInline[], ResolvedInline[]] {
   const before: ResolvedInline[] = [];
   const after: ResolvedInline[] = [];
@@ -182,7 +179,6 @@ function cutAt(inlines: readonly ResolvedInline[], [index, offset]: Split): [Res
   return [before, after];
 }
 
-/** A piece cut at each split point: the first part, then one from each point. */
 function cutAtSplits(inlines: ResolvedInline[], splits: readonly Split[]): { inlines: ResolvedInline[]; from: Split }[] {
   const parts: { inlines: ResolvedInline[]; from: Split }[] = [];
   let rest = inlines;
@@ -198,8 +194,6 @@ function cutAtSplits(inlines: ResolvedInline[], splits: readonly Split[]): { inl
   return parts;
 }
 
-/** A piece of a paragraph broken across pages: its marker, space before and first-line indent stay on its
- *  first piece, its space after on its last. */
 function paragraphPiece(p: Paragraph, inlines: ResolvedInline[], first: boolean, last: boolean): Paragraph {
   return {
     ...p,
@@ -215,8 +209,6 @@ function paragraphPiece(p: Paragraph, inlines: ResolvedInline[], first: boolean,
   };
 }
 
-/** `blocks` cut at their paragraphs' rendered breaks: what Word set on each page, in order. A paragraph
- *  with nothing but breaks keeps its empty line, after its last break. */
 function cutAtRenderedBreaks(blocks: readonly ResolvedBlock[]): ResolvedBlock[][] {
   const groups: ResolvedBlock[][] = [[]];
   for (const block of blocks) {
@@ -240,8 +232,6 @@ function cutAtRenderedBreaks(blocks: readonly ResolvedBlock[]): ResolvedBlock[][
   return groups;
 }
 
-/** Each cell's content as Word set it on successive pages, from the page the row starts on: a rendered
- *  break at the start of a cell is the row's own page break. */
 function cellPages(row: ResolvedRow): { startsPage: boolean; cells: ResolvedBlock[][][] } {
   let startsPage = false;
   const cells = row.cells.map((cell) => {
@@ -260,7 +250,6 @@ const EMPTY_CELL_PARAGRAPH = (cell: ResolvedRow["cells"][number]): ResolvedBlock
   return template === undefined ? [] : [{ ...template, marker: null, inlines: [] }];
 };
 
-/** A row Word broke across pages, as one row per page: each cell's content up to its next rendered break. */
 function rowPieces(row: ResolvedRow, cells: readonly ResolvedBlock[][][]): ResolvedRow[] {
   const count = Math.max(...cells.map((groups) => groups.length));
   return Array.from({ length: count }, (_, p) => ({
@@ -285,8 +274,6 @@ function paginateSections(sections: readonly ResolvedSection[], measured: Measur
   let number = 0;
   const current = (): Draft => pages[pages.length - 1];
   const part = () => current().parts[current().parts.length - 1];
-  // A floating text box goes on the page of the paragraph after it, which it is anchored in (the reader
-  // puts it before that paragraph): it waits until that paragraph's first piece is placed.
   let floats: [ResolvedBlock, string][] = [];
   const emit = (block: ResolvedBlock, key: string) => {
     if (block.kind === "textbox" && block.float !== null) {
@@ -318,9 +305,6 @@ function paginateSections(sections: readonly ResolvedSection[], measured: Measur
     current().laidOut = true;
     newPage();
   };
-  /** A break in a multi-column part moves to the next column, or past the last one to a new page; Word
-   *  also marks the start of a part's first column as rendered. In one column a column break is a page
-   *  break. */
   const breakPage = (why: Break | "content") => {
     const here = part();
     const count = here.columns?.count ?? 1;
@@ -345,8 +329,6 @@ function paginateSections(sections: readonly ResolvedSection[], measured: Measur
   const placeParagraph = (p: Paragraph, n: number) => {
     if (p.format.pageBreakBefore) breakPage("content");
     const { segments, cuts: breaks } = cutInlines(p.inlines, breakOf);
-    // A piece with nothing visible (a bookmark, an empty run) goes with the piece after it, or the last
-    // one with the piece before it.
     const pieces = segments.map((inlines, i) => ({ inlines, before: i === 0 ? null : breaks[i - 1] }));
     for (let i = 0; i < pieces.length - 1; i++) {
       if (!pieces[i].inlines.some(isVisibleInline)) {
@@ -381,8 +363,6 @@ function paginateSections(sections: readonly ResolvedSection[], measured: Measur
   const placeTable = (t: Table, n: number) => {
     const firstBody = t.rows.findIndex((row) => !row.isHeader);
     const head = firstBody === -1 ? [] : t.rows.slice(0, firstBody);
-    // The first row of the vertically merged region each row is in: a break inside one moves up to it,
-    // so no merged cell is cut.
     const mergeStart = t.rows.map((_, r) => r);
     t.rows.forEach((row, i) => {
       for (const cell of row.cells) {
@@ -398,8 +378,6 @@ function paginateSections(sections: readonly ResolvedSection[], measured: Measur
       start = from;
       repeated = head.length;
     };
-    /** Breaks before row `r` (before its merged region), carrying the region's rows over; false when the
-     *  page would keep no body row. */
     const breakAt = (r: number, rendered: boolean): boolean => {
       const target = mergeStart[r];
       const moved = r - target;
@@ -431,7 +409,6 @@ function paginateSections(sections: readonly ResolvedSection[], measured: Measur
       const rendered = row.cells.some((cell) => containsRenderedBreak(cell.blocks));
       const breaksHere = rendered || measured.has(formatKey({ kind: "row", block: n, row: r }));
       if (breaksHere && r >= head.length && breakAt(r, rendered)) {
-        // broken before the row
       } else if (rendered && chunk.length === 0) {
         breakPage("rendered");
       }
@@ -482,7 +459,6 @@ function footnoteNumbers(blocks: readonly ResolvedBlock[], out: Set<number>): Se
   return out;
 }
 
-/** Each section's headers or footers with the types it lacks inherited from the section before. */
 function inherited(sections: readonly ResolvedSection[], of: (s: ResolvedSection) => Stories): Stories[] {
   const out: Stories[] = [];
   sections.forEach((s, i) => out.push({ ...(i === 0 ? {} : out[i - 1]), ...of(s) }));

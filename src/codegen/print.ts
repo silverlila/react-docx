@@ -1,7 +1,5 @@
 /** printJsx turns a canonical document tree into a .tsx module that renders the same tree.
  *
- *  It is pure string building: no formatter, and no runtime import outside this folder.
- *
  *  JSX facts the printer relies on:
  *  - JSX text loses whitespace at line ends and decodes HTML entities, so text with outer spaces, other
  *    whitespace, a control character, `{`, `}`, `<`, `>` or `&` prints as a string expression.

@@ -1,34 +1,22 @@
-/** The body walk: blocks (paragraphs, tables, content controls), inline content (runs, hyperlinks,
- *  bookmarks, fields) and run content, read into author nodes for canonicalize.
+/** The body walk: reads the blocks, inline content and run content of the body, headers, footers,
+ *  footnotes and comments into author nodes for canonicalize. What it accepts is shaped by what docx.js
+ *  writes and what Word writes:
  *
- *  - Inline content is read in three steps. Its elements are flattened into items (each child of a w:r
- *    with its run, or another element). Complex fields and bookmark pairs are found over the items. Then
- *    each item becomes a piece: run content of a source w:r, or an inline node. Consecutive run content of
- *    one w:r becomes one TextRun with that run's properties, so a run splits only where OOXML forces it:
- *    page and column breaks, symbols and inline fields. Text breaks stay author `Break`s for canonicalize.
- *  - A page field becomes PageNumber run content of the run holding its instruction, so docx.js's
- *    one-run field reads back into the run it was written in.
- *  - Text equal to a PageNumber value ("CURRENT", …) is kept as its own TextRun's `text`, so canonicalize does not read it as a PageNumber.
- *  - Bookmarks: an end pairs with the most recent unpaired start of the same w:id in the same parent,
- *    because docx.js writes w:id="1" for every Bookmark. A pair crossing another pair or a field, or one
- *    split across parents, is kept as RawXml with its id moved to 100000 + an ordinal.
- *  - Word's _GoBack bookmark (the last edit position) is removed up front with `withoutGoBack`.
- *  - The generic fallback keeps an element as RawXml when its slot allows its name and
- *    `rawXmlOf` accepts it, else unwraps a wrapper's content, else drops it. Every RawXml names a renamed
- *    style (`clashingStyleIds`) by its fresh id.
- *  - OOXML requires a table cell to end with a paragraph; Word always complies, so a cell whose last
+ *  - docx.js writes a page field as one run, so the field reads back as PageNumber content of that run.
+ *  - docx.js writes w:id="1" for every Bookmark, so ids alone cannot pair bookmarks: an end pairs with the
+ *    most recent unpaired start of the same id in the same parent. A pair that crosses another pair or a
+ *    field, or spans parents, is kept as RawXml under a fresh id.
+ *  - docx.js registers numbering and writes footnote references only for the main part, so elsewhere a
+ *    numbered paragraph gets its marker as leading text and a footnote reference is dropped. docx.js
+ *    writes the footnote-reference run's style itself.
+ *  - docx.js adds pStyle ListParagraph to a numbered paragraph unless `custom` is set, so a list paragraph
+ *    with no w:pStyle gets `custom: true`.
+ *  - docx.js writes a Textbox as its own paragraph, while Word anchors text boxes inside a run, often in
+ *    mc:AlternateContent. A text box therefore becomes a Textbox paragraph of its own, in a Section body
+ *    only; anywhere else it is dropped.
+ *  - OOXML requires a table cell to end with a paragraph and Word always complies, so a cell whose last
  *    block would be RawXml or a Table gets an empty Paragraph without a diagnostic.
- *  - The walk reads the body, headers and footers, footnotes and comments, told apart by the context's
- *    part. docx.js registers numbering and writes footnote references only for the main part, so a
- *    numbered paragraph elsewhere gets its marker as leading text, and a footnote reference
- *    elsewhere is dropped. docx.js writes the footnote-reference run's style itself.
- *  - A paragraph with a list but no w:pStyle gets `custom: true`, because docx.js adds pStyle ListParagraph
- *    to a numbered paragraph otherwise.
- *  - docx.js writes a Textbox as its own paragraph, so a VML text box that is a paragraph's only content
- *    (directly in the w:p, as docx.js writes it, or in its only run, as Word does) makes that paragraph a
- *    Textbox, in a Section body only. A text box anywhere else is dropped.
- *  - mc:AlternateContent is read as its first Choice whose elements all map to a kind other than RawXml in
- *    the slot (`mapsToKind`), else as its Fallback. */
+ *  - Word's _GoBack bookmark marks the last edit position; it is removed up front. */
 
 import type * as docx from "docx";
 import { isOneOf, type Note } from "../ooxml/codec";
@@ -279,9 +267,6 @@ function readBlockElements(elements: readonly XmlElement[], ctx: BodyContext, li
   }
 }
 
-/** A paragraph, after the text boxes it holds beside other content (Word's anchored text boxes): docx.js
- *  writes a Textbox as a paragraph of its own, so each becomes a Textbox before the paragraph, in a Section
- *  body only. */
 function readParagraph(p: XmlElement, at: (offset: number) => BodyContext, inSection: boolean): AuthorNode[] {
   const all = elementsOf(p).filter((el) => el.name !== "w:pPr");
   const ctx = at(0);
@@ -299,8 +284,6 @@ function readParagraph(p: XmlElement, at: (offset: number) => BodyContext, inSec
   return [readOneParagraph(read, all.filter((el) => el !== lone.holder), ctx)];
 }
 
-/** The text boxes in `content`'s runs, directly or as alternate content's Fallback, and `content`
- *  without them. */
 function hoistTextBoxes(content: readonly XmlElement[], ctx: BodyContext): { boxes: TextBox[]; content: XmlElement[] } {
   const boxes: TextBox[] = [];
   const boxIn = (el: XmlElement): TextBox | null => {
@@ -407,7 +390,6 @@ function loneTextBox(content: readonly XmlElement[], ctx: ReadContext): LoneText
   return box === null ? null : { box, holder, run: holder, alternate: only };
 }
 
-/** The text box of alternate content read as its Fallback, when that Fallback is one w:pict. */
 function fallbackTextBox(alternate: XmlElement, ctx: ReadContext): TextBox | null {
   const chosen = alternateContent(alternate, (el) => mapsToKind(el, "run", ctx));
   const [pict, ...rest] = chosen?.used === "Fallback" ? chosen.elements : [];

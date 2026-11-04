@@ -1,16 +1,14 @@
 /** The style sheet Word applies to a document react-docx writes, built the way docx.js builds styles.xml,
  *  so the preview shows what Word shows.
  *
- *  - Document defaults: `styles.default.document` when given, else docx.js's. docx.js does
- *    `new DocumentDefaults(options.document ?? {})`, which replaces rather than merges.
- *  - docx.js's 13 default styles: its own options with the authored `styles.default.<key>` spread over them
- *    shallowly, as its DefaultStylesFactory does (`new Heading1Style({ run: {…}, ...options.heading1 })`).
- *    So an authored `heading1: { run: { size: 40 } }` loses docx.js's heading colour.
- *  - Then the document's paragraph and character styles, and its raw `importedStyles`, read with the same
- *    codecs as the reader. The raw style marked w:default="1" (usually Normal) is the default paragraph
- *    style; docx.js marks none of its own.
- *  - Raw styles are read with an empty theme: the reader resolved theme fonts and colours in every option
- *    it wrote, and docx.js writes no theme part. */
+ *  - docx.js's style type (IParagraphStylePropertiesOptions) leaves out pageBreakBefore, tabStops,
+ *    bidirectional and widowControl, which docx.js writes for a style.
+ *  - docx.js does `new DocumentDefaults(options.document ?? {})`, which replaces the defaults rather than
+ *    merging them.
+ *  - DefaultStylesFactory spreads `options.<key>` shallowly over each default style
+ *    (`new Heading1Style({ run: {…}, ...options.heading1 })`), so an authored
+ *    `heading1: { run: { size: 40 } }` loses docx.js's heading colour.
+ *  - docx.js writes no theme part and marks none of its styles w:default. */
 
 import type * as docx from "docx";
 import { NO_THEME_ENV, isOneOf, isOnValue, type Note } from "../ooxml/codec";
@@ -21,8 +19,6 @@ import { DEFAULT_STYLE_SLOTS } from "../schema/docx-facts";
 import type { StylesProps } from "../schema/elements";
 import { DOCX_DEFAULT_STYLES } from "./docx-default-styles.generated";
 
-/** A style's paragraph options as the reader reads them: docx.js's style type leaves out what the paragraph
- *  codec also reads (and docx.js writes) for a style. */
 export type SheetParagraph = docx.IParagraphStylePropertiesOptions & {
   readonly pageBreakBefore?: boolean;
   readonly tabStops?: readonly docx.TabStopDefinition[];

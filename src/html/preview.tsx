@@ -1,24 +1,17 @@
-/** DocxPreview: draws resolveDocument's data as React DOM.
+/** DocxPreview draws resolveDocument's pages as React DOM, every style inline.
  *
- *  - One sheet per page (pages.ts says where pages break), at the page's size: at least as tall as the
- *    page, taller when its content overflows. The header starts at the header distance from the top and
- *    pushes the body down when it is taller than the top margin; the footer ends at the footer distance
- *    from the bottom; footnotes sit at the foot of the body, above the bottom margin.
- *  - Fields show the page's number, the page count and the section's number and page count.
- *  - A part whose column breaks are known is a grid of equal columns, broken there. Another part with
- *    columns is a CSS multi-column box, which balances its columns.
- *  - Blocks lay out in block flow (paragraph spacing is padding, so it does not collapse), so a floating
- *    picture wraps the paragraphs after the one it is anchored in, as in Word.
- *  - Every style is inline (from css.ts), with no stylesheet and no class names, so the component needs no
- *    CSS setup in the host app.
- *  - Every block carries `data-docx-path`, its canonical tree path joined with ".".
- *  - It takes a tree, not JSX children: rendering children here would run react-docx's reconciler inside a
- *    React DOM render. Callers write `useMemo(() => renderToTree(element), [element])`.
- *  - Word's default text box insets are 0.05in top and bottom, 0.1in left and right.
+ *  - Word's default text box insets are 0.05in top and bottom, 0.1in left and right. Word's anchored text
+ *    boxes mostly have no line and no white fill, and the tree keeps neither, so a placed text box draws
+ *    without them; one in the flow draws as docx.js writes it, with Word's default line and white fill.
+ *  - Word colours and underlines a hyperlink through its runs' style, not the link, so a link draws as its
+ *    runs do.
  *  - Link targets come from whoever wrote the file, so only http:, https: and mailto: survive. The scheme
  *    is whatever `new URL` reports, which normalises case, spaces and tabs as a browser does.
+ *  - A block container is its own formatting context, so it holds its floats.
  *  - text-indent is inherited and would shift an inline-block's own first line.
- *  - A page break's <hr> would close a <p> when the markup is parsed, so paragraphs are <div>s. */
+ *  - A page break's <hr> would close a <p> when the markup is parsed, so paragraphs are <div>s.
+ *  - Fonts load on first layout, which makes every earlier measurement stale, so the pages are measured
+ *    again from no breaks each time a load finishes. */
 
 import React, { useContext, type CSSProperties, type ReactNode } from "react";
 import type { TreePath } from "../read/diagnostics";
@@ -50,11 +43,8 @@ const SAFE_LINK_SCHEMES: ReadonlySet<string> = new Set(["http:", "https:", "mail
 
 const pathAttr = (path: TreePath): string => path.join(".");
 
-/** A page is a column of its header, body, footnotes and footer. */
 const FLOW: CSSProperties = { display: "flex", flexDirection: "column" };
 
-/** A block container: block flow, so a floating picture wraps the paragraphs after its own, and a
- *  formatting context of its own, so it holds its floats. */
 const BLOCKS: CSSProperties = { display: "flow-root" };
 
 const SHEET: CSSProperties = {
@@ -129,7 +119,6 @@ function Field({ inline }: { readonly inline: Extract<ResolvedInline, { kind: "f
   );
 }
 
-/** A link draws as its runs do: Word colours and underlines a hyperlink through its runs' style, not the link. */
 const LINK: CSSProperties = { color: "inherit", textDecoration: "none" };
 
 const PT_PER_PX = 0.75;
@@ -141,9 +130,6 @@ function aligned(align: "left" | "center" | "right" | "top" | "bottom" | null, s
   return start + offset;
 }
 
-/** Where a floating object goes, at `widthPt` × `heightPt`. Wrapped square, it floats to the side of the
- *  text it is nearer; wrapped top and bottom, it is a block; not wrapped, it is placed on the page. A
- *  position from the anchoring paragraph counts from where the object stands in the flow. */
 function placement(float: ResolvedFloat, widthPt: number, heightPt: number, geometry: PageGeometry): CSSProperties {
   const { marginsPt } = geometry;
   const contentWidth = geometry.widthPt - marginsPt.left - marginsPt.right;
@@ -185,8 +171,6 @@ function FloatingImage({ image, float }: { readonly image: Extract<ResolvedInlin
   );
 }
 
-/** A text box in the flow is drawn as docx.js writes one, with Word's default line and white fill. A placed
- *  one is drawn without: Word's anchored text boxes mostly have neither, and the tree keeps neither. */
 function TextboxBlock({ block, breakKey }: { readonly block: Extract<ResolvedBlock, { kind: "textbox" }> } & Keyed): ReactNode {
   const page = usePage();
   const placed = block.float !== null;
@@ -341,9 +325,6 @@ function Gap({ item }: { readonly item: Extract<TabItem, { kind: "gap" }> }): Re
   );
 }
 
-/** The spans a tab stop places sit in one row as wide as the line at most, so they stay on one line:
- *  past it, their leaders give way first. Their text may wrap inside them, and a span's last line holds
- *  what follows its tab, as a table-of-contents entry's page number. */
 function TabbedInlines({ block }: { readonly block: Paragraph }): ReactNode {
   const { format, marker } = block;
   const startPt = marker === null ? format.firstLinePt : format.firstLinePt < 0 ? 0 : format.firstLinePt + MIN_MARKER_GAP_PT * 3;
@@ -394,7 +375,6 @@ function TabbedInlines({ block }: { readonly block: Paragraph }): ReactNode {
   );
 }
 
-/** A body block's break key (breaks.ts), for measuring pages. */
 type Keyed = { readonly breakKey?: string };
 
 function ParagraphBlock({ block, breakKey }: { readonly block: Paragraph } & Keyed): ReactNode {
@@ -433,7 +413,6 @@ function cellStyle(cell: ResolvedCell): CSSProperties {
   };
 }
 
-/** A table's place across its flow, in its own direction: a right-to-left table starts at the right. */
 const TABLE_ALIGN: Readonly<Record<"start" | "center" | "end", CSSProperties>> = {
   start: {},
   center: { marginInline: "auto" },
@@ -622,8 +601,6 @@ export const DocxPreview = React.forwardRef<HTMLDivElement, DocxPreviewProps>(fu
     const found = measureBreaks(root.current).filter((key) => !breaks.has(key));
     if (found.length > 0) setMeasured({ document, breaks: new Set([...breaks, ...found]) });
   }, [pages, fontsLoaded]);
-  // Fonts load when the first layout asks for them, after which every measurement is stale: measure again
-  // from no breaks each time a load finishes.
   React.useEffect(() => {
     const fonts = window.document.fonts;
     if (fonts === undefined) return;

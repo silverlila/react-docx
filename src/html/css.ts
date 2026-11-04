@@ -1,12 +1,16 @@
-/** - Right to left: a paragraph's indents are logical (Word's left indent is the start), its borders
+/** Word's layout rules the CSS reproduces:
+ *
+ *  - Right to left: a paragraph's indents are logical (Word's left indent is the start), its borders
  *    physical.
- *  - Line height: CSS sets a line box at its tallest inline box, as Word sets a line at its tallest run,
- *    so each run carries its own line height (ComputedRun.lineHeight) and the paragraph's box carries
- *    the paragraph mark's. An atLeast line is the paragraph's minimum with each run at its single height;
- *    an exact line is the paragraph's, inherited by every run.
+ *  - Line height: Word sets a line at its tallest run, as CSS sets a line box at its tallest inline box,
+ *    so each run carries its own line height and the paragraph's box carries the paragraph mark's. An
+ *    atLeast line is the paragraph's minimum with each run at its single height; an exact line is the
+ *    paragraph's, inherited by every run.
  *  - A paragraph's box takes the paragraph mark's font, so an empty paragraph is as tall as in Word.
- *  - pageBreakBefore sets no CSS break: paginate already starts the paragraph's page, and Word ignores it
- *    in table cells, headers and footers. */
+ *  - pageBreakBefore sets no CSS break: Word ignores it in table cells, headers and footers.
+ *  - Superscript and subscript are about two thirds of the run's size and do not make their line taller.
+ *  - Space before and after is padding, not margin: Word adds one paragraph's space after to the next
+ *    one's space before instead of collapsing them, and its shading and borders take in the spacing. */
 
 import type { CSSProperties } from "react";
 import { isOwnKey } from "../schema/own";
@@ -32,8 +36,6 @@ const UNDERLINE_STYLES: Readonly<Record<string, CSSProperties["textDecorationSty
 
 export const pt = (n: number): string => `${n}pt`;
 
-/** Word sets superscript and subscript at about two thirds of the run's size, and they do not make
- *  their line taller. */
 const SCRIPT_SCALE = 0.65;
 
 function textDecoration(r: ComputedRun): CSSProperties {
@@ -78,9 +80,6 @@ function lineHeight(p: ComputedParagraph): CSSProperties["lineHeight"] {
   return line.kind === "multiple" ? line.value * lineHeightOf(p.markRun.fontFamily) : pt(line.pt);
 }
 
-/** Space before and after is padding, which, unlike margins, adjacent paragraphs do not collapse: Word adds
- *  one paragraph's space after to the next one's space before. Word's shading and borders take in the
- *  spacing too. */
 const spacing = (p: ComputedParagraph): CSSProperties => ({ paddingTop: pt(p.spaceBeforePt), paddingBottom: pt(p.spaceAfterPt) });
 
 export function paragraphStyle(p: ComputedParagraph): CSSProperties {

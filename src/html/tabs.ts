@@ -1,37 +1,23 @@
 /** tabLayout: a paragraph's inline content cut at its tabs into boxes that put each piece of text where
  *  Word's tab stops put it, for the preview to draw without measuring text.
  *
- *  - A tab goes to the first stop past where the text before it ends (`wrappedStop` when the text wraps). That end is estimated from the
- *    text's length (ESTIMATED_EM per character, a full em for CJK); the estimate only picks the stop, and
- *    the boxes the browser lays out use the text's real width.
- *  - A left stop: the box holding the text before the tab is at least as wide as the distance to the stop,
- *    so the text after it starts there. A right stop: one box from the previous box's start to the stop
- *    holds the text before, the leader and the text after, right-aligned, so the text after ends at the
- *    stop. A center or decimal stop is drawn as a right stop past the stop by half the estimated text.
- *  - Positions are relative to the paragraph's left indent; the first line starts at the first-line
- *    indent. A hanging indent adds a stop at the left indent, as Word does. Bar stops place no text and
- *    are skipped.
- *  - Past the last stop, tabs go to the next multiple of the default tab stop (Word ignores default stops
- *    before a custom one). The browser places those itself: they stay tabs in the last span, drawn as tab
- *    characters with the default stop as the paragraph's tab-size.
- *  - A span is the last one when it has no width: it stays inline, and its text wraps. */
+ *  Word's tab rules it follows: a hanging indent adds a stop at the left indent; bar stops place no text;
+ *  default stops before a custom one are ignored; text that runs past every stop wraps, and a tab after
+ *  it goes to the last right- or center-aligned stop, as a long table-of-contents entry's page number. */
 
 import { cutInlines, isContainer } from "./inlines";
 import type { ResolvedInline, TabStop } from "./model";
 
 type Tab = Extract<ResolvedInline, { kind: "tab" }>;
 
-/** A piece of a tabbed line: content, or the gap a tab leaves, with its leader and the tab's own run. */
 export type TabItem =
   | { readonly kind: "content"; readonly inlines: readonly ResolvedInline[] }
   | { readonly kind: "gap"; readonly tab: Tab; readonly leader: TabStop["leader"] };
 
-/** widthPt: the span's width, at least (`exact` false) or exactly; null for the last span. */
 type TabSpan = { readonly widthPt: number | null; readonly exact: boolean; readonly items: readonly TabItem[] };
 
 type TabContext = {
   readonly stops: readonly TabStop[];
-  /** Where the first line's text starts, relative to the left indent. */
   readonly startPt: number;
 };
 
@@ -58,8 +44,6 @@ const tabOf = (inline: ResolvedInline): Tab | null => (inline.kind === "tab" ? i
 
 const nextStop = (at: number, context: TabContext): TabStop | undefined => context.stops.find((s) => s.posPt > at + MIN_GAP_PT);
 
-/** Text that runs past every stop wraps, and a tab after it goes from the end of its last line: to the
- *  last right- or center-aligned stop, as a long table-of-contents entry's page number. */
 function wrappedStop(at: number, context: TabContext): TabStop | undefined {
   const last = [...context.stops].reverse().find((s) => s.align !== "left");
   return last !== undefined && at > last.posPt && last.posPt > context.startPt ? last : undefined;

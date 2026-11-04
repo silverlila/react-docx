@@ -1,10 +1,10 @@
 /** docx.js writes one w:lvlOverride on every w:num: level 0's startOverride, set to the first level's
- *  `start` when that is a non-zero whole number and to 1 otherwise (createConcreteNumberingInstance). That
- *  override is accepted; any other is dropped. docx.js throws above level 9.
+ *  `start` when that is a non-zero whole number and to 1 otherwise (createConcreteNumberingInstance).
+ *  docx.js throws above level 9.
  *
  *  numId "0" means "not a list, even if the style is", and docx.js writes it as that numId. A numbering
- *  option without a style makes docx.js add pStyle ListParagraph; `custom: true` stops that. docx.js's own
- *  `default-bullet-numbering` abstractNum is counted ignored. */
+ *  option without a style makes docx.js add pStyle ListParagraph; `custom: true` stops that. docx.js adds
+ *  its own `default-bullet-numbering` abstractNum. */
 
 import type * as docx from "docx";
 import { applyFates, type FateTable, type Note } from "../ooxml/codec";

@@ -1,6 +1,4 @@
-/** `spec<P>()` is curried because TypeScript cannot infer some type arguments while others are given.
- *
- *  docx.js facts the table encodes:
+/** docx.js facts the table encodes:
  *  - Textbox accepts a `text` option and ignores it.
  *  - Textbox children are typed as inline content but written into `<w:txbxContent>`, which holds
  *    paragraphs, so a Textbox holds Paragraphs.

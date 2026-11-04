@@ -23,9 +23,6 @@ export type ThemeColors = Readonly<Record<string, string>>;
 
 export type Theme = { readonly fonts: ThemeFonts; readonly colors: ThemeColors };
 
-/** styleIds: the new id of each style whose own id docx.js gives a built-in style of the other type
- *  (`clashingStyleIds`). tableStyleBorders: each table style's borders, the default table style's under ""
- *  (`tableStyleBorders`); without it, a table reads only its own. */
 export type CodecEnv = {
   readonly theme: Theme;
   readonly styleIds?: ReadonlyMap<string, string>;
@@ -34,7 +31,6 @@ export type CodecEnv = {
 
 const NO_FONTS: ThemeFontSet = { latin: null, eastAsia: null, complex: null };
 
-/** An env with no theme, for XML read without its package. */
 export const NO_THEME_ENV: CodecEnv = { theme: { fonts: { major: NO_FONTS, minor: NO_FONTS }, colors: {} } };
 
 export type Note = {
@@ -250,7 +246,6 @@ export function requiredAttr(el: XmlElement, attribute: string, notes: Note[]): 
 
 export const stringVal: ValueReader<string> = (el, _env, notes) => requiredAttr(el, "w:val", notes);
 
-/** A reference to a style, by the id the tree gives it. */
 export const styleRefVal: ValueReader<string> = (el, env, notes) => {
   const id = requiredAttr(el, "w:val", notes);
   return id === null ? null : env.styleIds?.get(id) ?? id;

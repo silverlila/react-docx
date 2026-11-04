@@ -1,8 +1,5 @@
-/** w:ins/w:moveTo hold runs → InsertedTextRun; w:del/w:moveFrom hold runs → DeletedTextRun. Word writes a
- *  deleted run's text as w:delText and w:delInstrText; they are read as w:t and w:instrText.
- *
- *  A move is written as a deletion plus an insertion, with range marks (w:move*RangeStart/End) that carry
- *  no content. */
+/** Word writes a deleted run's text as w:delText and w:delInstrText. A move is written as a deletion plus
+ *  an insertion, with range marks (w:move*RangeStart/End) that carry no content. */
 
 import { isOwnKey } from "../schema/own";
 import type { ReadContext } from "./context";

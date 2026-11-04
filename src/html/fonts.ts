@@ -1,14 +1,11 @@
 /** What the preview knows about a font by name: Word's single line height for it, and a CSS fallback list
  *  for a browser that does not have it.
  *
- *  - Word sets a single-spaced line at the font's own height: (win ascent + win descent + external
- *    leading) / units per em, where the external leading is whatever the hhea line gap adds beyond the
- *    win metrics. LINE_HEIGHTS holds that ratio for the fonts Word documents use most, measured from the
- *    fonts' files (Times New Roman from Windows' copy, whose line gap Mac Word's copy lacks). Other fonts
- *    get DEFAULT_LINE_HEIGHT, Times New Roman's and Arial's.
- *  - The fallback list puts a metric-compatible substitute first where one exists (Carlito for Calibri,
- *    Liberation for Arial, Times New Roman and Courier New, Caladea for Cambria), then a generic family
- *    guessed from the name. */
+ *  - Word sets a single-spaced line at (win ascent + win descent + external leading) / units per em, where
+ *    the external leading is whatever the hhea line gap adds beyond the win metrics. Times New Roman's
+ *    ratio is measured from Windows' copy, because Mac Word's copy lacks the line gap.
+ *  - Metric-compatible substitutes: Carlito for Calibri, Liberation for Arial, Times New Roman and Courier
+ *    New, Caladea for Cambria. */
 
 import { own } from "../schema/own";
 
@@ -90,7 +87,6 @@ const MONOSPACE = /mono|courier|consol|code|typewriter|menlo|monaco/i;
 const SERIF =
   /(?<!sans[ -]?)serif|times|roman|garamond|georgia|cambria|antiqua|bookman|baskerville|caslon|didot|bodoni|palatino|minion|merriweather|playfair|lora|century|constantia|perpetua|goudy|calisto|bell mt|mincho|batang|song|sun\b|ming|david|traditional arabic|nazanin|lotus|mitra|zar|naskh/i;
 
-/** Word's single line height for `font`, as a multiple of its size. */
 export function lineHeightOf(font: string): number {
   return own(LINE_HEIGHTS, font) ?? DEFAULT_LINE_HEIGHT;
 }
@@ -102,7 +98,6 @@ function genericFamily(font: string): string {
 
 const quoted = (name: string): string => (name === "system-ui" ? name : `"${name.replace(/["\\]/g, "\\$&")}"`);
 
-/** A CSS font-family list for `fonts`, the run's fonts in Word's order of preference. */
 export function fontFamilyCss(fonts: readonly string[]): string {
   const names: string[] = [];
   for (const font of fonts) {

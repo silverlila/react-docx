@@ -1,5 +1,3 @@
-/** Everything the previewer does with a file, as plain functions: read it, print it as JSX, write it back. */
-
 import type { ReactElement } from "react";
 import { ELEMENTS, renderToBlob, type DocumentNode } from "@react-docx/core";
 import { readDocx, NotADocxError, type Diagnostic } from "@react-docx/core/reader";
@@ -13,15 +11,11 @@ export type LoadedFile = {
   readonly diagnostics: readonly Diagnostic[];
   readonly componentName: string;
   readonly module: GeneratedModule;
-  /** Milliseconds readDocx took. */
   readonly readMs: number;
 };
 
-/** Names a printed module already uses: the kinds it imports, and the globals it calls. */
 const TAKEN_NAMES: ReadonlySet<string> = new Set([...Object.keys(ELEMENTS), "Date", "URL"]);
 
-/** `my-resume.docx` → `MyResume`; prefixed with `Doc` when it would start with a digit, be empty, or take a
- *  name the module uses. The same rule as scripts/roundtrip.ts. */
 export function componentName(fileName: string): string {
   const pascal = fileName
     .replace(/\.docx$/i, "")
@@ -57,12 +51,10 @@ export function loadDocx(name: string, bytes: Uint8Array): LoadedFile {
   };
 }
 
-/** A sample file, written by react-docx in this browser from one of the site's example components. */
 export async function sampleBytes(element: ReactElement): Promise<Uint8Array> {
   return new Uint8Array(await (await renderToBlob(element)).arrayBuffer());
 }
 
-/** The generated component as a download: the bare .tsx, or a zip holding it and its assets/ folder. */
 export function moduleDownload(file: LoadedFile): { blob: Blob; name: string } {
   const tsx = `${file.componentName}.tsx`;
   if (file.module.assets.length === 0) {
@@ -73,7 +65,6 @@ export function moduleDownload(file: LoadedFile): { blob: Blob; name: string } {
   return { blob: new Blob([zipSync(entries)], { type: "application/zip" }), name: `${file.componentName}.zip` };
 }
 
-/** The document written back by react-docx: what a template made from this file would produce. */
 export async function rewrittenDocx(file: LoadedFile): Promise<{ blob: Blob; name: string }> {
   return { blob: await renderToBlob(file.document), name: file.name.replace(/(\.docx)?$/i, ".rewritten.docx") };
 }

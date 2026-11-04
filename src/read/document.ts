@@ -14,9 +14,6 @@
  *  - Settings are editor state and docx.js writes its own, so only the four it has options for are read,
  *    and only when on, since off is their default. The rest are counted ignored.
  *  - Custom properties are kept only as vt:lpwstr, the one value type docx.js writes.
- *  - Numbering, footnotes and comments are opened before the body, which reads them as it meets their
- *    references. Comments become Document children after the Sections. Styles are read after the body, so
- *    the lists only a style uses come after the body's.
  *  - docx.js recomputes app.xml's statistics, so app.xml is not read. */
 
 import type * as docx from "docx";

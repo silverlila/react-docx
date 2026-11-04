@@ -2,7 +2,10 @@
  *  it; and w:docDefaults → docx.js document defaults.
  *
  *  - docx.js's paragraph and character styles never write w:default.
- *  - docx.js gives a character style uiPriority 99 and unhideWhenUsed on write when they are absent. */
+ *  - docx.js gives a character style uiPriority 99 and unhideWhenUsed on write when they are absent.
+ *  - docx.js writes some built-in styles under ids Word uses for a style of the other type (its paragraph
+ *    style Strong is Word's character style Strong), and a styles.xml cannot hold both, so
+ *    `clashingStyleIds` gives each such Word style a fresh id. */
 
 import type * as docx from "docx";
 import { DEFAULT_STYLE_SLOTS } from "../schema/docx-facts";
@@ -112,8 +115,6 @@ function rawStyle(style: XmlElement, because: RawBecause, env: CodecEnv): StyleR
   return { kind: "raw", xml, because };
 }
 
-/** Word's styles whose id docx.js writes as a built-in style of the other type, each with a fresh id: Word's
- *  character style Strong is docx.js's paragraph style Strong, and a styles.xml cannot hold both. */
 export function clashingStyleIds(styles: XmlElement | null): ReadonlyMap<string, string> {
   const renames = new Map<string, string>();
   const all = elementsOf(styles).filter((el) => el.name === "w:style");
@@ -133,7 +134,6 @@ export function clashingStyleIds(styles: XmlElement | null): ReadonlyMap<string,
 
 const STYLE_REFERENCES = new Set(["w:rStyle", "w:pStyle", "w:tblStyle", "w:basedOn", "w:link", "w:next"]);
 
-/** `el` with its style references following `clashingStyleIds`' renames, for XML kept verbatim. */
 export function withRenamedStyles(el: XmlElement, renames: ReadonlyMap<string, string> | undefined): XmlElement {
   if (renames === undefined || renames.size === 0) return el;
   const walk = (node: XmlElement): XmlElement => {

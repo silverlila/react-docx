@@ -50,7 +50,6 @@ function Footer() {
   );
 }
 
-/** Mounts one page inside the site's header and footer. Each HTML entry calls this once. */
 export function mount(current: Page, page: ReactNode): void {
   createRoot(document.getElementById("root")!).render(
     <StrictMode>

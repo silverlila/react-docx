@@ -1,16 +1,5 @@
-/** Builds a .docx in memory from XML strings, for reader tests. Adapted from folio's
- *  packages/rebuild/test/docx-fixture.ts.
- *
- *  - `body` is the inner XML of `w:body`; `styles`, `numbering`, `footnotes`, `comments` are the inner XML
- *    of their part's root; `theme` is the whole `a:theme` element; `core` is the inner XML of
- *    `cp:coreProperties`. Each part given gets its relationship and content-type override.
- *  - `rels` is extra inner XML for word/_rels/document.xml.rels. The fixture's own relationships use ids
- *    starting `rIdFixture`, so a test's `rId1`… never collides with them.
- *  - `parts` and `media` are written at their zip paths as given. */
-
 import { strToU8, zipSync } from "fflate";
 
-/** The namespace declarations Word writes on a part's root; the reader ignores them. */
 export const NAMESPACES = [
   'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"',
   'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"',
@@ -26,7 +15,6 @@ export const NAMESPACES = [
   'xmlns:w10="urn:schemas-microsoft-com:office:word"',
 ].join(" ");
 
-/** The first 16 bytes of a PNG file. */
 export const PICTURE = new Uint8Array([
   0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
 ]);
@@ -54,7 +42,6 @@ const CORE_NAMESPACES = [
   'xmlns:dcterms="http://purl.org/dc/terms/"',
 ].join(" ");
 
-/** The word/ parts a fixture may carry, with their root element, relationship type and content type. */
 const WORD_PARTS = [
   { key: "styles", root: "w:styles", type: `${OFFICE_RELS}/styles`, content: `${WORD_TYPES}.styles+xml` },
   { key: "numbering", root: "w:numbering", type: `${OFFICE_RELS}/numbering`, content: `${WORD_TYPES}.numbering+xml` },
@@ -109,5 +96,4 @@ export function docx(parts: FixtureParts): Uint8Array {
   return zipSync(files);
 }
 
-/** A part root as Word writes it, e.g. `part("w:ftr", "<w:p>…</w:p>")` for `word/footer1.xml`. */
 export const part = (root: string, inside: string): string => wrapped(root, inside);

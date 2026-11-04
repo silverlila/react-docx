@@ -264,8 +264,6 @@ function readGrid(tblGrid: XmlElement | null, notes: Note[]): number[] | null {
 const TABLE_SIDES = ["top", "left", "bottom", "right", "insideHorizontal", "insideVertical"] as const;
 const NO_BORDER: docx.IBorderOptions = { style: "none", size: 0, color: "auto" };
 
-/** Each table style's borders with its basedOn chain's beneath them, by style id; the default table style's
- *  (w:default="1") also under "". */
 export function tableStyleBorders(styles: XmlElement | null, env: CodecEnv): ReadonlyMap<string, docx.ITableBordersOptions> {
   const own = new Map<string, { basedOn: string | null; borders: docx.ITableBordersOptions }>();
   let defaultId: string | null = null;
@@ -290,8 +288,6 @@ export function tableStyleBorders(styles: XmlElement | null, env: CodecEnv): Rea
   return merged;
 }
 
-/** The sides a table does not give are its style's, or none: what Word draws, which docx.js would
- *  otherwise write as single lines. */
 function withStyleBorders(options: Draft<TableOptions>, env: CodecEnv, notes: Note[]): void {
   if (env.tableStyleBorders === undefined) return;
   const own = options.borders ?? {};

@@ -1,10 +1,5 @@
-/** AC9: the reader against the writer (decision 10).
- *
- *  - react-docx output is an exact fixed point: read, write, read gives the same tree and the same XML.
- *  - Word-shaped input is stable after one write, and its first read reports exactly what it loses.
- *  - Real files in test/fixtures/real/ (gitignored, private) get the same stability check; their
- *    diagnostics are printed, not pinned. A real file may be long (a thesis takes seconds), so each gets
- *    REAL_FILE_TIMEOUT_MS. */
+/** vitest fails a suite with no tests, so the real-file suite is skipped, not left empty, when there are
+ *  no real files. */
 
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
@@ -21,7 +16,6 @@ const REAL = join(__dirname, "fixtures", "real");
 const read = (b: Uint8Array) => readDocx(b).document;
 const write = async (t: DocumentNode) => new Uint8Array(await renderToBuffer(t));
 
-/** Each real .docx, by file name; none when the folder is absent. */
 function realFiles(): { name: string; bytes: Uint8Array }[] {
   if (!existsSync(REAL)) return [];
   return readdirSync(REAL)
@@ -29,15 +23,11 @@ function realFiles(): { name: string; bytes: Uint8Array }[] {
     .map((name) => ({ name, bytes: new Uint8Array(readFileSync(join(REAL, name))) }));
 }
 
-/** t2 = read(write(read(bytes))) and t3 = read(write(t2)). */
 async function twoWrites(bytes: Uint8Array): Promise<{ t2: DocumentNode; t3: DocumentNode }> {
   const t2 = read(await write(read(bytes)));
   return { t2, t3: read(await write(t2)) };
 }
 
-/** What the first read of each Word-shaped fixture reports, in report order. Theme fonts in w:docDefaults
- *  resolve, but Word's empty complex-script theme font cannot; settings, latent styles and editing marks
- *  are ignored noise. Word's last-rendered page breaks are kept raw, for the preview to break pages at. */
 const LOSSES: Readonly<Record<string, readonly { kind: string; element: string }[]>> = {
   resume: [
     { kind: "dropped", element: "w:tblLook" },
@@ -196,7 +186,6 @@ describe("what the round trip found in the reader", () => {
 const REAL_FILES = realFiles();
 const REAL_FILE_TIMEOUT_MS = 30_000;
 
-/** Skipped, not empty, when there are no real files: vitest fails a suite with no tests. */
 describe.skipIf(REAL_FILES.length === 0)("real files are stable after one write", () => {
   test.each(REAL_FILES.map((f) => [f.name, f] as const))("%s", async (name, { bytes }) => {
     console.info(name, JSON.stringify(pairs(readDocx(bytes).diagnostics)));

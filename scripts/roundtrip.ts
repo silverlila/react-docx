@@ -1,14 +1,5 @@
-/** pnpm run roundtrip <file.docx> [more.docx …]
- *
- *  Reads each file and writes it back, into .roundtrip/<name>/:
- *  - roundtrip.docx: the file read with readDocx and written with renderToBuffer;
- *  - diagnostics.json: everything kept raw, resolved or dropped;
- *  - <Name>.tsx: the tree printed as a React component (PascalCase of the file name, prefixed with `Doc`
- *    when that would clash with a name the module uses), plus assets/ when the document has images;
- *  - preview.html: the read tree drawn by DocxPreview;
- *  - original.pdf and roundtrip.pdf, rendered by LibreOffice when `soffice` is on PATH. When LibreOffice
- *    fails on a file, that file's PDFs are skipped with an error and the run goes on.
- *  It prints a summary of the diagnostics per file, and exits 1 if any file failed to read or write. */
+/** soffice exits 0 when it cannot convert a file, so each PDF is checked for. Each run gives soffice a
+ *  LibreOffice profile of its own, so parallel runs do not fight over one. */
 
 import { execFileSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -24,14 +15,12 @@ import { previewHtml } from "./preview";
 const OUT = ".roundtrip";
 const TOP = 10;
 
-/** How many diagnostics of each kind; an ignored entry counts every occurrence. */
 function countsByKind(diagnostics: readonly Diagnostic[]): Record<Diagnostic["kind"], number> {
   const counts = { raw: 0, resolved: 0, dropped: 0, ignored: 0 };
   for (const d of diagnostics) counts[d.kind] += d.kind === "ignored" ? d.count : 1;
   return counts;
 }
 
-/** The `TOP` most frequent elements among diagnostics of `kind`, most frequent first. */
 function topElements(diagnostics: readonly Diagnostic[], kind: "dropped" | "raw"): [string, number][] {
   const counts = new Map<string, number>();
   for (const d of diagnostics) if (d.kind === kind) counts.set(d.element, (counts.get(d.element) ?? 0) + 1);
@@ -49,11 +38,8 @@ function summary(name: string, dir: string, diagnostics: readonly Diagnostic[]):
   return lines.join("\n");
 }
 
-/** Names a printed module already uses: the kinds it imports, and the globals it calls. */
 const TAKEN_NAMES: ReadonlySet<string> = new Set([...Object.keys(ELEMENTS), "Date", "URL"]);
 
-/** `my-resume` → `MyResume`; prefixed with `Doc` when it would start with a digit, be empty, or take a
- *  name the module uses (`document.docx` → `DocDocument`). */
 function componentName(name: string): string {
   const pascal = name
     .split(/[^A-Za-z0-9]+/)
@@ -62,7 +48,6 @@ function componentName(name: string): string {
   return /^[A-Za-z]/.test(pascal) && !TAKEN_NAMES.has(pascal) ? pascal : `Doc${pascal}`;
 }
 
-/** Writes the tree as <componentName>.tsx and its assets into `dir`. */
 function writeComponent(document: DocumentNode, name: string, dir: string): void {
   const component = componentName(name);
   const { source, assets } = printJsx(document, { componentName: component });
@@ -73,7 +58,6 @@ function writeComponent(document: DocumentNode, name: string, dir: string): void
   }
 }
 
-/** Whether `soffice` runs; asked once. */
 function hasSoffice(): boolean {
   try {
     execFileSync("soffice", ["--version"], { stdio: "ignore" });
@@ -83,9 +67,6 @@ function hasSoffice(): boolean {
   }
 }
 
-/** Converts each .docx to a PDF beside it, with a LibreOffice profile of this run's own so parallel runs
- *  do not fight over one. soffice exits 0 when it cannot convert a file, so each PDF is checked. When it
- *  exits non-zero, the failure is reported and these PDFs are skipped, so the run goes on. */
 function toPdf(files: readonly string[], dir: string, profile: string): void {
   const flag = `-env:UserInstallation=${pathToFileURL(profile).href}`;
   try {

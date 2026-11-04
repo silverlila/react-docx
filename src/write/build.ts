@@ -9,7 +9,7 @@
  *    written just as well. It reserves footnote ids −1 and 0 for its separators, so footnotes are
  *    numbered 1..n.
  *  - It spreads `styles` over its default style list, so raw styles passed as `importedStyles` would
- *    replace every default. They are appended after docx.js has built its own.
+ *    replace every default.
  *  - It ignores a run's `text` whenever `children` is truthy, even `[]`.
  *  - DeletedTextRun has no case for PageNumber.CURRENT_SECTION and writes the deleted word "SECTION",
  *    so that field is written as raw XML.

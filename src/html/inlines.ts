@@ -1,7 +1,3 @@
-/** Walks over a paragraph's resolved inlines, shared by paginate (pages.ts) and tabLayout (tabs.ts). Links
- *  and anchors are the inlines that hold inlines: a walk goes into them, and a cut through one leaves a copy
- *  of it around each part of its content. */
-
 import type { ResolvedInline } from "./model";
 
 export type ContainerInline = Extract<ResolvedInline, { kind: "link" | "anchor" }>;
@@ -9,8 +5,6 @@ export type ContainerInline = Extract<ResolvedInline, { kind: "link" | "anchor" 
 export const isContainer = (inline: ResolvedInline): inline is ContainerInline =>
   inline.kind === "link" || inline.kind === "anchor";
 
-/** `inlines` cut at each inline that `cutOf` turns into a cut, top level and inside links and anchors:
- *  n + 1 segments around n cuts. */
 export function cutInlines<C>(
   inlines: readonly ResolvedInline[],
   cutOf: (inline: ResolvedInline) => C | null,

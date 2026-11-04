@@ -1,5 +1,3 @@
-/** One small icon set, all 16px on a 24px grid at 1.75 stroke, so every icon on the site has the same weight. */
-
 import type { ReactNode, SVGProps } from "react";
 
 function Icon({ children, ...props }: SVGProps<SVGSVGElement> & { children: ReactNode }) {
@@ -83,7 +81,6 @@ export const GitHubIcon = () => (
   </svg>
 );
 
-/** The brand mark: a page with a folded corner, holding a pair of angle brackets. */
 export const BrandMark = () => (
   <svg className="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
     <rect width="32" height="32" rx="8" fill="var(--accent)" />
