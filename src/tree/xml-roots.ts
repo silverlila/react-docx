@@ -1,6 +1,9 @@
 /** Reads a RawXml fragment's top-level element names, or says why it is not well-formed or why docx.js
  *  cannot write it. It uses no XML parser, because canonicalize also runs in browsers.
  *
+ *  - An attribute named r:… is a relationship reference (r:id, r:embed, …). docx.js cannot write its
+ *    target, so it is its own kind and callers word it themselves. r: in text is not one.
+ *
  *  - XML whitespace is only space, tab, CR and LF. String.prototype.trim also strips U+00A0, U+FEFF and
  *    others, so it is not used.
  *  - docx.js writes an element's text after its last child element and drops the element before it, so
@@ -11,7 +14,8 @@
 export type XmlRoots =
   | { readonly kind: "roots"; readonly roots: readonly string[] }
   | { readonly kind: "malformed"; readonly reason: string }
-  | { readonly kind: "unwritable"; readonly reason: string };
+  | { readonly kind: "unwritable"; readonly reason: string }
+  | { readonly kind: "relationship"; readonly reason: string };
 
 const SKIPPED = [
   { open: "<!--", close: "-->", topLevel: true },
@@ -83,6 +87,9 @@ function attributesProblem(name: string, attributes: string): XmlRoots | null {
     const [, attribute, doubleQuoted, singleQuoted] = match;
     if (seen.has(attribute)) return malformed(`<${name}> has the attribute ${attribute} twice`);
     seen.add(attribute);
+    if (attribute.startsWith("r:")) {
+      return { kind: "relationship", reason: `<${name}> has the relationship reference ${attribute}` };
+    }
     const problem = referenceProblem(doubleQuoted ?? singleQuoted);
     if (problem !== null) return problem;
     at = ATTRIBUTE.lastIndex;

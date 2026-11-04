@@ -10,7 +10,7 @@
  *    character style read from Word gains both on its first write (decision 10). */
 
 import type * as docx from "docx";
-import { attrOf, childNamed, hasRelationship, serializeXml, type XmlElement } from "../read/xml";
+import { attrOf, childNamed, serializeXml, type XmlElement } from "../read/xml";
 import { xmlRoots } from "../tree/xml-roots";
 import {
   applyFates,
@@ -111,11 +111,11 @@ function rawBecause(style: XmlElement, type: string): RawBecause | null {
 }
 
 function rawStyle(style: XmlElement, because: RawBecause): StyleRead | StyleDropped {
-  if (hasRelationship(style)) {
-    return { kind: "dropped", because: "it carries an r: relationship reference, which raw XML cannot keep" };
-  }
   const xml = serializeXml(style);
   const roots = xmlRoots(xml);
+  if (roots.kind === "relationship") {
+    return { kind: "dropped", because: "it carries an r: relationship reference, which raw XML cannot keep" };
+  }
   if (roots.kind !== "roots") return { kind: "dropped", because: roots.reason };
   return { kind: "raw", xml, because };
 }

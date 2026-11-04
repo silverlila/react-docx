@@ -381,6 +381,11 @@ describe("the generic fallback", () => {
     expect(diagnosticsOf(bytes)).toContainEqual(expect.objectContaining({ kind: "raw", at: [0, 0], element: "w:sdt" }));
   });
 
+  test("a w:sdt whose text reads like an r: attribute is still kept as block RawXml", () => {
+    const sdt = `<w:sdt><w:sdtContent><w:p>${run("see r:id= here")}</w:p></w:sdtContent></w:sdt>`;
+    expect(blocks(docx({ body: sdt }))).toEqual([node("RawXml", { xml: sdt })]);
+  });
+
   test("a w:sdt holding a relationship is unwrapped: its content is read and the w:sdt dropped", () => {
     const bytes = docx({
       body: `<w:sdt><w:sdtContent><w:p><w:hyperlink r:id="rId1">${run("link")}</w:hyperlink></w:p></w:sdtContent></w:sdt>`,

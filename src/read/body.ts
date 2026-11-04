@@ -58,7 +58,7 @@ import {
 import { parseDrawing, parseVmlImage, readDrawing, readPicture } from "./images";
 import { isPlainMath, readMath } from "./math";
 import { alternateContent, textBoxOf, textBoxStyle, type TextBox } from "./objects";
-import { attrOf, childNamed, elementsOf, hasRelationship, serializeXml, textOf, type XmlElement } from "./xml";
+import { attrOf, childNamed, elementsOf, serializeXml, textOf, type XmlElement } from "./xml";
 
 type Slot = "block" | "inline" | "run";
 type Children = readonly (AuthorNode | string)[];
@@ -152,11 +152,11 @@ const rawXml = (xml: string): AuthorNode => node("RawXml", { xml });
  *  serialized fragment, and every root is one RAW_XML_ROOTS allows in `slot` (canonicalize would throw
  *  otherwise). */
 export function rawXmlOf(elements: readonly XmlElement[], slot: Slot): RawXmlCheck {
-  if (elements.some(hasRelationship)) {
-    return { kind: "refused", reason: "it carries an r: relationship reference, which docx.js cannot write" };
-  }
   const xml = elements.map(serializeXml).join("");
   const roots = xmlRoots(xml);
+  if (roots.kind === "relationship") {
+    return { kind: "refused", reason: "it carries an r: relationship reference, which docx.js cannot write" };
+  }
   if (roots.kind !== "roots") return { kind: "refused", reason: roots.reason };
   const allowed: readonly string[] = RAW_XML_ROOTS[slot];
   const stray = roots.roots.find((root) => !allowed.includes(root));

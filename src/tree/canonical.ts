@@ -49,7 +49,6 @@ const SUGAR: readonly string[] = ["List", "ListItem", "Break"];
 const PAGE_NUMBERS: readonly string[] = PAGE_NUMBER_VALUES;
 const STYLE_SLOTS = new Map(Object.entries(DEFAULT_STYLE_SLOTS));
 const DATA_URL_PREFIX = /^data:[^,]*;base64,/;
-const RELATIONSHIP_ATTRIBUTE = /\sr:[A-Za-z]+\s*=/;
 const STYLE_ID = /w:styleId="([^"]+)"/g;
 const COMMENT_MARKS: readonly Kind[] = ["CommentRangeStart", "CommentRangeEnd", "CommentReference"];
 const LOOSE_PARAGRAPH: AuthorNode = { type: "Paragraph", props: {}, children: [] };
@@ -416,15 +415,15 @@ function assertFragment({ xml, label, allowedRoots, where }: Fragment, path: rea
   const scanned = xmlRoots(xml);
   if (scanned.kind === "malformed") throw new TreeError(path, `${label} is not well-formed: ${scanned.reason}`);
   if (scanned.kind === "unwritable") throw new TreeError(path, `${label} cannot be written: ${scanned.reason}`);
-  if (scanned.roots.length === 0) throw new TreeError(path, `${label} must contain at least one element`);
-  const stray = scanned.roots.find((root) => !allowedRoots.includes(root));
-  if (stray !== undefined) throw new TreeError(path, `${label} <${stray}> is not allowed in ${where}`);
-  if (RELATIONSHIP_ATTRIBUTE.test(xml)) {
+  if (scanned.kind === "relationship") {
     throw new TreeError(
       path,
       `${label} cannot carry relationship references (r:id, r:embed, …): docx.js cannot write their targets`
     );
   }
+  if (scanned.roots.length === 0) throw new TreeError(path, `${label} must contain at least one element`);
+  const stray = scanned.roots.find((root) => !allowedRoots.includes(root));
+  if (stray !== undefined) throw new TreeError(path, `${label} <${stray}> is not allowed in ${where}`);
 }
 
 function assertRawXmlFits(parent: Parent, node: AuthorNode, path: readonly string[]): void {

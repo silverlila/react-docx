@@ -96,7 +96,3 @@ export const isOn = (el: XmlElement | null): boolean => el !== null && !OFF.has(
 
 export const textOf = (el: XmlElement): string =>
   el.children.map((child) => (typeof child === "string" ? child : textOf(child))).join("");
-
-/** Whether `el` or any element under it has an r: attribute (a relationship reference: r:id, r:embed, …). */
-export const hasRelationship = (el: XmlElement): boolean =>
-  Object.keys(el.attributes).some((name) => name.startsWith("r:")) || elementsOf(el).some(hasRelationship);

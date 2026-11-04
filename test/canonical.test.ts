@@ -544,6 +544,14 @@ describe("xmlRoots", () => {
     expect(xmlRoots(xml)).toEqual({ kind: "unwritable", reason });
   });
 
+  test("an r: attribute anywhere is a relationship reference; r: in text or another prefix is not", () => {
+    expect(xmlRoots('<w:r><w:drawing><a:blip r:embed="rId5"/></w:drawing></w:r>')).toEqual({
+      kind: "relationship",
+      reason: "<a:blip> has the relationship reference r:embed",
+    });
+    expect(xmlRoots('<w:r w14:paraId="1"><w:t>see r:id= here</w:t></w:r>')).toEqual({ kind: "roots", roots: ["w:r"] });
+  });
+
   test("XML whitespace between elements is indentation, not mixed content, written as text or a reference", () => {
     expect(xmlRoots("<w:r>\n  <w:rPr/>\n\t<w:t> a </w:t>\r\n</w:r>")).toEqual({ kind: "roots", roots: ["w:r"] });
     expect(xmlRoots("<w:r><w:rPr/>&#32;&#x9;<![CDATA[ ]]><w:t/></w:r>")).toEqual({ kind: "roots", roots: ["w:r"] });
@@ -666,6 +674,11 @@ describe("14. RawXml relationship references", () => {
 
   test("r: in text or in another prefix's attribute name is not a relationship reference", () => {
     const xml = '<w:r w14:paraId="1"><w:t>for:id=1 r:id</w:t></w:r>';
+    expect(() => canon(doc(n("Paragraph", {}, n("RawXml", { xml }))))).not.toThrow();
+  });
+
+  test("text that reads like an r: attribute is not a relationship reference", () => {
+    const xml = "<w:r><w:t>see r:id= here</w:t></w:r>";
     expect(() => canon(doc(n("Paragraph", {}, n("RawXml", { xml }))))).not.toThrow();
   });
 });
