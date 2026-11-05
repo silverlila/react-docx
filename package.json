@@ -1,6 +1,6 @@
 {
   "name": "@react-docx/core",
-  "version": "0.1.8",
+  "version": "0.2.0",
   "description": "A React custom renderer for generating Microsoft Word documents (.docx) using JSX",
   "keywords": [
     "document",
