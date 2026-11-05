@@ -2,6 +2,8 @@
 
 Generate Microsoft Word documents (`.docx`) using React components and JSX.
 
+Docs, and a previewer that opens any `.docx` in your browser: **[silverlila.github.io/react-docx](https://silverlila.github.io/react-docx/)**
+
 ## Why React-DOCX?
 
 Personally, I’ve always felt that when it comes to building documents, XML-style templating languages are the most natural fit. The docx library is excellent — it’s well-designed, feature-rich, and gives you full control over every aspect of a Word document.
@@ -9,6 +11,8 @@ Personally, I’ve always felt that when it comes to building documents, XML-sty
 However, working with it directly can feel a bit cumbersome at times, especially when managing deeply nested structures. That’s why I built React-DOCX — not to replace or reinvent docx, but to port it into a more expressive JSX syntax.
 
 This project uses the same types, the same structure, and still depends on docx under the hood. The only difference is that you can now use React’s familiar patterns — components, hooks, and context — to build documents in a cleaner and more declarative way.
+
+It also works the other way. It reads an existing `.docx` into the same document tree your JSX renders to, prints that tree as a React component you can keep editing, and draws it as HTML for a preview in the browser.
 
 ### Design Philosophy
 
@@ -24,16 +28,21 @@ This project uses the same types, the same structure, and still depends on docx 
 - **Direct DOCX API Mapping** - Props map directly to the `docx` library API
 - **React Patterns** - Supports Context, hooks, and component composition
 - **Zero Configuration** - Just import and start creating documents
+- **Read Word Files** - `readDocx` turns a `.docx` into a tree you can render back, and lists what it could not keep
+- **Generate JSX** - `printJsx` turns that tree into the source of a React component
+- **HTML Preview** - `DocxPreview` draws a document as pages of HTML without loading docx.js
 
 ## Installation
 
 ```bash
-npm install @react-docx/core
+npm install @react-docx/core docx react
 # or
-yarn add @react-docx/core
+yarn add @react-docx/core docx react
 # or
-pnpm add @react-docx/core
+pnpm add @react-docx/core docx react
 ```
+
+`react` (18.2 or later, including 19) and `docx` (9.5 or later) are peer dependencies, so your project picks their versions. TypeScript types ship with the package.
 
 ## Quick Start
 
@@ -256,6 +265,70 @@ Put `<Header>` and `<Footer>` directly inside a `<Section>`. They take the same 
 - Two headers, or two footers, of the same type in one section throw.
 - A `Header` or `Footer` anywhere except directly inside a `Section` throws.
 
+## Reading, Generating and Previewing
+
+### Reading a .docx
+
+`readDocx` turns a `.docx` into the same tree that `renderToTree` returns. It is synchronous, takes a `Uint8Array` or `ArrayBuffer`, and needs neither Node nor docx.js, so it runs in the browser too.
+
+```tsx
+import { readFileSync, writeFileSync } from "node:fs";
+import { renderToBuffer } from "@react-docx/core";
+import { readDocx } from "@react-docx/core/reader";
+
+const { document, diagnostics } = readDocx(readFileSync("resume.docx"));
+
+writeFileSync("resume.rewritten.docx", await renderToBuffer(document));
+```
+
+Bytes that are not a Word file throw `NotADocxError`. The first write can normalise a file Word saved; reading and writing again after that gives the same document every time.
+
+Some of what Word stores has no react-docx prop. `diagnostics` lists each such element with the part of the file it came from and, where it has one, its path in the tree:
+
+- `dropped` - docx.js cannot write it, so it is gone after a write. A cropped image comes back uncropped, for example.
+- `raw` - kept as a `RawXml` element. It is written back exactly, but cannot be edited as props.
+- `resolved` - a theme reference, such as a theme colour, replaced with its literal value.
+- `ignored` - editing noise, such as revision ids and spell-check marks, counted by element name.
+
+### Generating JSX
+
+`printJsx` prints a tree as the source of a React component. Design a template in Word, read it, and keep editing it as code: rendering the printed component gives the same tree back.
+
+```tsx
+import { componentName, printJsx } from "@react-docx/core/codegen";
+
+const name = componentName("my resume.docx"); // "MyResume"
+const { source, assets } = printJsx(document, { componentName: name });
+
+writeFileSync(`${name}.tsx`, source);
+for (const asset of assets) writeFileSync(asset.path, asset.bytes); // assets/image1.png, …
+```
+
+- Styles and numbering become constants at the top of the module, images become files under `assets/`, and the module imports only the components the document uses.
+- `componentName` turns a file name into a name `printJsx` accepts. A name that would start with a digit, or that is already a component's name such as `Paragraph`, gets a `Doc` prefix.
+- `importFrom` sets where the module imports the components from. It defaults to `"@react-docx/core"`.
+
+### Previewing as HTML
+
+`DocxPreview` draws a tree as HTML on pages of the document's page size, with its fonts, spacing, lists, tables, images, headers, footers and footnotes. It takes a tree rather than children, so render your JSX to a tree first:
+
+```tsx
+import { useMemo } from "react";
+import { DocxPreview, renderToTree } from "@react-docx/core/html";
+
+export function ResumePreview({ data }: { data: ResumeData }) {
+  const tree = useMemo(() => renderToTree(<Resume data={data} />), [data]);
+  return <DocxPreview document={tree} className="preview" />;
+}
+```
+
+- A page ends at a page break, before a section that is not continuous, before a paragraph with `pageBreakBefore`, and where Word ended it when it last saved the file. In a browser the preview also measures each page and moves what does not fit to the next one. Rendered on a server, a page that overflows grows instead.
+- Every style is inline, so it needs no stylesheet. It forwards its ref and any div props.
+- Every block carries `data-docx-path`, its path in the tree, for linking your UI to a place in the document.
+- Links keep only `http:`, `https:`, `mailto:` and in-document targets, because a file's links come from whoever wrote it.
+- Lines and pages break where the browser's text layout puts them, so a page can end a few lines earlier or later than in Word. Fonts are the browser's: one the viewer lacks falls back to another.
+- `resolveDocument` returns the pages as data, the same ones `DocxPreview` draws, for building a preview of your own.
+
 ## Upgrading from 0.1
 
 - **Versions.** React 18.2 or later (including 19) and docx 9.5 or later are required. React 16 and 17 and docx 8 are no longer supported.
@@ -272,6 +345,17 @@ Put `<Header>` and `<Footer>` directly inside a `<Section>`. They take the same 
 - **Lists.** `List`'s `level` prop is removed: nest a `<List>` in a `<List>` or a `<ListItem>` instead. Each `<List>` now numbers from 1, where before every numbered list continued the previous one, and a nested list keeps its own `type`.
 
 ## API Reference
+
+### Entry Points
+
+| Import                     | What it gives you                                                                        |
+| -------------------------- | ---------------------------------------------------------------------------------------- |
+| `@react-docx/core`         | The components, the rendering functions, `TreeError`, `ELEMENTS`, `DEFAULT_NUMBERING`    |
+| `@react-docx/core/reader`  | `readDocx`, `NotADocxError`, and the `Diagnostic` and `ReadResult` types                 |
+| `@react-docx/core/codegen` | `printJsx`, `componentName`                                                              |
+| `@react-docx/core/html`    | `DocxPreview`, `resolveDocument`, and `renderToTree` again so a preview needs one import |
+
+The `/reader` and `/html` entries load no docx.js, so a browser bundle that only reads or previews a document stays small.
 
 ### Components
 
@@ -290,19 +374,26 @@ Each component takes the options of its docx.js counterpart as props: the class 
 
 ### Rendering Functions
 
-Each takes a JSX element, or a tree returned by `renderToTree`.
+Each takes a JSX element, or a tree returned by `renderToTree` or `readDocx`.
 
-- `renderToBuffer(source)` - Returns `Promise<Buffer>`
-- `renderToBlob(source)` - Returns `Promise<Blob>`
-- `renderToBase64(source)` - Returns `Promise<string>`
-- `renderToTree(element)` - Returns the document as plain data, the same for every way of writing it
+- `renderToBuffer(source)` - Returns `Promise<Buffer>`, for files or HTTP responses in Node
+- `renderToBlob(source)` - Returns `Promise<Blob>`, for downloads in the browser
+- `renderToBase64(source)` - Returns `Promise<string>`, for APIs that take base64
+- `renderToTree(element)` - Returns the document as plain data (`DocumentNode`), the same for every way of writing it
+
+### Other Exports
+
+- `TreeError` - what rendering throws when an element sits where Word does not allow it, or a prop would write a file Word cannot open. Its message names the element's place, such as `Document > Section[0] > PageBreak[0]`.
+- `ELEMENTS` - every component, with its docx.js class and the children it allows.
+- `DEFAULT_NUMBERING` - the `"NumberedList"` and `"BulletList"` configs that `List` uses unless the `Document`'s `numbering` sets its own. Copy it as a starting point for your own markers.
 
 ## Type Safety
 
 All components have full TypeScript support. Props map directly to the `docx` library interfaces, so you can reference [docx documentation](https://docx.js.org/) for detailed prop options.
 
 ```tsx
-import { DocumentProps, SectionProps, ParagraphProps, TextRunProps } from "@react-docx/core";
+import type { DocumentProps, SectionProps, ParagraphProps, TextRunProps } from "@react-docx/core";
+import type { DocumentNode, Node, Kind, Props } from "@react-docx/core";
 ```
 
 ## Examples
@@ -311,11 +402,30 @@ See the `/examples` directory for complete examples:
 
 - **basic.tsx** - Basic document with text formatting
 - **advanced.tsx** - Tables, hyperlinks, page breaks
+- **header-footer.tsx** - Headers, footers and page numbers
 - **resume.tsx** - Professional resume template
+
+Run `pnpm run examples` to write each one's `.docx` next to it.
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit issues or pull requests.
+Issues and pull requests are welcome. CI fails a pull request with a lint error or unformatted code, so run `pnpm run lint` and `pnpm run fmt` before you push.
+
+```bash
+pnpm install
+pnpm test               # vitest
+pnpm run type-check     # tsc
+pnpm run lint           # oxlint
+pnpm run fmt            # oxfmt, rewrites files; fmt:check only reports
+pnpm run build          # tsup, writes dist/
+```
+
+Scripts for checking a change against real Word files:
+
+- `pnpm run roundtrip <file.docx> …` - reads each file, writes it back and prints it as JSX, into `.roundtrip/<name>/` with the diagnostics. With LibreOffice's `soffice` on your PATH it also writes a PDF of the original and of the rewrite, to compare.
+- `pnpm run preview <file.docx | module.tsx> [out.html]` - writes the HTML preview to `.preview/`. A `.tsx` module imports `@react-docx/core` from `dist/`, so run `pnpm run build` first.
+
+The website, with the docs and a previewer that opens any `.docx` in the browser, is in `site/`. It runs on the library's source, so it needs no build: `cd site && pnpm install && pnpm dev`.
 
 ## License
 
