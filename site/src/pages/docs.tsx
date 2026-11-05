@@ -372,8 +372,8 @@ writeFileSync("resume.rewritten.docx", await renderToBuffer(document));`}
             ]}
           />
           <p>
-            The <a href="/preview/">previewer</a> shows these for any file you open, and links each one to its place in
-            the preview.
+            The <a href={`${import.meta.env.BASE_URL}preview/`}>previewer</a> shows these for any file you open, and
+            links each one to its place in the preview.
           </p>
         </Section>
 

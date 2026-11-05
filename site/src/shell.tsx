@@ -8,15 +8,15 @@ export const GITHUB_URL = "https://github.com/silverlila/react-docx";
 type Page = "home" | "preview" | "docs";
 
 const NAV: readonly { page: Page; href: string; label: string }[] = [
-  { page: "docs", href: "/docs/", label: "Docs" },
-  { page: "preview", href: "/preview/", label: "Preview" },
+  { page: "docs", href: `${import.meta.env.BASE_URL}docs/`, label: "Docs" },
+  { page: "preview", href: `${import.meta.env.BASE_URL}preview/`, label: "Preview" },
 ];
 
 function Header({ current }: { current: Page }) {
   return (
     <header className="site-header">
       <div className="container">
-        <a className="brand" href="/" aria-current={current === "home" ? "page" : undefined}>
+        <a className="brand" href={import.meta.env.BASE_URL} aria-current={current === "home" ? "page" : undefined}>
           <BrandMark />
           react-docx
         </a>
@@ -41,8 +41,8 @@ function Footer() {
       <div className="container">
         <span>react-docx · MIT licence · built on docx.js</span>
         <nav aria-label="Footer">
-          <a href="/docs/">Docs</a>
-          <a href="/preview/">Preview a file</a>
+          <a href={`${import.meta.env.BASE_URL}docs/`}>Docs</a>
+          <a href={`${import.meta.env.BASE_URL}preview/`}>Preview a file</a>
           <a href={GITHUB_URL}>GitHub</a>
         </nav>
       </div>

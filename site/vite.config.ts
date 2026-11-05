@@ -8,6 +8,7 @@ import react from "@vitejs/plugin-react";
 const here = (path: string) => fileURLToPath(new URL(path, import.meta.url));
 
 export default defineConfig({
+  base: process.env.SITE_BASE ?? "/",
   plugins: [react()],
   resolve: {
     alias: [

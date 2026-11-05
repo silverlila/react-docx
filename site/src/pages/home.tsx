@@ -68,11 +68,11 @@ function Home() {
           into JSX, and preview either one as HTML in the browser.
         </p>
         <div className="hero-actions">
-          <a className="btn btn-primary" href="/docs/">
+          <a className="btn btn-primary" href={`${import.meta.env.BASE_URL}docs/`}>
             Get started
             <ArrowRightIcon />
           </a>
-          <a className="btn btn-secondary" href="/preview/">
+          <a className="btn btn-secondary" href={`${import.meta.env.BASE_URL}preview/`}>
             Preview a .docx
           </a>
         </div>
@@ -137,7 +137,7 @@ function Home() {
               The file is read on the page and never uploaded.
             </p>
           </div>
-          <a className="btn btn-primary" href="/preview/">
+          <a className="btn btn-primary" href={`${import.meta.env.BASE_URL}preview/`}>
             Open the previewer
             <ArrowRightIcon />
           </a>
